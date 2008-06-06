@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -22,7 +22,7 @@
 ***********************************************************************/
 
 #include "glpapi.h"
-#define fault xfault1
+#define xfault xerror
 
 /*----------------------------------------------------------------------
 -- lpx_reset_parms - reset control parameters to default values.
@@ -93,31 +93,31 @@ void lpx_set_int_parm(LPX *lp, int parm, int val)
       switch (parm)
       {  case LPX_K_MSGLEV:
             if (!(0 <= val && val <= 3))
-               fault("lpx_set_int_parm: MSGLEV = %d; invalid value",
+               xfault("lpx_set_int_parm: MSGLEV = %d; invalid value\n",
                   val);
             cps->msg_lev = val;
             break;
          case LPX_K_SCALE:
             if (!(0 <= val && val <= 3))
-               fault("lpx_set_int_parm: SCALE = %d; invalid value",
+               xfault("lpx_set_int_parm: SCALE = %d; invalid value\n",
                   val);
             cps->scale = val;
             break;
          case LPX_K_DUAL:
             if (!(val == 0 || val == 1))
-               fault("lpx_set_int_parm: DUAL = %d; invalid value",
+               xfault("lpx_set_int_parm: DUAL = %d; invalid value\n",
                   val);
             cps->dual = val;
             break;
          case LPX_K_PRICE:
             if (!(val == 0 || val == 1))
-               fault("lpx_set_int_parm: PRICE = %d; invalid value",
+               xfault("lpx_set_int_parm: PRICE = %d; invalid value\n",
                   val);
             cps->price = val;
             break;
          case LPX_K_ROUND:
             if (!(val == 0 || val == 1))
-               fault("lpx_set_int_parm: ROUND = %d; invalid value",
+               xfault("lpx_set_int_parm: ROUND = %d; invalid value\n",
                   val);
             cps->round = val;
             break;
@@ -129,86 +129,86 @@ void lpx_set_int_parm(LPX *lp, int parm, int val)
             break;
          case LPX_K_OUTFRQ:
             if (!(val > 0))
-               fault("lpx_set_int_parm: OUTFRQ = %d; invalid value",
+               xfault("lpx_set_int_parm: OUTFRQ = %d; invalid value\n",
                   val);
             cps->out_frq = val;
             break;
          case LPX_K_BRANCH:
             if (!(val == 0 || val == 1 || val == 2 || val == 3))
-               fault("lpx_set_int_parm: BRANCH = %d; invalid value",
+               xfault("lpx_set_int_parm: BRANCH = %d; invalid value\n",
                   val);
             cps->branch = val;
             break;
          case LPX_K_BTRACK:
             if (!(val == 0 || val == 1 || val == 2 || val == 3))
-               fault("lpx_set_int_parm: BTRACK = %d; invalid value",
+               xfault("lpx_set_int_parm: BTRACK = %d; invalid value\n",
                   val);
             cps->btrack = val;
             break;
          case LPX_K_MPSINFO:
             if (!(val == 0 || val == 1))
-               fault("lpx_set_int_parm: MPSINFO = %d; invalid value",
+               xfault("lpx_set_int_parm: MPSINFO = %d; invalid value\n",
                   val);
             cps->mps_info = val;
             break;
          case LPX_K_MPSOBJ:
             if (!(val == 0 || val == 1 || val == 2))
-               fault("lpx_set_int_parm: MPSOBJ = %d; invalid value",
+               xfault("lpx_set_int_parm: MPSOBJ = %d; invalid value\n",
                   val);
             cps->mps_obj = val;
             break;
          case LPX_K_MPSORIG:
             if (!(val == 0 || val == 1))
-               fault("lpx_set_int_parm: MPSORIG = %d; invalid value",
+               xfault("lpx_set_int_parm: MPSORIG = %d; invalid value\n",
                   val);
             cps->mps_orig = val;
             break;
          case LPX_K_MPSWIDE:
             if (!(val == 0 || val == 1))
-               fault("lpx_set_int_parm: MPSWIDE = %d; invalid value",
+               xfault("lpx_set_int_parm: MPSWIDE = %d; invalid value\n",
                   val);
             cps->mps_wide = val;
             break;
          case LPX_K_MPSFREE:
             if (!(val == 0 || val == 1))
-               fault("lpx_set_int_parm: MPSFREE = %d; invalid value",
+               xfault("lpx_set_int_parm: MPSFREE = %d; invalid value\n",
                   val);
             cps->mps_free = val;
             break;
          case LPX_K_MPSSKIP:
             if (!(val == 0 || val == 1))
-               fault("lpx_set_int_parm: MPSSKIP = %d; invalid value",
+               xfault("lpx_set_int_parm: MPSSKIP = %d; invalid value\n",
                   val);
             cps->mps_skip = val;
             break;
          case LPX_K_LPTORIG:
             if (!(val == 0 || val == 1))
-               fault("lpx_set_int_parm: LPTORIG = %d; invalid value",
+               xfault("lpx_set_int_parm: LPTORIG = %d; invalid value\n",
                   val);
             cps->lpt_orig = val;
             break;
          case LPX_K_PRESOL:
             if (!(val == 0 || val == 1))
-               fault("lpx_set_int_parm: PRESOL = %d; invalid value",
+               xfault("lpx_set_int_parm: PRESOL = %d; invalid value\n",
                   val);
             cps->presol = val;
             break;
          case LPX_K_BINARIZE:
             if (!(val == 0 || val == 1))
-               fault("lpx_set_int_parm: BINARIZE = %d; invalid value",
-                  val);
+               xfault("lpx_set_int_parm: BINARIZE = %d; invalid value\n"
+                  , val);
             cps->binarize = val;
             break;
          case LPX_K_USECUTS:
             if (val & ~LPX_C_ALL)
-               fault("lpx_set_int_parm: USECUTS = 0x%X; invalid value",
+            xfault("lpx_set_int_parm: USECUTS = 0x%X; invalid value\n",
                   val);
             cps->use_cuts = val;
             break;
          case LPX_K_BFTYPE:
 #if 0
             if (!(1 <= val && val <= 3))
-               fault("lpx_set_int_parm: BFTYPE = %d; invalid value",
+               xfault("lpx_set_int_parm: BFTYPE = %d; invalid value\n",
                   val);
             cps->bf_type = val;
 #else
@@ -222,15 +222,15 @@ void lpx_set_int_parm(LPX *lp, int parm, int val)
                   case 3:
                      parm.type = GLP_BF_GR; break;
                   default:
-                     fault("lpx_set_int_parm: BFTYPE = %d; invalid valu"
-                        "e", val);
+                     xfault("lpx_set_int_parm: BFTYPE = %d; invalid val"
+                        "ue\n", val);
                }
                glp_set_bfcp(lp, &parm);
             }
 #endif
             break;
          default:
-            fault("lpx_set_int_parm: parm = %d; invalid parameter",
+            xfault("lpx_set_int_parm: parm = %d; invalid parameter\n",
                parm);
       }
       return;
@@ -313,7 +313,7 @@ int lpx_get_int_parm(LPX *lp, int parm)
             break;
 #endif
          default:
-            fault("lpx_get_int_parm: parm = %d; invalid parameter",
+            xfault("lpx_get_int_parm: parm = %d; invalid parameter\n",
                parm);
       }
       return val;
@@ -338,13 +338,13 @@ void lpx_set_real_parm(LPX *lp, int parm, double val)
       switch (parm)
       {  case LPX_K_RELAX:
             if (!(0.0 <= val && val <= 1.0))
-               fault("lpx_set_real_parm: RELAX = %g; invalid value",
+               xfault("lpx_set_real_parm: RELAX = %g; invalid value\n",
                   val);
             cps->relax = val;
             break;
          case LPX_K_TOLBND:
             if (!(DBL_EPSILON <= val && val <= 0.001))
-               fault("lpx_set_real_parm: TOLBND = %g; invalid value",
+               xfault("lpx_set_real_parm: TOLBND = %g; invalid value\n",
                   val);
 #if 0
             if (cps->tol_bnd > val)
@@ -357,7 +357,7 @@ void lpx_set_real_parm(LPX *lp, int parm, double val)
             break;
          case LPX_K_TOLDJ:
             if (!(DBL_EPSILON <= val && val <= 0.001))
-               fault("lpx_set_real_parm: TOLDJ = %g; invalid value",
+               xfault("lpx_set_real_parm: TOLDJ = %g; invalid value\n",
                   val);
 #if 0
             if (cps->tol_dj > val)
@@ -370,7 +370,7 @@ void lpx_set_real_parm(LPX *lp, int parm, double val)
             break;
          case LPX_K_TOLPIV:
             if (!(DBL_EPSILON <= val && val <= 0.001))
-               fault("lpx_set_real_parm: TOLPIV = %g; invalid value",
+               xfault("lpx_set_real_parm: TOLPIV = %g; invalid value\n",
                   val);
             cps->tol_piv = val;
             break;
@@ -388,24 +388,24 @@ void lpx_set_real_parm(LPX *lp, int parm, double val)
             break;
          case LPX_K_TOLINT:
             if (!(DBL_EPSILON <= val && val <= 0.001))
-               fault("lpx_set_real_parm: TOLINT = %g; invalid value",
+               xfault("lpx_set_real_parm: TOLINT = %g; invalid value\n",
                   val);
             cps->tol_int = val;
             break;
          case LPX_K_TOLOBJ:
             if (!(DBL_EPSILON <= val && val <= 0.001))
-               fault("lpx_set_real_parm: TOLOBJ = %g; invalid value",
+               xfault("lpx_set_real_parm: TOLOBJ = %g; invalid value\n",
                   val);
             cps->tol_obj = val;
             break;
          case LPX_K_MIPGAP:
             if (val < 0.0)
-               fault("lpx_set_real_parm: MIPGAP = %g; invalid value",
+               xfault("lpx_set_real_parm: MIPGAP = %g; invalid value\n",
                   val);
             cps->mip_gap = val;
             break;
          default:
-            fault("lpx_set_real_parm: parm = %d; invalid parameter",
+            xfault("lpx_set_real_parm: parm = %d; invalid parameter\n",
                parm);
       }
       return;
@@ -462,7 +462,7 @@ double lpx_get_real_parm(LPX *lp, int parm)
             val = cps->mip_gap;
             break;
          default:
-            fault("lpx_get_real_parm: parm = %d; invalid parameter",
+            xfault("lpx_get_real_parm: parm = %d; invalid parameter\n",
                parm);
       }
       return val;

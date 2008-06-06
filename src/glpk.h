@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -30,7 +30,7 @@ extern "C" {
 
 /* library version numbers: */
 #define GLP_MAJOR_VERSION  4
-#define GLP_MINOR_VERSION  25
+#define GLP_MINOR_VERSION  28
 
 #ifndef _GLP_PROB
 #define _GLP_PROB
@@ -69,11 +69,8 @@ typedef struct { double _prob; } glp_prob;
 #define GLP_OPT         5  /* solution is optimal */
 #define GLP_UNBND       6  /* solution is unbounded */
 
-#ifndef _GLP_ULONG
-#define _GLP_ULONG
-typedef struct { unsigned int lo, hi; } glp_ulong;
-/* 64-bit unsigned integer data type */
-#endif
+typedef struct { int lo, hi; } glp_long;
+/* long integer data type */
 
 #ifndef _GLP_BFCP
 #define _GLP_BFCP
@@ -551,23 +548,18 @@ void *glp_calloc(int n, int size);
 void glp_free(void *ptr);
 /* free memory block */
 
-void glp_mem_usage(int *count, int *cpeak, glp_ulong *total,
-      glp_ulong *tpeak);
+void glp_mem_usage(int *count, int *cpeak, glp_long *total,
+      glp_long *tpeak);
 /* get memory usage information */
 
 void glp_mem_limit(int limit);
 /* set memory usage limit */
 
-#ifdef EOF
-FILE *glp_fopen(const char *fname, const char *mode);
-/* open file */
-
-void glp_fclose(FILE *fp);
-/* close file */
-#endif
-
 void glp_free_env(void);
 /* free GLPK library environment */
+
+int glp_main(int argc, const char *argv[]);
+/* stand-alone LP/MIP solver */
 
 /**********************************************************************/
 

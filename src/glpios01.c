@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -125,7 +125,7 @@ glp_tree *ios_create_tree(glp_prob *mip, const glp_iocp *parm)
       /* initialize control parameters */
       tree->parm = parm;
       tree->tm_beg = xtime();
-      tree->tm_lag = ulset(0, 0);
+      tree->tm_lag = xlset(0);
       tree->sol_cnt = 0;
       /* initialize advanced solver interface */
       tree->reason = 0;

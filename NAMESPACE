@@ -1,3 +1,15 @@
 useDynLib("Rglpk")
 
 export("Rglpk_solve_LP")
+export("Rglpk_read_file")
+export("print.MP_data_from_file")
+
+## simple_triplet_matrix from KH's relations package
+S3method("[", "simple_triplet_matrix")
+S3method("as.matrix", "simple_triplet_matrix")
+S3method("as.simple_triplet_matrix", "matrix")
+S3method("as.simple_triplet_matrix", "simple_triplet_matrix")
+S3method("cbind", "simple_triplet_matrix")
+S3method("dim", "simple_triplet_matrix")
+S3method("rbind", "simple_triplet_matrix")
+S3method("t", "simple_triplet_matrix")

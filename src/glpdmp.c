@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -22,6 +22,7 @@
 ***********************************************************************/
 
 #include "glpdmp.h"
+#define xfault xerror
 
 #define _GLPDMP_DEBUG 0
 
@@ -57,7 +58,9 @@ DMP *dmp_create_pool(void)
       xprintf("dmp_create_pool: warning: debug mode enabled\n");
 #endif
       pool = xmalloc(sizeof(DMP));
+#if 0
       pool->size = 0;
+#endif
       for (k = 0; k <= 31; k++) pool->avail[k] = NULL;
       pool->block = NULL;
       pool->used = DMP_BLK_SIZE;
@@ -96,8 +99,10 @@ void *dmp_get_atom(DMP *pool, int size)
 #endif
       if (!(1 <= size && size <= 256))
          xfault("dmp_get_atom: size = %d; invalid atom size\n", size);
+#if 0
       if (!(pool->size == 0 || pool->size == size))
          xfault("dmp_get_atom: size = %d; wrong atom size\n", size);
+#endif
       /* adjust the size to provide the proper data alignment */
       size = align_datasize(size);
 #if _GLPDMP_DEBUG
@@ -164,8 +169,10 @@ void dmp_free_atom(DMP *pool, void *atom, int size)
 {     int k;
       if (!(1 <= size && size <= 256))
          xfault("dmp_free_atom: size = %d; invalid atom size\n", size);
+#if 0
       if (!(pool->size == 0 || pool->size == size))
          xfault("dmp_free_atom: size = %d; wrong atom size\n", size);
+#endif
       if (pool->count.lo == 0 && pool->count.hi == 0)
          xfault("dmp_free_atom: pool allocation error\n");
 #if _GLPDMP_DEBUG
@@ -200,7 +207,7 @@ void dmp_free_atom(DMP *pool, void *atom, int size)
 *  SYNOPSIS
 *
 *  #include "glpdmp.h"
-*  glp_ulong dmp_in_use(DMP *pool);
+*  xlong_t dmp_in_use(DMP *pool);
 *
 *  DESCRIPTION
 *
@@ -212,7 +219,7 @@ void dmp_free_atom(DMP *pool, void *atom, int size)
 *
 *  The routine returns the number of atoms which are still in use. */
 
-glp_ulong dmp_in_use(DMP *pool)
+xlong_t dmp_in_use(DMP *pool)
 {     return
          pool->count;
 }

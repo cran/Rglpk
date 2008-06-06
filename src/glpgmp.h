@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -28,7 +28,7 @@
 #include <config.h>
 #endif
 
-#ifdef HAVE_GMP_H             /* use GNU MP library */
+#ifdef HAVE_GMP               /* use GNU MP bignum library */
 
 #include <gmp.h>
 
@@ -139,8 +139,8 @@ typedef struct mpq *mpq_t;
 #define mpq_sgn               _glp_mpq_sgn
 #define mpq_out_str           _glp_mpq_out_str
 
-void *gmp_get_atom(void);
-void gmp_free_atom(void *ptr);
+void *gmp_get_atom(int size);
+void gmp_free_atom(void *ptr, int size);
 int gmp_pool_count(void);
 unsigned short *gmp_get_work(int size);
 void gmp_free_mem(void);

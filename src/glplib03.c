@@ -1,9 +1,9 @@
-/* glplib03.c (TLS communication) */
+/* glplib03.c (error handling) */
 
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,124 +21,120 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_STDIO
 #include "glplib.h"
-
-#if !defined(GLP_TLS_CONFIG) || GLP_TLS_CONFIG == 0
-
-/* platform-independent ISO C version */
-
-static void *tls = NULL;
-/* in a re-entrant version of the package this variable must be placed
-   in the Thread Local Storage (TLS) */
 
 /***********************************************************************
 *  NAME
 *
-*  lib_set_ptr - store global pointer in TLS
+*  xassert - check for logical condition
 *
 *  SYNOPSIS
 *
 *  #include "glplib.h"
-*  void lib_set_ptr(void *ptr);
+*  void xassert(int expr);
 *
 *  DESCRIPTION
 *
-*  The routine lib_set_ptr stores a pointer specified by the parameter
-*  ptr in the Thread Local Storage (TLS). */
+*  The routine xassert (implemented as a macro) checks for a logical
+*  condition specified by the parameter expr. If the condition is false
+*  (i.e. the value of expr is zero), the routine writes a message to
+*  the terminal and abnormally terminates the program. */
 
-void lib_set_ptr(void *ptr)
-{     tls = ptr;
+void lib_xassert(const char *expr, const char *file, int line)
+{     lib_xerror1(file, line)("Assertion failed: %s\n", expr);
+      /* no return */
+}
+
+/***********************************************************************
+*  NAME
+*
+*  xerror - display error message and terminate execution
+*
+*  SYNOPSIS
+*
+*  #include "glplib.h"
+*  void xerror(const char *fmt, ...);
+*
+*  DESCRIPTION
+*
+*  The routine xerror (implemented as a macro) formats its parameters
+*  under the format control string fmt, writes the formatted message to
+*  the terminal, and abnormally terminates the program. */
+
+xerror_t lib_xerror1(const char *file, int line)
+{     LIBENV *env = lib_link_env();
+      env->err_file = file;
+      env->err_line = line;
+      return lib_xerror2;
+}
+
+void lib_xerror2(const char *fmt, ...)
+{     LIBENV *env = lib_link_env();
+      va_list arg;
+      va_start(arg, fmt);
+      xvprintf(fmt, arg);
+      va_end(arg);
+      xprintf("Error detected in file %s at line %d\n",
+         env->err_file, env->err_line);
+      fflush(stdout);
+      fflush(stderr);
+      abort();
+      /* no return */
+}
+
+void lib_fault_hook(int (*func)(void *info, char *buf), void *info)
+{     /* (obsolete) */
+      xassert(func == func);
+      xassert(info == info);
       return;
 }
 
 /***********************************************************************
 *  NAME
 *
-*  lib_get_ptr - retrieve global pointer from TLS
+*  lib_err_msg - save error message string
 *
 *  SYNOPSIS
 *
 *  #include "glplib.h"
-*  void *lib_get_ptr(void);
+*  void lib_err_msg(const char *msg);
 *
-*  RETURNS
+*  DESCRIPTION
 *
-*  The routine lib_get_ptr returns a pointer previously stored by the
-*  routine lib_set_ptr. If the latter has not been called yet, NULL is
-*  returned. */
+*  The routine lib_err_msg saves an error message string specified by
+*  the parameter msg. The message is obtained by some library routines
+*  with a call to strerror(errno). */
 
-void *lib_get_ptr(void)
-{     void *ptr;
-      ptr = tls;
-      return ptr;
-}
-
-#elif GLP_TLS_CONFIG == 1
-
-/* there must be a version for GNU/Linux */
-
-#elif GLP_TLS_CONFIG == 2
-
-/* multi-threaded DLL for MSVC 6.0 */
-
-#include <windows.h>
-
-static DWORD dwTlsIndex;
-
-BOOL APIENTRY DllMain
-(     HINSTANCE hinstDLL,  /* DLL module handle */
-      DWORD fdwReason,     /* reason called */
-      LPVOID lpvReserved   /* reserved */
-)
-{     switch (fdwReason)
-      {  /* the DLL is loading due to process initialization or a call
-            to LoadLibrary */
-         case DLL_PROCESS_ATTACH:
-            /* allocate a TLS index */
-            dwTlsIndex = TlsAlloc();
-            if (dwTlsIndex == 0xFFFFFFFF) return FALSE;
-            /* initialize the index for first thread */
-            TlsSetValue(dwTlsIndex, NULL);
-            /* initialize GLPK library environment */
-            lib_init_env();
-            break;
-         /* the attached process creates a new thread */
-         case DLL_THREAD_ATTACH:
-            /* initialize the TLS index for this thread */
-            TlsSetValue(dwTlsIndex, NULL);
-            /* initialize GLPK library environment */
-            lib_init_env();
-            break;
-         /* the thread of the attached process terminates */
-         case DLL_THREAD_DETACH:
-            /* free GLPK library environment */
-            lib_free_env();
-            break;
-         /* the DLL is unloading due to process termination or call to
-            FreeLibrary */
-         case DLL_PROCESS_DETACH:
-            /* free GLPK library environment */
-            lib_free_env();
-            /* release the TLS index */
-            TlsFree(dwTlsIndex);
-            break;
-         default:
-            break;
-      }
-      return TRUE;
-}
-
-void lib_set_ptr(void *ptr)
-{     TlsSetValue(dwTlsIndex, ptr);
+void lib_err_msg(const char *msg)
+{     LIBENV *env = lib_link_env();
+      int len = strlen(msg);
+      if (len >= sizeof(env->err_msg))
+         len = sizeof(env->err_msg) - 1;
+      memcpy(env->err_msg, msg, len);
+      if (len > 0 && env->err_msg[len-1] == '\n') len--;
+      env->err_msg[len] = '\0';
       return;
 }
 
-void *lib_get_ptr(void)
-{     void *ptr;
-      ptr = TlsGetValue(dwTlsIndex);
-      return ptr;
-}
+/***********************************************************************
+*  NAME
+*
+*  xerrmsg - retrieve error message string
+*
+*  SYNOPSIS
+*
+*  #include "glplib.h"
+*  const char *xerrmsg(void);
+*
+*  RETURNS
+*
+*  The routine xerrmsg returns a pointer to an error message string
+*  previously set by some library routine to indicate an error. */
 
-#endif
+const char *xerrmsg(void)
+{     LIBENV *env = lib_link_env();
+      return env->err_msg;
+}
 
 /* eof */

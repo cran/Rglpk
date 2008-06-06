@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -113,12 +113,11 @@ struct HBM
       /* solution vector values */
 };
 
-#define hbm_read_mat          _glp_hbm_read_mat
-#define hbm_free_mat          _glp_hbm_free_mat
-
-HBM *hbm_read_mat(char *fname);
+#define hbm_read_mat _glp_hbm_read_mat
+HBM *hbm_read_mat(const char *fname);
 /* read sparse matrix in Harwell-Boeing format */
 
+#define hbm_free_mat _glp_hbm_free_mat
 void hbm_free_mat(HBM *hbm);
 /* free sparse matrix in Harwell-Boeing format */
 

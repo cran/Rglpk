@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -22,9 +22,8 @@
 ***********************************************************************/
 
 #include "glpapi.h"
-#include "glplib.h"
-#define print xprint1
-#define fault xfault1
+#define xfault xerror
+#define strerror(errno) xerrmsg()
 
 /*----------------------------------------------------------------------
 -- lpx_read_mps - read problem data in fixed MPS format.
@@ -51,7 +50,7 @@ struct dsa
       /* LP/MIP problem object */
       const char *fname;
       /* name of input text file */
-      FILE *fp;
+      XFILE *fp;
       /* stream assigned to input text file */
       int count;
       /* card count */
@@ -71,29 +70,31 @@ loop: dsa->count++;
       memset(dsa->card, ' ', 80), dsa->card[80] = '\0';
       j = 0;
       for (;;)
-      {  c = fgetc(dsa->fp);
-         if (ferror(dsa->fp))
-         {  print("%s:%d: read error - %s", dsa->fname, dsa->count,
-               strerror(errno));
+      {  c = xfgetc(dsa->fp);
+         if (xferror(dsa->fp))
+         {  xprintf("%s:%d: read error - %s\n",
+               dsa->fname, dsa->count, strerror(errno));
             goto fail;
          }
-         if (feof(dsa->fp))
+         if (xfeof(dsa->fp))
          {  if (j == 0)
-               print("%s:%d: unexpected EOF", dsa->fname, dsa->count);
+               xprintf("%s:%d: unexpected EOF\n",
+                  dsa->fname, dsa->count);
             else
-               print("%s:%d: missing final NL", dsa->fname, dsa->count);
+               xprintf("%s:%d: missing final NL\n",
+                  dsa->fname, dsa->count);
             goto fail;
          }
          if (c == '\r') continue;
          if (c == '\n') break;
          if (iscntrl(c))
-         {  print("%s:%d: invalid control character 0x%02X", dsa->fname,
-               dsa->count, c);
+         {  xprintf("%s:%d: invalid control character 0x%02X\n",
+               dsa->fname, dsa->count, c);
             goto fail;
          }
          if (j == 80)
-         {  print("%s:%d: card image exceeds 80 chars", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: card image exceeds 80 chars\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          dsa->card[j++] = (char)c;
@@ -135,7 +136,7 @@ static int split_card(struct dsa *dsa)
       dsa->f1[2] = '\0'; strspx(dsa->f1);
       /* column 4 must be blank */
       if (dsa->card[3] != ' ')
-      {  print("%s:%d: invalid data card; column 4 must be blank",
+      {  xprintf("%s:%d: invalid data card; column 4 must be blank\n",
             dsa->fname, dsa->count);
          goto fail;
       }
@@ -144,8 +145,8 @@ static int split_card(struct dsa *dsa)
       dsa->f2[8] = '\0'; adjust_name(dsa->f2);
       /* columns 13-14 must be blank */
       if (memcmp(dsa->card+12, "  ", 2) != 0)
-      {  print("%s:%d: invalid data card; columns 13-14 must be blank",
-            dsa->fname, dsa->count);
+      {  xprintf("%s:%d: invalid data card; columns 13-14 must be blank"
+            "\n", dsa->fname, dsa->count);
          goto fail;
       }
       /* dollar sign in column 15 begins a comment */
@@ -158,8 +159,8 @@ static int split_card(struct dsa *dsa)
       dsa->f3[8] = '\0'; adjust_name(dsa->f3);
       /* columns 23-24 must be blank */
       if (memcmp(dsa->card+22, "  ", 2) != 0)
-      {  print("%s:%d: invalid data card; columns 23-24 must be blank",
-            dsa->fname, dsa->count);
+      {  xprintf("%s:%d: invalid data card; columns 23-24 must be blank"
+            "\n", dsa->fname, dsa->count);
          goto fail;
       }
       /* scan field 4 (number) in columns 25-36 */
@@ -167,8 +168,8 @@ static int split_card(struct dsa *dsa)
       dsa->f4[12] = '\0'; strspx(dsa->f4);
       /* columns 37-39 must be blank */
       if (memcmp(dsa->card+36, "   ", 3) != 0)
-      {  print("%s:%d: invalid data card; columns 37-39 must be blank",
-            dsa->fname, dsa->count);
+      {  xprintf("%s:%d: invalid data card; columns 37-39 must be blank"
+            "\n", dsa->fname, dsa->count);
          goto fail;
       }
       /* dollar sign in column 40 begins a comment */
@@ -181,8 +182,8 @@ static int split_card(struct dsa *dsa)
       dsa->f5[8] = '\0'; adjust_name(dsa->f5);
       /* columns 48-49 must be blank */
       if (memcmp(dsa->card+47, "  ", 2) != 0)
-      {  print("%s:%d: invalid data card; columns 48-49 must be blank",
-            dsa->fname, dsa->count);
+      {  xprintf("%s:%d: invalid data card; columns 48-49 must be blank"
+            "\n", dsa->fname, dsa->count);
          goto fail;
       }
       /* scan field 6 (number) in columns 50-61 */
@@ -190,8 +191,8 @@ static int split_card(struct dsa *dsa)
       dsa->f6[12] = '\0'; strspx(dsa->f6);
       /* columns 62-72 must be blank */
       if (memcmp(dsa->card+61, "           ", 11) != 0)
-      {  print("%s:%d: invalid data card; columns 62-72 must be blank",
-            dsa->fname, dsa->count);
+      {  xprintf("%s:%d: invalid data card; columns 62-72 must be blank"
+            "\n", dsa->fname, dsa->count);
          goto fail;
       }
 done: return 0;
@@ -209,7 +210,7 @@ loop: /* read and split next data card */
       i = lpx_add_rows(dsa->lp, 1);
       /* scan row type in field 1 */
       if (dsa->f1[0] == '\0')
-      {  print("%s:%d: missing row type in field 1", dsa->fname,
+      {  xprintf("%s:%d: missing row type in field 1\n", dsa->fname,
             dsa->count);
          goto fail;
       }
@@ -226,19 +227,19 @@ loop: /* read and split next data card */
       else if (strcmp(dsa->f1, "E") == 0)
          type = LPX_FX;
       else
-      {  print("%s:%d: invalid row type in field 1", dsa->fname,
+      {  xprintf("%s:%d: invalid row type in field 1\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       lpx_set_row_bnds(dsa->lp, i, type, 0.0, 0.0);
       /* scan row name in field 2 */
       if (dsa->f2[0] == '\0')
-      {  print("%s:%d: missing row name in field 2", dsa->fname,
+      {  xprintf("%s:%d: missing row name in field 2\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (lpx_find_row(dsa->lp, dsa->f2) != 0)
-      {  print("%s:%d: row %s multiply specified", dsa->fname,
+      {  xprintf("%s:%d: row %s multiply specified\n", dsa->fname,
             dsa->count);
          goto fail;
       }
@@ -247,7 +248,7 @@ loop: /* read and split next data card */
       /* fields 3-6 must be blank */
       if (!(dsa->f3[0] == '\0' && dsa->f4[0] == '\0' &&
             dsa->f5[0] == '\0' && dsa->f6[0] == '\0'))
-      {  print("%s:%d: invalid data card; fields 3-6 must be blank",
+      {  xprintf("%s:%d: invalid data card; fields 3-6 must be blank\n",
             dsa->fname, dsa->count);
          goto fail;
       }
@@ -289,7 +290,7 @@ loop: /* read and split next data card */
       if (split_card(dsa)) goto fail;
       /* field 1 must be blank */
       if (dsa->f1[0] != '\0')
-      {  print("%s:%d: invalid data card; field 1 must be blank",
+      {  xprintf("%s:%d: invalid data card; field 1 must be blank\n",
             dsa->fname, dsa->count);
          goto fail;
       }
@@ -297,20 +298,20 @@ loop: /* read and split next data card */
       if (strcmp(dsa->f3, "'MARKER'") == 0)
       {  /* fields 4 and 6 must be blank */
          if (!(dsa->f4[0] == '\0' && dsa->f6[0] == '\0'))
-         {  print("%s:%d: invalid data card; fields 4 and 6 must be bla"
-               "nk", dsa->fname, dsa->count);
+         {  xprintf("%s:%d: invalid data card; fields 4 and 6 must be b"
+               "lank\n", dsa->fname, dsa->count);
             goto fail;
          }
          /* scan marker name in field 2 */
          if (dsa->f2[0] == '\0')
-         {  print("%s:%d: missing marker name in field 2", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: missing marker name in field 2\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          /* scan marker type in field 5 */
          if (dsa->f5[0] == '\0')
-         {  print("%s:%d: missing marker type in field 5", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: missing marker type in field 5\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          else if (strcmp(dsa->f5, "'INTORG'") == 0)
@@ -318,8 +319,8 @@ loop: /* read and split next data card */
          else if (strcmp(dsa->f5, "'INTEND'") == 0)
             marker = 0;
          else
-         {  print("%s:%d: invalid marker type in field 5", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: invalid marker type in field 5\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          goto loop;
@@ -327,8 +328,8 @@ loop: /* read and split next data card */
       /* scan column name in field 2 */
       if (dsa->f2[0] == '\0')
       {  if (j == 0)
-         {  print("%s:%d: missing column name in field 2", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: missing column name in field 2\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          /* still the current column */
@@ -345,7 +346,7 @@ loop: /* read and split next data card */
       }
       /* create new column */
       if (lpx_find_col(dsa->lp, dsa->f2) != 0)
-      {  print("%s:%d: column %s multiply specified", dsa->fname,
+      {  xprintf("%s:%d: column %s multiply specified\n", dsa->fname,
             dsa->count, dsa->f2);
          goto fail;
       }
@@ -358,28 +359,28 @@ loop: /* read and split next data card */
       lpx_set_col_bnds(dsa->lp, j, LPX_LO, 0.0, 0.0);
 skip: /* scan row name and coefficient in fields 3 and 4 */
       if (dsa->f3[0] == '\0')
-      {  print("%s:%d: missing row name in field 3", dsa->fname,
+      {  xprintf("%s:%d: missing row name in field 3\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       i = lpx_find_row(dsa->lp, dsa->f3);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             dsa->f3);
          goto fail;
       }
       if (dsa->f4[0] == '\0')
-      {  print("%s:%d: missing coefficient value in field 4",
+      {  xprintf("%s:%d: missing coefficient value in field 4\n",
             dsa->fname, dsa->count);
          goto fail;
       }
       if (str2num(dsa->f4, &temp))
-      {  print("%s:%d: invalid coefficient value in field 4",
+      {  xprintf("%s:%d: invalid coefficient value in field 4\n",
             dsa->fname, dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: coefficient in row %s multiply specified",
+      {  xprintf("%s:%d: coefficient in row %s multiply specified\n",
             dsa->fname, dsa->count, dsa->f3);
          goto fail;
       }
@@ -387,28 +388,28 @@ skip: /* scan row name and coefficient in fields 3 and 4 */
       /* scan optional row name and coefficient in fields 5 and 6 */
       if (dsa->f5[0] == '\0' && dsa->f6[0] == '\0') goto loop;
       if (dsa->f5[0] == '\0')
-      {  print("%s:%d: missing row name in field 5", dsa->fname,
+      {  xprintf("%s:%d: missing row name in field 5\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       i = lpx_find_row(dsa->lp, dsa->f5);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             dsa->f5);
          goto fail;
       }
       if (dsa->f6[0] == '\0')
-      {  print("%s:%d: missing coefficient value in field 6",
+      {  xprintf("%s:%d: missing coefficient value in field 6\n",
             dsa->fname, dsa->count);
          goto fail;
       }
       if (str2num(dsa->f6, &temp))
-      {  print("%s:%d: invalid coefficient value in field 6",
+      {  xprintf("%s:%d: invalid coefficient value in field 6\n",
             dsa->fname, dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: coefficient in row %s multiply specified",
+      {  xprintf("%s:%d: coefficient in row %s multiply specified\n",
             dsa->fname, dsa->count, dsa->f5);
          goto fail;
       }
@@ -429,9 +430,9 @@ static void set_rhs(struct dsa *dsa, int i, double b)
             if (dsa->obj == i)
                lpx_set_obj_coef(dsa->lp, 0, b);
             else if (b != 0.0)
-               print("%s:%d: warning: non-zero rhs for free row %s igno"
-                  "red", dsa->fname, dsa->count, lpx_get_row_name(dsa->
-                  lp, i));
+               xprintf("%s:%d: warning: non-zero rhs for free row %s ig"
+                  "nored\n", dsa->fname, dsa->count,
+                  lpx_get_row_name(dsa->lp, i));
             break;
          case LPX_LO:
             lpx_set_row_bnds(dsa->lp, i, LPX_LO, b, 0.0);
@@ -463,71 +464,71 @@ loop: /* read and split next data card */
       if (split_card(dsa)) goto fail;
       /* field 1 must be blank */
       if (dsa->f1[0] != '\0')
-      {  print("%s:%d: invalid data card; field 1 must be blank",
+      {  xprintf("%s:%d: invalid data card; field 1 must be blank\n",
             dsa->fname, dsa->count);
          goto fail;
       }
       /* scan optional rhs vector name in field 2 */
       if (name[0] == '\n') strcpy(name, dsa->f2);
       if (!(dsa->f2[0] == '\0' || strcmp(dsa->f2, name) == 0))
-      {  print("%s:%d: at most one rhs vector allowed", dsa->fname,
+      {  xprintf("%s:%d: at most one rhs vector allowed\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       /* scan row name and rhs value in fields 3 and 4 */
       if (dsa->f3[0] == '\0')
-      {  print("%s:%d: missing row name in field 3", dsa->fname,
+      {  xprintf("%s:%d: missing row name in field 3\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       i = lpx_find_row(dsa->lp, dsa->f3);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             dsa->f3);
          goto fail;
       }
       if (dsa->f4[0] == '\0')
-      {  print("%s:%d: missing rhs value in field 4", dsa->fname,
+      {  xprintf("%s:%d: missing rhs value in field 4\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (str2num(dsa->f4, &temp))
-      {  print("%s:%d: invalid rhs value in field 4", dsa->fname,
+      {  xprintf("%s:%d: invalid rhs value in field 4\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: rhs for row %s multiply specified", dsa->fname,
-            dsa->count, dsa->f3);
+      {  xprintf("%s:%d: rhs for row %s multiply specified\n",
+            dsa->fname, dsa->count, dsa->f3);
          goto fail;
       }
       set_rhs(dsa, i, temp), map[i] = 1;
       /* scan optional row name and rhs value in fields 5 and 6 */
       if (dsa->f5[0] == '\0' && dsa->f6[0] == '\0') goto loop;
       if (dsa->f5[0] == '\0')
-      {  print("%s:%d: missing row name in field 5", dsa->fname,
+      {  xprintf("%s:%d: missing row name in field 5\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       i = lpx_find_row(dsa->lp, dsa->f5);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             dsa->f5);
          goto fail;
       }
       if (dsa->f6[0] == '\0')
-      {  print("%s:%d: missing rhs value in field 6", dsa->fname,
+      {  xprintf("%s:%d: missing rhs value in field 6\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (str2num(dsa->f6, &temp))
-      {  print("%s:%d: invalid rhs value in field 6", dsa->fname,
+      {  xprintf("%s:%d: invalid rhs value in field 6\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: rhs for row %s multiply specified", dsa->fname,
-            dsa->count, dsa->f5);
+      {  xprintf("%s:%d: rhs for row %s multiply specified\n",
+            dsa->fname, dsa->count, dsa->f5);
          goto fail;
       }
       set_rhs(dsa, i, temp), map[i] = 1;
@@ -543,8 +544,9 @@ static void set_range(struct dsa *dsa, int i, double r)
       double b;
       switch (lpx_get_row_type(dsa->lp, i))
       {  case LPX_FR:
-            print("%s:%d: warning: range value for free row %s ignored",
-               dsa->fname, dsa->count, lpx_get_row_name(dsa->lp, i));
+            xprintf("%s:%d: warning: range value for free row %s ignore"
+               "d\n", dsa->fname, dsa->count,
+               lpx_get_row_name(dsa->lp, i));
             break;
          case LPX_LO:
             b = lpx_get_row_lb(dsa->lp, i);
@@ -588,71 +590,71 @@ loop: /* read and split next data card */
       if (split_card(dsa)) goto fail;
       /* field 1 must be blank */
       if (dsa->f1[0] != '\0')
-      {  print("%s:%d: invalid data card; field 1 must be blank",
+      {  xprintf("%s:%d: invalid data card; field 1 must be blank\n",
             dsa->fname, dsa->count);
          goto fail;
       }
       /* scan optional ranges vector name in field 2 */
       if (name[0] == '\n') strcpy(name, dsa->f2);
       if (!(dsa->f2[0] == '\0' || strcmp(dsa->f2, name) == 0))
-      {  print("%s:%d: at most one ranges vector allowed", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: at most one ranges vector allowed\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       /* scan row name and range value in fields 3 and 4 */
       if (dsa->f3[0] == '\0')
-      {  print("%s:%d: missing row name in field 3", dsa->fname,
+      {  xprintf("%s:%d: missing row name in field 3\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       i = lpx_find_row(dsa->lp, dsa->f3);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             dsa->f3);
          goto fail;
       }
       if (dsa->f4[0] == '\0')
-      {  print("%s:%d: missing range value in field 4", dsa->fname,
+      {  xprintf("%s:%d: missing range value in field 4\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (str2num(dsa->f4, &temp))
-      {  print("%s:%d: invalid range value in field 4", dsa->fname,
+      {  xprintf("%s:%d: invalid range value in field 4\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: range for row %s multiply specified", dsa->fname,
-            dsa->count, dsa->f3);
+      {  xprintf("%s:%d: range for row %s multiply specified\n",
+            dsa->fname, dsa->count, dsa->f3);
          goto fail;
       }
       set_range(dsa, i, temp), map[i] = 1;
       /* scan optional row name and range value in fields 5 and 6 */
       if (dsa->f5[0] == '\0' && dsa->f6[0] == '\0') goto loop;
       if (dsa->f5[0] == '\0')
-      {  print("%s:%d: missing row name in field 5", dsa->fname,
+      {  xprintf("%s:%d: missing row name in field 5\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       i = lpx_find_row(dsa->lp, dsa->f5);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             dsa->f5);
          goto fail;
       }
       if (dsa->f6[0] == '\0')
-      {  print("%s:%d: missing range value in field 6", dsa->fname,
+      {  xprintf("%s:%d: missing range value in field 6\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (str2num(dsa->f6, &temp))
-      {  print("%s:%d: invalid range value in field 6", dsa->fname,
+      {  xprintf("%s:%d: invalid range value in field 6\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: range for row %s multiply specified", dsa->fname,
-            dsa->count, dsa->f5);
+      {  xprintf("%s:%d: range for row %s multiply specified\n",
+            dsa->fname, dsa->count, dsa->f5);
          goto fail;
       }
       set_range(dsa, i, temp), map[i] = 1;
@@ -674,26 +676,26 @@ loop: /* read and split next data card */
       if (split_card(dsa)) goto fail;
       /* scan bound type in field 1 */
       if (dsa->f1[0] == '\0')
-      {  print("%s:%d: missing bound type in field 1", dsa->fname,
+      {  xprintf("%s:%d: missing bound type in field 1\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       /* scan optional bounds vector name in field 2 */
       if (name[0] == '\n') strcpy(name, dsa->f2);
       if (!(dsa->f2[0] == '\0' || strcmp(dsa->f2, name) == 0))
-      {  print("%s:%d: at most one bounds vector allowed", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: at most one bounds vector allowed\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       /* scan column name in field 3 */
       if (dsa->f3[0] == '\0')
-      {  print("%s:%d: missing column name in field 3", dsa->fname,
+      {  xprintf("%s:%d: missing column name in field 3\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       j = lpx_find_col(dsa->lp, dsa->f3);
       if (j == 0)
-      {  print("%s:%d: column %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: column %s not found\n", dsa->fname, dsa->count,
             dsa->f3);
          goto fail;
       }
@@ -703,12 +705,12 @@ loop: /* read and split next data card */
             strcmp(dsa->f1, "UI") == 0))
          goto skip;
       if (dsa->f4[0] == '\0')
-      {  print("%s:%d: missing bound value in field 4", dsa->fname,
+      {  xprintf("%s:%d: missing bound value in field 4\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (str2num(dsa->f4, &temp))
-      {  print("%s:%d: invalid bound value in field 4", dsa->fname,
+      {  xprintf("%s:%d: invalid bound value in field 4\n", dsa->fname,
             dsa->count);
          goto fail;
       }
@@ -752,7 +754,7 @@ skip: /* change column bounds */
          lb = 0.0, ub = 1.0;
       }
       else
-      {  print("%s:%d: invalid bound type in field 1", dsa->fname,
+      {  xprintf("%s:%d: invalid bound type in field 1\n", dsa->fname,
             dsa->count);
          goto fail;
       }
@@ -769,7 +771,7 @@ skip: /* change column bounds */
       lpx_set_col_bnds(dsa->lp, j, type, lb, ub);
       /* fields 5-6 must be blank */
       if (!(dsa->f5[0] == '\0' && dsa->f6[0] == '\0'))
-      {  print("%s:%d: invalid data card; fields 5-6 must be blank",
+      {  xprintf("%s:%d: invalid data card; fields 5-6 must be blank\n",
             dsa->fname, dsa->count);
          goto fail;
       }
@@ -786,12 +788,12 @@ LPX *lpx_read_mps(const char *fname)
       dsa->fp = NULL;
       dsa->count = 0;
       dsa->obj = 0;
-      print("lpx_read_mps: reading problem data from `%s'...",
+      xprintf("lpx_read_mps: reading problem data from `%s'...\n",
          dsa->fname);
       dsa->fp = xfopen(dsa->fname, "r");
       if (dsa->fp == NULL)
-      {  print("lpx_read_mps: unable to open `%s' - %s", dsa->fname,
-            strerror(errno));
+      {  xprintf("lpx_read_mps: unable to open `%s' - %s\n",
+            dsa->fname, strerror(errno));
          goto fail;
       }
       dsa->lp = lpx_create_prob();
@@ -799,7 +801,7 @@ LPX *lpx_read_mps(const char *fname)
       /* read NAME indicator card */
       if (read_card(dsa)) goto fail;
       if (memcmp(dsa->card, "NAME ", 5) != 0)
-      {  print("%s:%d: NAME indicator card missing", dsa->fname,
+      {  xprintf("%s:%d: NAME indicator card missing\n", dsa->fname,
             dsa->count);
          goto fail;
       }
@@ -807,20 +809,20 @@ LPX *lpx_read_mps(const char *fname)
       dsa->f3[8] = '\0'; adjust_name(dsa->f3);
       lpx_set_prob_name(dsa->lp, dsa->f3);
       if (dsa->f3[0] == '\0')
-         print("lpx_read_mps: problem name not specified");
+         xprintf("lpx_read_mps: problem name not specified\n");
       else
-         print("lpx_read_mps: problem %s", dsa->f3);
+         xprintf("lpx_read_mps: problem %s\n", dsa->f3);
       /* read ROWS section */
       if (read_card(dsa)) goto fail;
       if (memcmp(dsa->card, "ROWS ", 5) != 0)
-      {  print("%s:%d: ROWS indicator card missing", dsa->fname,
+      {  xprintf("%s:%d: ROWS indicator card missing\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (read_rows(dsa)) goto fail;
       /* read COLUMNS section */
       if (memcmp(dsa->card, "COLUMNS ", 8) != 0)
-      {  print("%s:%d: COLUMNS indicator card missing", dsa->fname,
+      {  xprintf("%s:%d: COLUMNS indicator card missing\n", dsa->fname,
             dsa->count);
          goto fail;
       }
@@ -828,7 +830,7 @@ LPX *lpx_read_mps(const char *fname)
       {  int m = lpx_get_num_rows(dsa->lp);
          int n = lpx_get_num_cols(dsa->lp);
          int nnz = lpx_get_num_nz(dsa->lp);
-         print("lpx_read_mps: %d row%s, %d column%s, %d non-zero%s",
+         xprintf("lpx_read_mps: %d row%s, %d column%s, %d non-zero%s\n",
             m, m == 1 ? "" : "s", n, n == 1 ? "" : "s", nnz, nnz == 1 ?
             "" : "s");
       }
@@ -843,7 +845,7 @@ LPX *lpx_read_mps(const char *fname)
          if (read_bounds(dsa)) goto fail;
       /* check ENDATA indicator card */
       if (memcmp(dsa->card, "ENDATA ", 7) != 0)
-      {  print("%s:%d: ENDATA indicator card missing", dsa->fname,
+      {  xprintf("%s:%d: ENDATA indicator card missing\n", dsa->fname,
             dsa->count);
          goto fail;
       }
@@ -861,10 +863,10 @@ LPX *lpx_read_mps(const char *fname)
             strcpy(s, "all of");
          else
             sprintf(s, "%d of", nb);
-         print("lpx_read_mps: %d integer column%s, %s which %s binary",
-            ni, ni == 1 ? "" : "s", s, nb == 1 ? "is" : "are");
+         xprintf("lpx_read_mps: %d integer column%s, %s which %s binary"
+            "\n", ni, ni == 1 ? "" : "s", s, nb == 1 ? "is" : "are");
       }
-      print("lpx_read_mps: %d cards were read", dsa->count);
+      xprintf("lpx_read_mps: %d cards were read\n", dsa->count);
       xfclose(dsa->fp);
       lpx_delete_index(dsa->lp);
       lpx_order_matrix(dsa->lp);
@@ -941,13 +943,13 @@ static char *mps_numb(double val, char numb[12+1])
          if (e != NULL) sprintf(e+1, "%d", atoi(e+1));
          if (strlen(str) <= 12) return strcpy(numb, str);
       }
-      fault("lpx_write_mps: unable to convert floating point number %g "
-         "to character string", val);
+      xfault("lpx_write_mps: unable to convert floating point number %g"
+         " to character string\n", val);
       return NULL; /* make the compiler happy */
 }
 
 int lpx_write_mps(LPX *lp, const char *fname)
-{     FILE *fp;
+{     XFILE *fp;
       int wide = lpx_get_int_parm(lp, LPX_K_MPSWIDE);
       int frei = lpx_get_int_parm(lp, LPX_K_MPSFREE);
       int skip = lpx_get_int_parm(lp, LPX_K_MPSSKIP);
@@ -955,11 +957,12 @@ int lpx_write_mps(LPX *lp, const char *fname)
       int mip, make_obj, nrows, ncols, i, j, flag, *ndx;
       double *obj, *val;
       char rname[8+1], cname[8+1], vname[8+1], numb[12+1];
-      print("lpx_write_mps: writing problem data to `%s'...", fname);
+      xprintf("lpx_write_mps: writing problem data to `%s'...\n",
+         fname);
       /* open the output text file */
       fp = xfopen(fname, "w");
       if (fp == NULL)
-      {  print("lpx_write_mps: unable to create `%s' - %s", fname,
+      {  xprintf("lpx_write_mps: unable to create `%s' - %s\n", fname,
             strerror(errno));
          goto fail;
       }
@@ -970,7 +973,7 @@ int lpx_write_mps(LPX *lp, const char *fname)
       ncols = lpx_get_num_cols(lp);
       /* the problem should contain at least one row and one column */
       if (!(nrows > 0 && ncols > 0))
-         fault("lpx_write_mps: problem has no rows/columns");
+         xfault("lpx_write_mps: problem has no rows/columns\n");
       /* determine if the routine should output the objective row */
       make_obj = lpx_get_int_parm(lp, LPX_K_MPSOBJ);
       if (make_obj == 2)
@@ -987,29 +990,29 @@ int lpx_write_mps(LPX *lp, const char *fname)
       if (lpx_get_int_parm(lp, LPX_K_MPSINFO))
       {  const char *name = lpx_get_prob_name(lp);
          if (name == NULL) name = "UNKNOWN";
-         fprintf(fp, "* Problem:    %.31s\n", name);
-         fprintf(fp, "* Class:      %s\n", !mip ? "LP" : "MIP");
-         fprintf(fp, "* Rows:       %d\n", nrows);
+         xfprintf(fp, "* Problem:    %.31s\n", name);
+         xfprintf(fp, "* Class:      %s\n", !mip ? "LP" : "MIP");
+         xfprintf(fp, "* Rows:       %d\n", nrows);
          if (!mip)
-            fprintf(fp, "* Columns:    %d\n", ncols);
+            xfprintf(fp, "* Columns:    %d\n", ncols);
          else
-            fprintf(fp, "* Columns:    %d (%d integer, %d binary)\n",
+            xfprintf(fp, "* Columns:    %d (%d integer, %d binary)\n",
                ncols, lpx_get_num_int(lp), lpx_get_num_bin(lp));
-         fprintf(fp, "* Non-zeros:  %d\n", lpx_get_num_nz(lp));
-         fprintf(fp, "* Format:     Fixed MPS\n");
-         fprintf(fp, "*\n");
+         xfprintf(fp, "* Non-zeros:  %d\n", lpx_get_num_nz(lp));
+         xfprintf(fp, "* Format:     Fixed MPS\n");
+         xfprintf(fp, "*\n");
       }
       /* write NAME indicator card */
       {  const char *name = lpx_get_prob_name(lp);
          if (name == NULL)
-            fprintf(fp, "NAME\n");
+            xfprintf(fp, "NAME\n");
          else
-            fprintf(fp, "NAME          %.8s\n", name);
+            xfprintf(fp, "NAME          %.8s\n", name);
       }
       /* write ROWS section */
-      fprintf(fp, "ROWS\n");
+      xfprintf(fp, "ROWS\n");
       if (make_obj)
-         fprintf(fp, " %c  %s\n", 'N', row_name(lp, 0, rname));
+         xfprintf(fp, " %c  %s\n", 'N', row_name(lp, 0, rname));
       for (i = 1; i <= nrows; i++)
       {  int typx;
          lpx_get_row_bnds(lp, i, &typx, NULL, NULL);
@@ -1021,7 +1024,7 @@ int lpx_write_mps(LPX *lp, const char *fname)
             case LPX_FX: typx = 'E'; break;
             default: xassert(typx != typx);
          }
-         fprintf(fp, " %c  %s\n", typx, row_name(lp, i, rname));
+         xfprintf(fp, " %c  %s\n", typx, row_name(lp, i, rname));
       }
       /* prepare coefficients of the objective function */
       obj = xcalloc(1+ncols, sizeof(double));
@@ -1048,7 +1051,7 @@ int lpx_write_mps(LPX *lp, const char *fname)
       for (j = 0; j <= ncols; j++)
          if (fabs(obj[j]) < 1e-12) obj[j] = 0.0;
       /* write COLUMNS section */
-      fprintf(fp, "COLUMNS\n");
+      xfprintf(fp, "COLUMNS\n");
       ndx = xcalloc(1+nrows, sizeof(int));
       val = xcalloc(1+nrows, sizeof(double));
       for (j = 1; j <= ncols; j++)
@@ -1058,13 +1061,13 @@ int lpx_write_mps(LPX *lp, const char *fname)
          if (iv && marker % 2 == 0)
          {  /* open new intorg/intend group */
             marker++;
-            fprintf(fp, "    M%07d  'MARKER'                 'INTORG'\n"
+           xfprintf(fp, "    M%07d  'MARKER'                 'INTORG'\n"
                , marker);
          }
          else if (!iv && marker % 2 == 1)
          {  /* close the current intorg/intend group */
             marker++;
-            fprintf(fp, "    M%07d  'MARKER'                 'INTEND'\n"
+           xfprintf(fp, "    M%07d  'MARKER'                 'INTEND'\n"
                , marker);
          }
          /* obtain j-th column of the constraint matrix */
@@ -1072,25 +1075,25 @@ int lpx_write_mps(LPX *lp, const char *fname)
          ndx[0] = 0;
          val[0] = (make_obj ? obj[j] : 0.0);
          if (len == 0 && val[0] == 0.0 && !skip)
-            fprintf(fp, "    %-8s  %-8s  %12s   $ empty column\n",
+            xfprintf(fp, "    %-8s  %-8s  %12s   $ empty column\n",
                cname, row_name(lp, 1, rname), mps_numb(0.0, numb));
          for (t = val[0] != 0.0 ? 0 : 1; t <= len; t++)
          {  if (nl)
-               fprintf(fp, "    %-8s  ", cname);
+               xfprintf(fp, "    %-8s  ", cname);
             else
-               fprintf(fp, "   ");
-            fprintf(fp, "%-8s  %12s",
+               xfprintf(fp, "   ");
+            xfprintf(fp, "%-8s  %12s",
                row_name(lp, ndx[t], rname), mps_numb(val[t], numb));
             if (wide) nl = 1 - nl;
-            if (nl) fprintf(fp, "\n");
+            if (nl) xfprintf(fp, "\n");
             if (frei) strcpy(cname, "");
          }
-         if (!nl) fprintf(fp, "\n");
+         if (!nl) xfprintf(fp, "\n");
       }
       if (marker % 2 == 1)
       {  /* close the last intorg/intend group (if not closed) */
          marker++;
-         fprintf(fp, "    M%07d  'MARKER'                 'INTEND'\n",
+         xfprintf(fp, "    M%07d  'MARKER'                 'INTEND'\n",
             marker);
       }
       xfree(ndx);
@@ -1121,17 +1124,17 @@ int lpx_write_mps(LPX *lp, const char *fname)
                   xassert(typx != typx);
             }
             if (rhs == 0.0) continue;
-            if (!flag) fprintf(fp, "RHS\n"), flag = 1;
+            if (!flag) xfprintf(fp, "RHS\n"), flag = 1;
             if (nl)
-                fprintf(fp, "    %-8s  ", vname);
+                xfprintf(fp, "    %-8s  ", vname);
             else
-                fprintf(fp, "   ");
-            fprintf(fp, "%-8s  %12s",
+                xfprintf(fp, "   ");
+            xfprintf(fp, "%-8s  %12s",
                row_name(lp, i, rname), mps_numb(rhs, numb));
             if (wide) nl = 1 - nl;
-            if (nl) fprintf(fp, "\n");
+            if (nl) xfprintf(fp, "\n");
          }
-         if (!nl) fprintf(fp, "\n");
+         if (!nl) xfprintf(fp, "\n");
       }
       xfree(obj);
       /* write RANGES section */
@@ -1143,18 +1146,18 @@ int lpx_write_mps(LPX *lp, const char *fname)
             double lb, ub, rng;
             lpx_get_row_bnds(lp, i, &typx, &lb, &ub);
             if (typx != LPX_DB) continue;
-            if (!flag) fprintf(fp, "RANGES\n"), flag = 1;
+            if (!flag) xfprintf(fp, "RANGES\n"), flag = 1;
             if (nl)
-                fprintf(fp, "    %-8s  ", vname);
+                xfprintf(fp, "    %-8s  ", vname);
             else
-                fprintf(fp, "   ");
+                xfprintf(fp, "   ");
             rng = (ub > 0.0 ? ub - lb : lb - ub);
-            fprintf(fp, "%-8s  %12s",
+            xfprintf(fp, "%-8s  %12s",
                row_name(lp, i, rname), mps_numb(rng, numb));
             if (wide) nl = 1 - nl;
-            if (nl) fprintf(fp, "\n");
+            if (nl) xfprintf(fp, "\n");
          }
-         if (!nl) fprintf(fp, "\n");
+         if (!nl) xfprintf(fp, "\n");
       }
       /* write BOUNDS section */
       flag = 0;
@@ -1164,31 +1167,31 @@ int lpx_write_mps(LPX *lp, const char *fname)
             double lb, ub;
             lpx_get_col_bnds(lp, j, &typx, &lb, &ub);
             if (typx == LPX_LO && lb == 0.0) continue;
-            if (!flag) fprintf(fp, "BOUNDS\n"), flag = 1;
+            if (!flag) xfprintf(fp, "BOUNDS\n"), flag = 1;
             switch (typx)
             {  case LPX_FR:
-                  fprintf(fp, " FR %-8s  %-8s\n", vname,
+                  xfprintf(fp, " FR %-8s  %-8s\n", vname,
                      col_name(lp, j, cname));
                   break;
                case LPX_LO:
-                  fprintf(fp, " LO %-8s  %-8s  %12s\n", vname,
+                  xfprintf(fp, " LO %-8s  %-8s  %12s\n", vname,
                      col_name(lp, j, cname), mps_numb(lb, numb));
                   break;
                case LPX_UP:
-                  fprintf(fp, " MI %-8s  %-8s\n", vname,
+                  xfprintf(fp, " MI %-8s  %-8s\n", vname,
                      col_name(lp, j, cname));
-                  fprintf(fp, " UP %-8s  %-8s  %12s\n", vname,
+                  xfprintf(fp, " UP %-8s  %-8s  %12s\n", vname,
                      col_name(lp, j, cname), mps_numb(ub, numb));
                   break;
                case LPX_DB:
                   if (lb != 0.0)
-                  fprintf(fp, " LO %-8s  %-8s  %12s\n", vname,
+                  xfprintf(fp, " LO %-8s  %-8s  %12s\n", vname,
                      col_name(lp, j, cname), mps_numb(lb, numb));
-                  fprintf(fp, " UP %-8s  %-8s  %12s\n", vname,
+                  xfprintf(fp, " UP %-8s  %-8s  %12s\n", vname,
                      col_name(lp, j, cname), mps_numb(ub, numb));
                   break;
                case LPX_FX:
-                  fprintf(fp, " FX %-8s  %-8s  %12s\n", vname,
+                  xfprintf(fp, " FX %-8s  %-8s  %12s\n", vname,
                      col_name(lp, j, cname), mps_numb(lb, numb));
                   break;
                default:
@@ -1197,11 +1200,11 @@ int lpx_write_mps(LPX *lp, const char *fname)
          }
       }
       /* write ENDATA indicator card */
-      fprintf(fp, "ENDATA\n");
+      xfprintf(fp, "ENDATA\n");
       /* close the output text file */
-      fflush(fp);
-      if (ferror(fp))
-      {  print("lpx_write_mps: write error on `%s' - %s", fname,
+      xfflush(fp);
+      if (xferror(fp))
+      {  xprintf("lpx_write_mps: write error on `%s' - %s\n", fname,
             strerror(errno));
          goto fail;
       }
@@ -1239,19 +1242,19 @@ int lpx_read_bas(LPX *lp, const char *fname)
       dsa->fp = NULL;
       dsa->count = 0;
       dsa->obj = 0;
-      print("lpx_read_bas: reading LP basis from `%s'...",
+      xprintf("lpx_read_bas: reading LP basis from `%s'...\n",
          dsa->fname);
       dsa->fp = xfopen(dsa->fname, "r");
       if (dsa->fp == NULL)
-      {  print("lpx_read_bas: unable to open `%s' - %s", dsa->fname,
-            strerror(errno));
+      {  xprintf("lpx_read_bas: unable to open `%s' - %s\n",
+            dsa->fname, strerror(errno));
          goto fail;
       }
       lpx_create_index(dsa->lp);
       /* read NAME indicator card */
       if (read_card(dsa)) goto fail;
       if (memcmp(dsa->card, "NAME ", 5) != 0)
-      {  print("%s:%d: NAME indicator card missing", dsa->fname,
+      {  xprintf("%s:%d: NAME indicator card missing\n", dsa->fname,
             dsa->count);
          goto fail;
       }
@@ -1264,19 +1267,19 @@ loop: /* read and split next data card */
       /* check indicator in field 1 */
       if (!(strcmp(dsa->f1, "XL") == 0 || strcmp(dsa->f1, "XU") == 0 ||
             strcmp(dsa->f1, "LL") == 0 || strcmp(dsa->f1, "UL") == 0))
-      {  print("%s:%d: invalid indicator in filed 1", dsa->fname,
+      {  xprintf("%s:%d: invalid indicator in field 1\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       /* scan column name in field 2 */
       if (dsa->f2[0] == '\0')
-      {  print("%s:%d: missing column name in field 2", dsa->fname,
+      {  xprintf("%s:%d: missing column name in field 2\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       j = lpx_find_col(dsa->lp, dsa->f2);
       if (j == 0)
-      {  print("%s:%d: column %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: column %s not found\n", dsa->fname, dsa->count,
             dsa->f2);
          goto fail;
       }
@@ -1284,13 +1287,13 @@ loop: /* read and split next data card */
       if (dsa->f1[0] == 'X')
       {  /* scan row name in field 3 */
          if (dsa->f3[0] == '\0')
-         {  print("%s:%d: missing row name in field 3", dsa->fname,
+         {  xprintf("%s:%d: missing row name in field 3\n", dsa->fname,
                dsa->count);
             goto fail;
          }
          i = lpx_find_row(dsa->lp, dsa->f3);
          if (i == 0)
-         {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+         {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
                dsa->f3);
             goto fail;
          }
@@ -1298,7 +1301,7 @@ loop: /* read and split next data card */
       else
       {  /* field 3 must be blank */
          if (dsa->f3[0] != '\0')
-         {  print("%s:%d: invalid data card; field 3 must be blank",
+         {  xprintf("%s:%d: invalid data card; field 3 must be blank\n",
                dsa->fname, dsa->count);
             goto fail;
          }
@@ -1307,7 +1310,7 @@ loop: /* read and split next data card */
       /* fields 4-6 must be blank */
       if (!(dsa->f4[0] == '\0' && dsa->f5[0] == '\0' &&
             dsa->f6[0] == '\0'))
-      {  print("%s:%d: invalid data card; fields 4-6 must be blank",
+      {  xprintf("%s:%d: invalid data card; fields 4-6 must be blank\n",
             dsa->fname, dsa->count);
          goto fail;
       }
@@ -1323,11 +1326,11 @@ loop: /* read and split next data card */
       goto loop;
 fini: /* check ENDATA indicator card */
       if (memcmp(dsa->card, "ENDATA ", 7) != 0)
-      {  print("%s:%d: ENDATA indicator card missing", dsa->fname,
+      {  xprintf("%s:%d: ENDATA indicator card missing\n", dsa->fname,
             dsa->count);
          goto fail;
       }
-      print("lpx_read_bas: %d cards were read", dsa->count);
+      xprintf("lpx_read_bas: %d cards were read\n", dsa->count);
       xfclose(dsa->fp);
       lpx_delete_index(dsa->lp);
       return 0;
@@ -1355,14 +1358,14 @@ fail: if (dsa->fp != NULL) xfclose(dsa->fp);
 -- the routine prints an error message and returns non-zero. */
 
 int lpx_write_bas(LPX *lp, const char *fname)
-{     FILE *fp;
+{     XFILE *fp;
       int nrows, ncols, i, j, rtype, ctype, rstat, cstat;
       char rname[8+1], cname[8+1];
-      print("lpx_write_bas: writing LP basis to `%s'...", fname);
+      xprintf("lpx_write_bas: writing LP basis to `%s'...\n", fname);
       /* open the output text file */
       fp = xfopen(fname, "w");
       if (fp == NULL)
-      {  print("lpx_write_bas: unable to create `%s' - %s", fname,
+      {  xprintf("lpx_write_bas: unable to create `%s' - %s\n", fname,
             strerror(errno));
          goto fail;
       }
@@ -1371,7 +1374,7 @@ int lpx_write_bas(LPX *lp, const char *fname)
       ncols = lpx_get_num_cols(lp);
       /* the problem should contain at least one row and one column */
       if (!(nrows > 0 && ncols > 0))
-         fault("lpx_write_bas: problem has no rows/columns");
+         xfault("lpx_write_bas: problem has no rows/columns\n");
       /* write comment cards (if required) */
       if (lpx_get_int_parm(lp, LPX_K_MPSINFO))
       {  int dir, status;
@@ -1380,13 +1383,13 @@ int lpx_write_bas(LPX *lp, const char *fname)
          /* problem name and statistics */
          name = lpx_get_prob_name(lp);
          if (name == NULL) name = "UNKNOWN";
-         fprintf(fp, "* Problem:    %.31s\n", name);
-         fprintf(fp, "* Rows:       %d\n", nrows);
-         fprintf(fp, "* Columns:    %d\n", ncols);
-         fprintf(fp, "* Non-zeros:  %d\n", lpx_get_num_nz(lp));
+         xfprintf(fp, "* Problem:    %.31s\n", name);
+         xfprintf(fp, "* Rows:       %d\n", nrows);
+         xfprintf(fp, "* Columns:    %d\n", ncols);
+         xfprintf(fp, "* Non-zeros:  %d\n", lpx_get_num_nz(lp));
          /* solution status */
          status = lpx_get_status(lp);
-         fprintf(fp, "* Status:     %s\n",
+         xfprintf(fp, "* Status:     %s\n",
             status == LPX_OPT    ? "OPTIMAL" :
             status == LPX_FEAS   ? "FEASIBLE" :
             status == LPX_INFEAS ? "INFEASIBLE (INTERMEDIATE)" :
@@ -1397,20 +1400,20 @@ int lpx_write_bas(LPX *lp, const char *fname)
          name = lpx_get_obj_name(lp);
          dir = lpx_get_obj_dir(lp);
          obj = lpx_get_obj_val(lp);
-         fprintf(fp, "* Objective:  %s%s%.10g %s\n",
+         xfprintf(fp, "* Objective:  %s%s%.10g %s\n",
             name == NULL ? "" : name,
             name == NULL ? "" : " = ", obj,
             dir == LPX_MIN ? "(MINimum)" :
             dir == LPX_MAX ? "(MAXimum)" : "(" "???" ")");
-         fprintf(fp, "* Format:     Fixed MPS\n");
-         fprintf(fp, "*\n");
+         xfprintf(fp, "* Format:     Fixed MPS\n");
+         xfprintf(fp, "*\n");
       }
       /* write NAME indicator card */
       {  const char *name = lpx_get_prob_name(lp);
          if (name == NULL)
-            fprintf(fp, "NAME\n");
+            xfprintf(fp, "NAME\n");
          else
-            fprintf(fp, "NAME          %.8s\n", name);
+            xfprintf(fp, "NAME          %.8s\n", name);
       }
       /* write information about which columns should be made basic
          and which rows should be made non-basic */
@@ -1434,7 +1437,7 @@ int lpx_write_bas(LPX *lp, const char *fname)
          xassert(i <= nrows && j <= ncols);
          /* write the pair (basic column, non-basic row) */
          lpx_get_row_bnds(lp, i, &rtype, NULL, NULL);
-         fprintf(fp, " %s %-8s  %s\n",
+         xfprintf(fp, " %s %-8s  %s\n",
             (rtype == LPX_DB && rstat == LPX_NU) ? "XU" : "XL",
             col_name(lp, j, cname), row_name(lp, i, rname));
       }
@@ -1444,15 +1447,15 @@ int lpx_write_bas(LPX *lp, const char *fname)
       {  lpx_get_col_bnds(lp, j, &ctype, NULL, NULL);
          lpx_get_col_info(lp, j, &cstat, NULL, NULL);
          if (ctype == LPX_DB && cstat != LPX_BS)
-            fprintf(fp, " %s %s\n",
+            xfprintf(fp, " %s %s\n",
                cstat == LPX_NU ? "UL" : "LL", col_name(lp, j, cname));
       }
       /* write ENDATA indcator card */
-      fprintf(fp, "ENDATA\n");
+      xfprintf(fp, "ENDATA\n");
       /* close the output text file */
-      fflush(fp);
-      if (ferror(fp))
-      {  print("lpx_write_bas: write error on `%s' - %s", fname,
+      xfflush(fp);
+      if (xferror(fp))
+      {  xprintf("lpx_write_bas: write error on `%s' - %s\n", fname,
             strerror(errno));
          goto fail;
       }
@@ -1499,7 +1502,7 @@ struct dsa
       /* LP/MIP problem object */
       const char *fname;
       /* name of input text file */
-      FILE *fp;
+      XFILE *fp;
       /* stream assigned to input text file */
       int count;
       /* line count */
@@ -1516,15 +1519,15 @@ static int read_c(struct dsa *dsa)
 {     /* read character from input file */
       int c;
       if (dsa->c == '\n') dsa->count++;
-      c = fgetc(dsa->fp);
-      if (ferror(dsa->fp))
-      {  print("%s:%d: read error - %s", dsa->fname, dsa->count,
+      c = xfgetc(dsa->fp);
+      if (xferror(dsa->fp))
+      {  xprintf("%s:%d: read error - %s\n", dsa->fname, dsa->count,
             strerror(errno));
          goto fail;
       }
-      if (feof(dsa->fp))
+      if (xfeof(dsa->fp))
       {  if (dsa->c == '\n')
-         {  print("%s:%d: unexpected EOF", dsa->fname, dsa->count);
+         {  xprintf("%s:%d: unexpected EOF\n", dsa->fname, dsa->count);
             goto fail;
          }
          c = '\n';
@@ -1534,8 +1537,8 @@ static int read_c(struct dsa *dsa)
       else if (isspace(c))
          c = ' ';
       else if (iscntrl(c))
-      {  print("%s:%d: invalid control character 0x%02X", dsa->fname,
-            dsa->count, c);
+      {  xprintf("%s:%d: invalid control character 0x%02X\n",
+            dsa->fname, dsa->count, c);
          goto fail;
       }
       dsa->c = c;
@@ -1577,7 +1580,7 @@ static int read_item(struct dsa *dsa)
       {  int len = 0;
          while (!(dsa->c == ' ' || dsa->c == '\n'))
          {  if (len == sizeof(dsa->item) - 1)
-            {  print("%s:%d: item `%.15s...' too long", dsa->fname,
+            {  xprintf("%s:%d: item `%.15s...' too long\n", dsa->fname,
                   dsa->count, dsa->item);
                goto fail;
             }
@@ -1600,7 +1603,7 @@ loop: /* check if there is more data lines */
       /* scan row type */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing row type", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: missing row type\n", dsa->fname, dsa->count);
          goto fail;
       }
       else if (strcmp(dsa->item, "N") == 0)
@@ -1616,14 +1619,14 @@ loop: /* check if there is more data lines */
       else if (strcmp(dsa->item, "E") == 0)
          type = LPX_FX;
       else
-      {  print("%s:%d: invalid row type", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: invalid row type\n", dsa->fname, dsa->count);
          goto fail;
       }
       lpx_set_row_bnds(dsa->lp, i, type, 0.0, 0.0);
       /* scan row name */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing row name", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: missing row name\n", dsa->fname, dsa->count);
          goto fail;
       }
       lpx_set_row_name(dsa->lp, i, dsa->item);
@@ -1671,14 +1674,15 @@ loop: /* check if there is more data lines */
       /* scan column name */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing column name", dsa->fname, dsa->count);
+      {  xprintf(
+            "%s:%d: missing column name\n", dsa->fname, dsa->count);
          goto fail;
       }
       strcpy(cname, dsa->item);
       /* scan row name */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing row name", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: missing row name\n", dsa->fname, dsa->count);
          goto fail;
       }
       strcpy(rname, dsa->item);
@@ -1686,7 +1690,8 @@ loop: /* check if there is more data lines */
       if (strcmp(rname, "'MARKER'") == 0)
       {  if (read_item(dsa)) goto fail;
          if (dsa->item[0] == '\0')
-         {  print("%s:%d: missing marker type", dsa->fname, dsa->count);
+         {  xprintf(
+               "%s:%d: missing marker type\n", dsa->fname, dsa->count);
             goto fail;
          }
          else if (strcmp(dsa->item, "'INTORG'") == 0)
@@ -1694,7 +1699,8 @@ loop: /* check if there is more data lines */
          else if (strcmp(dsa->item, "'INTEND'") == 0)
             marker = 0;
          else
-         {  print("%s:%d: invalid marker type", dsa->fname, dsa->count);
+         {  xprintf(
+               "%s:%d: invalid marker type\n", dsa->fname, dsa->count);
             goto fail;
          }
          goto skip;
@@ -1707,8 +1713,8 @@ loop: /* check if there is more data lines */
          }
          /* create new column */
          if (lpx_find_col(dsa->lp, cname) != 0)
-         {  print("%s:%d: column %s multiply specified", dsa->fname,
-               dsa->count, cname);
+         {  xprintf("%s:%d: column %s multiply specified\n",
+               dsa->fname, dsa->count, cname);
             goto fail;
          }
          j = lpx_add_cols(dsa->lp, 1);
@@ -1722,24 +1728,24 @@ loop: /* check if there is more data lines */
       /* find row */
       i = lpx_find_row(dsa->lp, rname);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             rname);
          goto fail;
       }
       /* scan coefficient value */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing coefficient value", dsa->fname,
+      {  xprintf("%s:%d: missing coefficient value\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (str2num(dsa->item, &temp))
-      {  print("%s:%d: invalid coefficient value", dsa->fname,
+      {  xprintf("%s:%d: invalid coefficient value\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: coefficient in row %s multiply specified",
+      {  xprintf("%s:%d: coefficient in row %s multiply specified\n",
             dsa->fname, dsa->count, rname);
          goto fail;
       }
@@ -1751,24 +1757,24 @@ loop: /* check if there is more data lines */
       /* find row */
       i = lpx_find_row(dsa->lp, rname);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             rname);
          goto fail;
       }
       /* scan coefficient value */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing coefficient value", dsa->fname,
+      {  xprintf("%s:%d: missing coefficient value\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (str2num(dsa->item, &temp))
-      {  print("%s:%d: invalid coefficient value", dsa->fname,
+      {  xprintf("%s:%d: invalid coefficient value\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: coefficient in row %s multiply specified",
+      {  xprintf("%s:%d: coefficient in row %s multiply specified\n",
             dsa->fname, dsa->count, rname);
          goto fail;
       }
@@ -1794,9 +1800,9 @@ static void set_rhs(struct dsa *dsa, int i, double b)
             if (dsa->obj == i)
                lpx_set_obj_coef(dsa->lp, 0, b);
             else if (b != 0.0)
-               print("%s:%d: warning: non-zero rhs for free row %s igno"
-                  "red", dsa->fname, dsa->count, lpx_get_row_name(dsa->
-                  lp, i));
+               xprintf("%s:%d: warning: non-zero rhs for free row %s ig"
+                  "nored\n", dsa->fname, dsa->count,
+                  lpx_get_row_name(dsa->lp, i));
             break;
          case LPX_LO:
             lpx_set_row_bnds(dsa->lp, i, LPX_LO, b, 0.0);
@@ -1827,42 +1833,42 @@ loop: /* check if there is more data lines */
       /* scan rhs vector name */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing rhs vector name", dsa->fname,
+      {  xprintf("%s:%d: missing rhs vector name\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (name[0] == '\0') strcpy(name, dsa->item);
       if (strcmp(dsa->item, name) != 0)
-      {  print("%s:%d: at most one rhs vector allowed", dsa->fname,
+      {  xprintf("%s:%d: at most one rhs vector allowed\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       /* scan row name */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing row name", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: missing row name\n", dsa->fname, dsa->count);
          goto fail;
       }
       /* find row */
       i = lpx_find_row(dsa->lp, dsa->item);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             dsa->item);
          goto fail;
       }
       /* scan rhs value */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing rhs value", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: missing rhs value\n", dsa->fname, dsa->count);
          goto fail;
       }
       if (str2num(dsa->item, &temp))
-      {  print("%s:%d: invalid rhs value", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: invalid rhs value\n", dsa->fname, dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: rhs for row %s multiply specified", dsa->fname,
-            dsa->count, lpx_get_row_name(dsa->lp, i));
+      {  xprintf("%s:%d: rhs for row %s multiply specified\n",
+            dsa->fname, dsa->count, lpx_get_row_name(dsa->lp, i));
          goto fail;
       }
       set_rhs(dsa, i, temp), map[i] = 1;
@@ -1872,23 +1878,23 @@ loop: /* check if there is more data lines */
       /* find row */
       i = lpx_find_row(dsa->lp, dsa->item);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             dsa->item);
          goto fail;
       }
       /* scan rhs value */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing rhs value", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: missing rhs value\n", dsa->fname, dsa->count);
          goto fail;
       }
       if (str2num(dsa->item, &temp))
-      {  print("%s:%d: invalid rhs value", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: invalid rhs value\n", dsa->fname, dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: rhs for row %s multiply specified", dsa->fname,
-            dsa->count, lpx_get_row_name(dsa->lp, i));
+      {  xprintf("%s:%d: rhs for row %s multiply specified\n",
+            dsa->fname, dsa->count, lpx_get_row_name(dsa->lp, i));
          goto fail;
       }
       set_rhs(dsa, i, temp), map[i] = 1;
@@ -1909,8 +1915,9 @@ static void set_range(struct dsa *dsa, int i, double r)
       double b;
       switch (lpx_get_row_type(dsa->lp, i))
       {  case LPX_FR:
-            print("%s:%d: warning: range value for free row %s ignored",
-               dsa->fname, dsa->count, lpx_get_row_name(dsa->lp, i));
+            xprintf("%s:%d: warning: range value for free row %s ignore"
+               "d\n", dsa->fname, dsa->count,
+               lpx_get_row_name(dsa->lp, i));
             break;
          case LPX_LO:
             b = lpx_get_row_lb(dsa->lp, i);
@@ -1953,42 +1960,44 @@ loop: /* check if there is more data lines */
       /* scan range vector name */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing range vector name", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: missing range vector name\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       if (name[0] == '\0') strcpy(name, dsa->item);
       if (strcmp(dsa->item, name) != 0)
-      {  print("%s:%d: at most one range vector allowed", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: at most one range vector allowed\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       /* scan row name */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing row name", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: missing row name\n", dsa->fname, dsa->count);
          goto fail;
       }
       /* find row */
       i = lpx_find_row(dsa->lp, dsa->item);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             dsa->item);
          goto fail;
       }
       /* scan range value */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing range value", dsa->fname, dsa->count);
+      {  xprintf(
+            "%s:%d: missing range value\n", dsa->fname, dsa->count);
          goto fail;
       }
       if (str2num(dsa->item, &temp))
-      {  print("%s:%d: invalid range value", dsa->fname, dsa->count);
+      {  xprintf(
+            "%s:%d: invalid range value\n", dsa->fname, dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: range for row %s multiply specified", dsa->fname,
-            dsa->count, lpx_get_row_name(dsa->lp, i));
+      {  xprintf("%s:%d: range for row %s multiply specified\n",
+            dsa->fname, dsa->count, lpx_get_row_name(dsa->lp, i));
          goto fail;
       }
       set_range(dsa, i, temp), map[i] = 1;
@@ -1998,23 +2007,25 @@ loop: /* check if there is more data lines */
       /* find row */
       i = lpx_find_row(dsa->lp, dsa->item);
       if (i == 0)
-      {  print("%s:%d: row %s not found", dsa->fname, dsa->count,
+      {  xprintf("%s:%d: row %s not found\n", dsa->fname, dsa->count,
             dsa->item);
          goto fail;
       }
       /* scan range value */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing range value", dsa->fname, dsa->count);
+      {  xprintf(
+            "%s:%d: missing range value\n", dsa->fname, dsa->count);
          goto fail;
       }
       if (str2num(dsa->item, &temp))
-      {  print("%s:%d: invalid range value", dsa->fname, dsa->count);
+      {  xprintf(
+            "%s:%d: invalid range value\n", dsa->fname, dsa->count);
          goto fail;
       }
       if (map[i])
-      {  print("%s:%d: range for row %s multiply specified", dsa->fname,
-            dsa->count, lpx_get_row_name(dsa->lp, i));
+      {  xprintf("%s:%d: range for row %s multiply specified\n",
+            dsa->fname, dsa->count, lpx_get_row_name(dsa->lp, i));
          goto fail;
       }
       set_range(dsa, i, temp), map[i] = 1;
@@ -2041,38 +2052,41 @@ loop: /* check if there is more data lines */
       /* scan bound type */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing bound type", dsa->fname, dsa->count);
+      {  xprintf(
+            "%s:%d: missing bound type\n", dsa->fname, dsa->count);
          goto fail;
       }
       if (strlen(dsa->item) != 2)
-      {  print("%s:%d: invalid bound type", dsa->fname, dsa->count);
+      {  xprintf(
+            "%s:%d: invalid bound type\n", dsa->fname, dsa->count);
          goto fail;
       }
       strcpy(btyp, dsa->item);
       /* scan bound vector name */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing bound vector name", dsa->fname,
+      {  xprintf("%s:%d: missing bound vector name\n", dsa->fname,
             dsa->count);
          goto fail;
       }
       if (name[0] == '\0') strcpy(name, dsa->item);
       if (strcmp(dsa->item, name) != 0)
-      {  print("%s:%d: at most one bound vector allowed", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: at most one bound vector allowed\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       /* scan column name */
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing column name", dsa->fname, dsa->count);
+      {  xprintf(
+            "%s:%d: missing column name\n", dsa->fname, dsa->count);
          goto fail;
       }
       /* find column */
       j = lpx_find_col(dsa->lp, dsa->item);
       if (j == 0)
-      {  print("%s:%d: column %s not found", dsa->fname, dsa->count,
-            dsa->item);
+      {  xprintf("%s:%d: column %s not found\n",
+            dsa->fname, dsa->count, dsa->item);
          goto fail;
       }
       /* scan optional bound value */
@@ -2082,11 +2096,13 @@ loop: /* check if there is more data lines */
          goto skip;
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-      {  print("%s:%d: missing bound value", dsa->fname, dsa->count);
+      {  xprintf(
+            "%s:%d: missing bound value\n", dsa->fname, dsa->count);
          goto fail;
       }
       if (str2num(dsa->item, &temp))
-      {  print("%s:%d: invalid bound value", dsa->fname, dsa->count);
+      {  xprintf(
+            "%s:%d: invalid bound value\n", dsa->fname, dsa->count);
          goto fail;
       }
 skip: /* change column bounds */
@@ -2129,7 +2145,8 @@ skip: /* change column bounds */
          lb = 0.0, ub = 1.0;
       }
       else
-      {  print("%s:%d: invalid bound type", dsa->fname, dsa->count);
+      {  xprintf(
+            "%s:%d: invalid bound type\n", dsa->fname, dsa->count);
          goto fail;
       }
       if (lb == -DBL_MAX && ub == +DBL_MAX)
@@ -2162,21 +2179,21 @@ LPX *lpx_read_freemps(const char *fname)
       dsa->count = 0;
       dsa->c = '\n';
       dsa->obj = 0;
-      print("lpx_read_freemps: reading problem data from `%s'...",
+      xprintf("lpx_read_freemps: reading problem data from `%s'...\n",
          dsa->fname);
       dsa->fp = xfopen(dsa->fname, "r");
       if (dsa->fp == NULL)
-      {  print("lpx_read_freemps: unable to open `%s' - %s", dsa->fname,
-            strerror(errno));
+      {  xprintf("lpx_read_freemps: unable to open `%s' - %s\n",
+            dsa->fname, strerror(errno));
          goto fail;
       }
       dsa->lp = lpx_create_prob();
       lpx_create_index(dsa->lp);
-      /* read very first character */
+      /* read the very first character */
       if (read_char(dsa)) goto fail;
       /* read NAME indicator record */
       if (dsa->c == ' ')
-err1: {  print("%s:%d: NAME indicator record missing", dsa->fname,
+err1: {  xprintf("%s:%d: NAME indicator record missing\n", dsa->fname,
             dsa->count);
          goto fail;
       }
@@ -2184,9 +2201,9 @@ err1: {  print("%s:%d: NAME indicator record missing", dsa->fname,
       if (strcmp(dsa->item, "NAME") != 0) goto err1;
       if (read_item(dsa)) goto fail;
       if (dsa->item[0] == '\0')
-         print("lpx_read_freemps: problem name not specified");
+         xprintf("lpx_read_freemps: problem name not specified\n");
       else
-      {  print("lpx_read_freemps: problem %s", dsa->item);
+      {  xprintf("lpx_read_freemps: problem %s\n", dsa->item);
          lpx_set_prob_name(dsa->lp, dsa->item);
          while (dsa->c != '\n')
             if (read_char(dsa)) goto fail;
@@ -2195,8 +2212,8 @@ err1: {  print("%s:%d: NAME indicator record missing", dsa->fname,
       xassert(dsa->item[0] == '\0');
       /* read ROWS section */
       if (dsa->c == ' ')
-err2: {  print("%s:%d: ROWS indicator record missing", dsa->fname,
-            dsa->count);
+err2: {  xprintf("%s:%d: ROWS indicator record missing\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       if (read_item(dsa)) goto fail;
@@ -2210,8 +2227,8 @@ err2: {  print("%s:%d: ROWS indicator record missing", dsa->fname,
       xassert(dsa->c != ' ');
       if (read_item(dsa)) goto fail;
       if (strcmp(dsa->item, "COLUMNS") != 0)
-      {  print("%s:%d: COLUMNS indicator record missing", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: COLUMNS indicator record missing\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       while (dsa->c != '\n')
@@ -2222,9 +2239,9 @@ err2: {  print("%s:%d: ROWS indicator record missing", dsa->fname,
       {  int m = lpx_get_num_rows(dsa->lp);
          int n = lpx_get_num_cols(dsa->lp);
          int nnz = lpx_get_num_nz(dsa->lp);
-         print("lpx_read_freemps: %d row%s, %d column%s, %d non-zero%s",
-            m, m == 1 ? "" : "s", n, n == 1 ? "" : "s", nnz, nnz == 1 ?
-            "" : "s");
+         xprintf("lpx_read_freemps: %d row%s, %d column%s, %d non-zero%"
+            "s\n", m, m == 1 ? "" : "s", n, n == 1 ? "" : "s", nnz,
+            nnz == 1 ? "" : "s");
       }
       /* read RHS section (optional) */
       xassert(dsa->c != ' ');
@@ -2260,8 +2277,8 @@ err2: {  print("%s:%d: ROWS indicator record missing", dsa->fname,
       }
       /* check ENDATA indicator line */
       if (strcmp(dsa->item, "ENDATA") != 0)
-      {  print("%s:%d: ENDATA indicator record missing", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: ENDATA indicator record missing\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       if (lpx_get_class(dsa->lp) == LPX_MIP)
@@ -2278,10 +2295,11 @@ err2: {  print("%s:%d: ROWS indicator record missing", dsa->fname,
             strcpy(s, "all of");
          else
             sprintf(s, "%d of", nb);
-         print("lpx_read_freemps: %d integer column%s, %s which %s bina"
-            "ry", ni, ni == 1 ? "" : "s", s, nb == 1 ? "is" : "are");
+         xprintf("lpx_read_freemps: %d integer column%s, %s which %s bi"
+            "nary\n", ni, ni == 1 ? "" : "s", s, nb == 1 ? "is" : "are")
+            ;
       }
-      print("lpx_read_freemps: %d records were read", dsa->count);
+      xprintf("lpx_read_freemps: %d records were read\n", dsa->count);
       xfclose(dsa->fp);
       lpx_delete_index(dsa->lp);
       lpx_order_matrix(dsa->lp);
@@ -2370,26 +2388,26 @@ static char *mps_numb(double val, char numb[12+1])
          if (e != NULL) sprintf(e+1, "%d", atoi(e+1));
          if (strlen(str) <= 12) return strcpy(numb, str);
       }
-      fault("lpx_write_freemps: unable to convert floating point number"
-         " %g to character string", val);
+      xfault("lpx_write_freemps: unable to convert floating point numbe"
+         "r %g to character string\n", val);
       return NULL; /* make the compiler happy */
 }
 
 int lpx_write_freemps(LPX *lp, const char *fname)
-{     FILE *fp;
+{     XFILE *fp;
       int wide = lpx_get_int_parm(lp, LPX_K_MPSWIDE);
       int skip = lpx_get_int_parm(lp, LPX_K_MPSSKIP);
       int marker = 0; /* intorg/intend marker count */
       int mip, make_obj, nrows, ncols, i, j, flag, *ndx;
       double *obj, *val;
       char rname[255+1], cname[255+1], numb[12+1];
-      print("lpx_write_freemps: writing problem data to `%s'...", fname)
-         ;
+      xprintf("lpx_write_freemps: writing problem data to `%s'...\n",
+         fname);
       /* open the output text file */
       fp = xfopen(fname, "w");
       if (fp == NULL)
-      {  print("lpx_write_freemps: unable to create `%s' - %s", fname,
-            strerror(errno));
+      {  xprintf("lpx_write_freemps: unable to create `%s' - %s\n",
+            fname, strerror(errno));
          goto fail;
       }
       /* determine whether the problem is LP or MIP */
@@ -2399,7 +2417,7 @@ int lpx_write_freemps(LPX *lp, const char *fname)
       ncols = lpx_get_num_cols(lp);
       /* the problem should contain at least one row and one column */
       if (!(nrows > 0 && ncols > 0))
-         fault("lpx_write_freemps: problem has no rows/columns");
+         xfault("lpx_write_freemps: problem has no rows/columns\n");
       /* determine if the routine should output the objective row */
       make_obj = lpx_get_int_parm(lp, LPX_K_MPSOBJ);
       if (make_obj == 2)
@@ -2416,29 +2434,29 @@ int lpx_write_freemps(LPX *lp, const char *fname)
       if (lpx_get_int_parm(lp, LPX_K_MPSINFO))
       {  const char *name = lpx_get_prob_name(lp);
          if (name == NULL) name = "UNKNOWN";
-         fprintf(fp, "* Problem:    %s\n", name);
-         fprintf(fp, "* Class:      %s\n", !mip ? "LP" : "MIP");
-         fprintf(fp, "* Rows:       %d\n", nrows);
+         xfprintf(fp, "* Problem:    %s\n", name);
+         xfprintf(fp, "* Class:      %s\n", !mip ? "LP" : "MIP");
+         xfprintf(fp, "* Rows:       %d\n", nrows);
          if (!mip)
-            fprintf(fp, "* Columns:    %d\n", ncols);
+            xfprintf(fp, "* Columns:    %d\n", ncols);
          else
-            fprintf(fp, "* Columns:    %d (%d integer, %d binary)\n",
+            xfprintf(fp, "* Columns:    %d (%d integer, %d binary)\n",
                ncols, lpx_get_num_int(lp), lpx_get_num_bin(lp));
-         fprintf(fp, "* Non-zeros:  %d\n", lpx_get_num_nz(lp));
-         fprintf(fp, "* Format:     Free MPS\n");
-         fprintf(fp, "*\n");
+         xfprintf(fp, "* Non-zeros:  %d\n", lpx_get_num_nz(lp));
+         xfprintf(fp, "* Format:     Free MPS\n");
+         xfprintf(fp, "*\n");
       }
       /* write NAME indicator record */
       {  const char *name = lpx_get_prob_name(lp);
          if (name == NULL)
-            fprintf(fp, "NAME\n");
+            xfprintf(fp, "NAME\n");
          else
-            fprintf(fp, "NAME %s\n", mps_name((void *)name));
+            xfprintf(fp, "NAME %s\n", mps_name((void *)name));
       }
       /* write ROWS section */
-      fprintf(fp, "ROWS\n");
+      xfprintf(fp, "ROWS\n");
       if (make_obj)
-         fprintf(fp, " %c %s\n", 'N', row_name(lp, 0, rname));
+         xfprintf(fp, " %c %s\n", 'N', row_name(lp, 0, rname));
       for (i = 1; i <= nrows; i++)
       {  int typx;
          lpx_get_row_bnds(lp, i, &typx, NULL, NULL);
@@ -2450,7 +2468,7 @@ int lpx_write_freemps(LPX *lp, const char *fname)
             case LPX_FX: typx = 'E'; break;
             default: xassert(typx != typx);
          }
-         fprintf(fp, " %c %s\n", typx, row_name(lp, i, rname));
+         xfprintf(fp, " %c %s\n", typx, row_name(lp, i, rname));
       }
       /* prepare coefficients of the objective function */
       obj = xcalloc(1+ncols, sizeof(double));
@@ -2477,7 +2495,7 @@ int lpx_write_freemps(LPX *lp, const char *fname)
       for (j = 0; j <= ncols; j++)
          if (fabs(obj[j]) < 1e-12) obj[j] = 0.0;
       /* write COLUMNS section */
-      fprintf(fp, "COLUMNS\n");
+      xfprintf(fp, "COLUMNS\n");
       ndx = xcalloc(1+nrows, sizeof(int));
       val = xcalloc(1+nrows, sizeof(double));
       for (j = 1; j <= ncols; j++)
@@ -2487,33 +2505,33 @@ int lpx_write_freemps(LPX *lp, const char *fname)
          if (iv && marker % 2 == 0)
          {  /* open new intorg/intend group */
             marker++;
-            fprintf(fp, " M%07d 'MARKER' 'INTORG'\n", marker);
+            xfprintf(fp, " M%07d 'MARKER' 'INTORG'\n", marker);
          }
          else if (!iv && marker % 2 == 1)
          {  /* close the current intorg/intend group */
             marker++;
-            fprintf(fp, " M%07d 'MARKER' 'INTEND'\n", marker);
+            xfprintf(fp, " M%07d 'MARKER' 'INTEND'\n", marker);
          }
          /* obtain j-th column of the constraint matrix */
          len = lpx_get_mat_col(lp, j, ndx, val);
          ndx[0] = 0;
          val[0] = (make_obj ? obj[j] : 0.0);
          if (len == 0 && val[0] == 0.0 && !skip)
-            fprintf(fp, " %s %s %s $ empty column\n", cname,
+            xfprintf(fp, " %s %s %s $ empty column\n", cname,
                row_name(lp, 1, rname), mps_numb(0.0, numb));
          for (t = val[0] != 0.0 ? 0 : 1; t <= len; t++)
-         {  if (nl) fprintf(fp, " %s", cname);
-            fprintf(fp, " %s %s", row_name(lp, ndx[t], rname),
+         {  if (nl) xfprintf(fp, " %s", cname);
+            xfprintf(fp, " %s %s", row_name(lp, ndx[t], rname),
                mps_numb(val[t], numb));
             if (wide) nl = 1 - nl;
-            if (nl) fprintf(fp, "\n");
+            if (nl) xfprintf(fp, "\n");
          }
-         if (!nl) fprintf(fp, "\n");
+         if (!nl) xfprintf(fp, "\n");
       }
       if (marker % 2 == 1)
       {  /* close the last intorg/intend group (if not closed) */
          marker++;
-         fprintf(fp, " M%07d 'MARKER' 'INTEND'\n", marker);
+         xfprintf(fp, " M%07d 'MARKER' 'INTEND'\n", marker);
       }
       xfree(ndx);
       xfree(val);
@@ -2542,14 +2560,14 @@ int lpx_write_freemps(LPX *lp, const char *fname)
                   xassert(typx != typx);
             }
             if (rhs == 0.0) continue;
-            if (!flag) fprintf(fp, "RHS\n"), flag = 1;
-            if (nl) fprintf(fp, " RHS1");
-            fprintf(fp, " %s %s", row_name(lp, i, rname), mps_numb(rhs,
+            if (!flag) xfprintf(fp, "RHS\n"), flag = 1;
+            if (nl) xfprintf(fp, " RHS1");
+            xfprintf(fp, " %s %s", row_name(lp, i, rname), mps_numb(rhs,
                numb));
             if (wide) nl = 1 - nl;
-            if (nl) fprintf(fp, "\n");
+            if (nl) xfprintf(fp, "\n");
          }
-         if (!nl) fprintf(fp, "\n");
+         if (!nl) xfprintf(fp, "\n");
       }
       xfree(obj);
       /* write RANGES section */
@@ -2560,15 +2578,15 @@ int lpx_write_freemps(LPX *lp, const char *fname)
             double lb, ub, rng;
             lpx_get_row_bnds(lp, i, &typx, &lb, &ub);
             if (typx != LPX_DB) continue;
-            if (!flag) fprintf(fp, "RANGES\n"), flag = 1;
-            if (nl) fprintf(fp, " RNG1");
+            if (!flag) xfprintf(fp, "RANGES\n"), flag = 1;
+            if (nl) xfprintf(fp, " RNG1");
             rng = (ub > 0.0 ? ub - lb : lb - ub);
-            fprintf(fp, " %s %s", row_name(lp, i, rname), mps_numb(rng,
+            xfprintf(fp, " %s %s", row_name(lp, i, rname), mps_numb(rng,
                numb));
             if (wide) nl = 1 - nl;
-            if (nl) fprintf(fp, "\n");
+            if (nl) xfprintf(fp, "\n");
          }
-         if (!nl) fprintf(fp, "\n");
+         if (!nl) xfprintf(fp, "\n");
       }
       /* write BOUNDS section */
       flag = 0;
@@ -2577,29 +2595,29 @@ int lpx_write_freemps(LPX *lp, const char *fname)
             double lb, ub;
             lpx_get_col_bnds(lp, j, &typx, &lb, &ub);
             if (typx == LPX_LO && lb == 0.0) continue;
-            if (!flag) fprintf(fp, "BOUNDS\n"), flag = 1;
+            if (!flag) xfprintf(fp, "BOUNDS\n"), flag = 1;
             switch (typx)
             {  case LPX_FR:
-                  fprintf(fp, " FR BND1 %s\n", col_name(lp, j, cname));
+                  xfprintf(fp, " FR BND1 %s\n", col_name(lp, j, cname));
                   break;
                case LPX_LO:
-                  fprintf(fp, " LO BND1 %s %s\n", col_name(lp, j,
+                  xfprintf(fp, " LO BND1 %s %s\n", col_name(lp, j,
                      cname), mps_numb(lb, numb));
                   break;
                case LPX_UP:
-                  fprintf(fp, " MI BND1 %s\n", col_name(lp, j, cname));
-                  fprintf(fp, " UP BND1 %s %s\n", col_name(lp, j,
+                  xfprintf(fp, " MI BND1 %s\n", col_name(lp, j, cname));
+                  xfprintf(fp, " UP BND1 %s %s\n", col_name(lp, j,
                      cname), mps_numb(ub, numb));
                   break;
                case LPX_DB:
                   if (lb != 0.0)
-                  fprintf(fp, " LO BND1 %s %s\n", col_name(lp, j,
+                  xfprintf(fp, " LO BND1 %s %s\n", col_name(lp, j,
                      cname), mps_numb(lb, numb));
-                  fprintf(fp, " UP BND1 %s %s\n", col_name(lp, j,
+                  xfprintf(fp, " UP BND1 %s %s\n", col_name(lp, j,
                      cname), mps_numb(ub, numb));
                   break;
                case LPX_FX:
-                  fprintf(fp, " FX BND1 %s %s\n", col_name(lp, j,
+                  xfprintf(fp, " FX BND1 %s %s\n", col_name(lp, j,
                      cname), mps_numb(lb, numb));
                   break;
                default:
@@ -2608,12 +2626,12 @@ int lpx_write_freemps(LPX *lp, const char *fname)
          }
       }
       /* write ENDATA indicator record */
-      fprintf(fp, "ENDATA\n");
+      xfprintf(fp, "ENDATA\n");
       /* close the output text file */
-      fflush(fp);
-      if (ferror(fp))
-      {  print("lpx_write_freemps: write error on `%s' - %s", fname,
-            strerror(errno));
+      xfflush(fp);
+      if (xferror(fp))
+      {  xprintf("lpx_write_freemps: write error on `%s' - %s\n",
+            fname, strerror(errno));
          goto fail;
       }
       xfclose(fp);
@@ -2671,48 +2689,49 @@ static char *col_name(LPX *lp, int j, char name[255+1])
 }
 
 int lpx_print_prob(LPX *lp, const char *fname)
-{     FILE *fp;
+{     XFILE *fp;
       int m, n, mip, i, j, len, t, type, *ndx;
       double coef, lb, ub, *val;
       char *str, name[255+1];
-      print("lpx_write_prob: writing problem data to `%s'...", fname);
+      xprintf("lpx_write_prob: writing problem data to `%s'...\n",
+         fname);
       fp = xfopen(fname, "w");
       if (fp == NULL)
-      {  print("lpx_write_prob: unable to create `%s' - %s", fname,
-            strerror(errno));
+      {  xprintf("lpx_write_prob: unable to create `%s' - %s\n",
+            fname, strerror(errno));
          goto fail;
       }
       m = lpx_get_num_rows(lp);
       n = lpx_get_num_cols(lp);
       mip = (lpx_get_class(lp) == LPX_MIP);
       str = (void *)lpx_get_prob_name(lp);
-      fprintf(fp, "Problem:    %s\n", str == NULL ? "(unnamed)" : str);
-      fprintf(fp, "Class:      %s\n", !mip ? "LP" : "MIP");
-      fprintf(fp, "Rows:       %d\n", m);
+      xfprintf(fp, "Problem:    %s\n", str == NULL ? "(unnamed)" : str);
+      xfprintf(fp, "Class:      %s\n", !mip ? "LP" : "MIP");
+      xfprintf(fp, "Rows:       %d\n", m);
       if (!mip)
-         fprintf(fp, "Columns:    %d\n", n);
+         xfprintf(fp, "Columns:    %d\n", n);
       else
-         fprintf(fp, "Columns:    %d (%d integer, %d binary)\n",
+         xfprintf(fp, "Columns:    %d (%d integer, %d binary)\n",
             n, lpx_get_num_int(lp), lpx_get_num_bin(lp));
-      fprintf(fp, "Non-zeros:  %d\n", lpx_get_num_nz(lp));
-      fprintf(fp, "\n");
-      fprintf(fp, "*** OBJECTIVE FUNCTION ***\n");
-      fprintf(fp, "\n");
+      xfprintf(fp, "Non-zeros:  %d\n", lpx_get_num_nz(lp));
+      xfprintf(fp, "\n");
+      xfprintf(fp, "*** OBJECTIVE FUNCTION ***\n");
+      xfprintf(fp, "\n");
       switch (lpx_get_obj_dir(lp))
       {  case LPX_MIN:
-            fprintf(fp, "Minimize:");
+            xfprintf(fp, "Minimize:");
             break;
          case LPX_MAX:
-            fprintf(fp, "Maximize:");
+            xfprintf(fp, "Maximize:");
             break;
          default:
             xassert(lp != lp);
       }
       str = (void *)lpx_get_obj_name(lp);
-      fprintf(fp, " %s\n", str == NULL ? "(unnamed)" : str);
+      xfprintf(fp, " %s\n", str == NULL ? "(unnamed)" : str);
       coef = lpx_get_obj_coef(lp, 0);
       if (coef != 0.0)
-         fprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
+         xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
             "(constant term)");
       for (i = 1; i <= m; i++)
 #if 0
@@ -2721,72 +2740,72 @@ int lpx_print_prob(LPX *lp, const char *fname)
       {  coef = 0.0;
 #endif
          if (coef != 0.0)
-            fprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
                row_name(lp, i, name));
       }
       for (j = 1; j <= n; j++)
       {  coef = lpx_get_obj_coef(lp, j);
          if (coef != 0.0)
-            fprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
                col_name(lp, j, name));
       }
-      fprintf(fp, "\n");
-      fprintf(fp, "*** ROWS (CONSTRAINTS) ***\n");
+      xfprintf(fp, "\n");
+      xfprintf(fp, "*** ROWS (CONSTRAINTS) ***\n");
       ndx = xcalloc(1+n, sizeof(int));
       val = xcalloc(1+n, sizeof(double));
       for (i = 1; i <= m; i++)
-      {  fprintf(fp, "\n");
-         fprintf(fp, "Row %d: %s", i, row_name(lp, i, name));
+      {  xfprintf(fp, "\n");
+         xfprintf(fp, "Row %d: %s", i, row_name(lp, i, name));
          lpx_get_row_bnds(lp, i, &type, &lb, &ub);
          switch (type)
          {  case LPX_FR:
-               fprintf(fp, " free");
+               xfprintf(fp, " free");
                break;
             case LPX_LO:
-               fprintf(fp, " >= %.*g", DBL_DIG, lb);
+               xfprintf(fp, " >= %.*g", DBL_DIG, lb);
                break;
             case LPX_UP:
-               fprintf(fp, " <= %.*g", DBL_DIG, ub);
+               xfprintf(fp, " <= %.*g", DBL_DIG, ub);
                break;
             case LPX_DB:
-               fprintf(fp, " >= %.*g <= %.*g", DBL_DIG, lb, DBL_DIG,
+               xfprintf(fp, " >= %.*g <= %.*g", DBL_DIG, lb, DBL_DIG,
                   ub);
                break;
             case LPX_FX:
-               fprintf(fp, " = %.*g", DBL_DIG, lb);
+               xfprintf(fp, " = %.*g", DBL_DIG, lb);
                break;
             default:
                xassert(type != type);
          }
-         fprintf(fp, "\n");
+         xfprintf(fp, "\n");
 #if 0
          coef = lpx_get_row_coef(lp, i);
 #else
          coef = 0.0;
 #endif
          if (coef != 0.0)
-            fprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
                "(objective)");
          len = lpx_get_mat_row(lp, i, ndx, val);
          for (t = 1; t <= len; t++)
-            fprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, val[t],
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, val[t],
                col_name(lp, ndx[t], name));
       }
       xfree(ndx);
       xfree(val);
-      fprintf(fp, "\n");
-      fprintf(fp, "*** COLUMNS (VARIABLES) ***\n");
+      xfprintf(fp, "\n");
+      xfprintf(fp, "*** COLUMNS (VARIABLES) ***\n");
       ndx = xcalloc(1+m, sizeof(int));
       val = xcalloc(1+m, sizeof(double));
       for (j = 1; j <= n; j++)
-      {  fprintf(fp, "\n");
-         fprintf(fp, "Col %d: %s", j, col_name(lp, j, name));
+      {  xfprintf(fp, "\n");
+         xfprintf(fp, "Col %d: %s", j, col_name(lp, j, name));
          if (mip)
          {  switch (lpx_get_col_kind(lp, j))
             {  case LPX_CV:
                   break;
                case LPX_IV:
-                  fprintf(fp, " integer");
+                  xfprintf(fp, " integer");
                   break;
                default:
                   xassert(lp != lp);
@@ -2795,41 +2814,41 @@ int lpx_print_prob(LPX *lp, const char *fname)
          lpx_get_col_bnds(lp, j, &type, &lb, &ub);
          switch (type)
          {  case LPX_FR:
-               fprintf(fp, " free");
+               xfprintf(fp, " free");
                break;
             case LPX_LO:
-               fprintf(fp, " >= %.*g", DBL_DIG, lb);
+               xfprintf(fp, " >= %.*g", DBL_DIG, lb);
                break;
             case LPX_UP:
-               fprintf(fp, " <= %.*g", DBL_DIG, ub);
+               xfprintf(fp, " <= %.*g", DBL_DIG, ub);
                break;
             case LPX_DB:
-               fprintf(fp, " >= %.*g <= %.*g", DBL_DIG, lb, DBL_DIG,
+               xfprintf(fp, " >= %.*g <= %.*g", DBL_DIG, lb, DBL_DIG,
                   ub);
                break;
             case LPX_FX:
-               fprintf(fp, " = %.*g", DBL_DIG, lb);
+               xfprintf(fp, " = %.*g", DBL_DIG, lb);
                break;
             default:
                xassert(type != type);
          }
-         fprintf(fp, "\n");
+         xfprintf(fp, "\n");
          coef = lpx_get_obj_coef(lp, j);
          if (coef != 0.0)
-            fprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
                "(objective)");
          len = lpx_get_mat_col(lp, j, ndx, val);
          for (t = 1; t <= len; t++)
-            fprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, val[t],
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, val[t],
                row_name(lp, ndx[t], name));
       }
       xfree(ndx);
       xfree(val);
-      fprintf(fp, "\n");
-      fprintf(fp, "End of output\n");
-      fflush(fp);
-      if (ferror(fp))
-      {  print("lpx_write_prob: write error on `%s' - %s", fname,
+      xfprintf(fp, "\n");
+      xfprintf(fp, "End of output\n");
+      xfflush(fp);
+      if (xferror(fp))
+      {  xprintf("lpx_write_prob: write error on `%s' - %s\n", fname,
             strerror(errno));
          goto fail;
       }
@@ -2865,13 +2884,14 @@ fail: if (fp != NULL) xfclose(fp);
 -- the routine prints an error message and returns non-zero. */
 
 int lpx_print_sol(LPX *lp, const char *fname)
-{     FILE *fp;
+{     XFILE *fp;
       int what, round;
-      print("lpx_print_sol: writing LP problem solution to `%s'...",
+      xprintf(
+         "lpx_print_sol: writing LP problem solution to `%s'...\n",
          fname);
       fp = xfopen(fname, "w");
       if (fp == NULL)
-      {  print("lpx_print_sol: can't create `%s' - %s", fname,
+      {  xprintf("lpx_print_sol: can't create `%s' - %s\n", fname,
             strerror(errno));
          goto fail;
       }
@@ -2879,27 +2899,27 @@ int lpx_print_sol(LPX *lp, const char *fname)
       {  const char *name;
          name = lpx_get_prob_name(lp);
          if (name == NULL) name = "";
-         fprintf(fp, "%-12s%s\n", "Problem:", name);
+         xfprintf(fp, "%-12s%s\n", "Problem:", name);
       }
       /* number of rows (auxiliary variables) */
       {  int nr;
          nr = lpx_get_num_rows(lp);
-         fprintf(fp, "%-12s%d\n", "Rows:", nr);
+         xfprintf(fp, "%-12s%d\n", "Rows:", nr);
       }
       /* number of columns (structural variables) */
       {  int nc;
          nc = lpx_get_num_cols(lp);
-         fprintf(fp, "%-12s%d\n", "Columns:", nc);
+         xfprintf(fp, "%-12s%d\n", "Columns:", nc);
       }
       /* number of non-zeros (constraint coefficients) */
       {  int nz;
          nz = lpx_get_num_nz(lp);
-         fprintf(fp, "%-12s%d\n", "Non-zeros:", nz);
+         xfprintf(fp, "%-12s%d\n", "Non-zeros:", nz);
       }
       /* solution status */
       {  int status;
          status = lpx_get_status(lp);
-         fprintf(fp, "%-12s%s\n", "Status:",
+         xfprintf(fp, "%-12s%s\n", "Status:",
             status == LPX_OPT    ? "OPTIMAL" :
             status == LPX_FEAS   ? "FEASIBLE" :
             status == LPX_INFEAS ? "INFEASIBLE (INTERMEDIATE)" :
@@ -2914,7 +2934,7 @@ int lpx_print_sol(LPX *lp, const char *fname)
          name = (void *)lpx_get_obj_name(lp);
          dir = lpx_get_obj_dir(lp);
          obj = lpx_get_obj_val(lp);
-         fprintf(fp, "%-12s%s%s%.10g %s\n", "Objective:",
+         xfprintf(fp, "%-12s%s%s%.10g %s\n", "Objective:",
             name == NULL ? "" : name,
             name == NULL ? "" : " = ", obj,
             dir == LPX_MIN ? "(MINimum)" :
@@ -2923,12 +2943,12 @@ int lpx_print_sol(LPX *lp, const char *fname)
       /* main sheet */
       for (what = 1; what <= 2; what++)
       {  int mn, ij;
-         fprintf(fp, "\n");
-         fprintf(fp, "   No. %-12s St   Activity     Lower bound   Uppe"
-            "r bound    Marginal\n",
+         xfprintf(fp, "\n");
+         xfprintf(fp, "   No. %-12s St   Activity     Lower bound   Upp"
+            "er bound    Marginal\n",
             what == 1 ? "  Row name" : "Column name");
-         fprintf(fp, "------ ------------ -- ------------- ------------"
-            "- ------------- -------------\n");
+         xfprintf(fp, "------ ------------ -- ------------- -----------"
+            "-- ------------- -------------\n");
          mn = (what == 1 ? lpx_get_num_rows(lp) : lpx_get_num_cols(lp));
          for (ij = 1; ij <= mn; ij++)
          {  const char *name;
@@ -2953,147 +2973,147 @@ int lpx_print_sol(LPX *lp, const char *fname)
                lpx_set_int_parm(lp, LPX_K_ROUND, round);
             }
             /* row/column ordinal number */
-            fprintf(fp, "%6d ", ij);
+            xfprintf(fp, "%6d ", ij);
             /* row column/name */
             if (strlen(name) <= 12)
-               fprintf(fp, "%-12s ", name);
+               xfprintf(fp, "%-12s ", name);
             else
-               fprintf(fp, "%s\n%20s", name, "");
+               xfprintf(fp, "%s\n%20s", name, "");
             /* row/column status */
-            fprintf(fp, "%s ",
+            xfprintf(fp, "%s ",
                tagx == LPX_BS ? "B " :
                tagx == LPX_NL ? "NL" :
                tagx == LPX_NU ? "NU" :
                tagx == LPX_NF ? "NF" :
                tagx == LPX_NS ? "NS" : "??");
             /* row/column primal activity */
-            fprintf(fp, "%13.6g ", vx);
+            xfprintf(fp, "%13.6g ", vx);
             /* row/column lower bound */
             if (typx == LPX_LO || typx == LPX_DB || typx == LPX_FX)
-               fprintf(fp, "%13.6g ", lb);
+               xfprintf(fp, "%13.6g ", lb);
             else
-               fprintf(fp, "%13s ", "");
+               xfprintf(fp, "%13s ", "");
             /* row/column upper bound */
             if (typx == LPX_UP || typx == LPX_DB)
-               fprintf(fp, "%13.6g ", ub);
+               xfprintf(fp, "%13.6g ", ub);
             else if (typx == LPX_FX)
-               fprintf(fp, "%13s ", "=");
+               xfprintf(fp, "%13s ", "=");
             else
-               fprintf(fp, "%13s ", "");
+               xfprintf(fp, "%13s ", "");
             /* row/column dual activity */
             if (tagx != LPX_BS)
             {  if (dx == 0.0)
-                  fprintf(fp, "%13s", "< eps");
+                  xfprintf(fp, "%13s", "< eps");
                else
-                  fprintf(fp, "%13.6g", dx);
+                  xfprintf(fp, "%13.6g", dx);
             }
             /* end of line */
-            fprintf(fp, "\n");
+            xfprintf(fp, "\n");
          }
       }
-      fprintf(fp, "\n");
+      xfprintf(fp, "\n");
 #if 1
       if (lpx_get_prim_stat(lp) != LPX_P_UNDEF &&
           lpx_get_dual_stat(lp) != LPX_D_UNDEF)
       {  int m = lpx_get_num_rows(lp);
          LPXKKT kkt;
-         fprintf(fp, "Karush-Kuhn-Tucker optimality conditions:\n\n");
+         xfprintf(fp, "Karush-Kuhn-Tucker optimality conditions:\n\n");
          lpx_check_kkt(lp, 1, &kkt);
-         fprintf(fp, "KKT.PE: max.abs.err. = %.2e on row %d\n",
+         xfprintf(fp, "KKT.PE: max.abs.err. = %.2e on row %d\n",
             kkt.pe_ae_max, kkt.pe_ae_row);
-         fprintf(fp, "        max.rel.err. = %.2e on row %d\n",
+         xfprintf(fp, "        max.rel.err. = %.2e on row %d\n",
             kkt.pe_re_max, kkt.pe_re_row);
          switch (kkt.pe_quality)
          {  case 'H':
-               fprintf(fp, "        High quality\n");
+               xfprintf(fp, "        High quality\n");
                break;
             case 'M':
-               fprintf(fp, "        Medium quality\n");
+               xfprintf(fp, "        Medium quality\n");
                break;
             case 'L':
-               fprintf(fp, "        Low quality\n");
+               xfprintf(fp, "        Low quality\n");
                break;
             default:
-               fprintf(fp, "        PRIMAL SOLUTION IS WRONG\n");
+               xfprintf(fp, "        PRIMAL SOLUTION IS WRONG\n");
                break;
          }
-         fprintf(fp, "\n");
-         fprintf(fp, "KKT.PB: max.abs.err. = %.2e on %s %d\n",
+         xfprintf(fp, "\n");
+         xfprintf(fp, "KKT.PB: max.abs.err. = %.2e on %s %d\n",
             kkt.pb_ae_max, kkt.pb_ae_ind <= m ? "row" : "column",
             kkt.pb_ae_ind <= m ? kkt.pb_ae_ind : kkt.pb_ae_ind - m);
-         fprintf(fp, "        max.rel.err. = %.2e on %s %d\n",
+         xfprintf(fp, "        max.rel.err. = %.2e on %s %d\n",
             kkt.pb_re_max, kkt.pb_re_ind <= m ? "row" : "column",
             kkt.pb_re_ind <= m ? kkt.pb_re_ind : kkt.pb_re_ind - m);
          switch (kkt.pb_quality)
          {  case 'H':
-               fprintf(fp, "        High quality\n");
+               xfprintf(fp, "        High quality\n");
                break;
             case 'M':
-               fprintf(fp, "        Medium quality\n");
+               xfprintf(fp, "        Medium quality\n");
                break;
             case 'L':
-               fprintf(fp, "        Low quality\n");
+               xfprintf(fp, "        Low quality\n");
                break;
             default:
-               fprintf(fp, "        PRIMAL SOLUTION IS INFEASIBLE\n");
+               xfprintf(fp, "        PRIMAL SOLUTION IS INFEASIBLE\n");
                break;
          }
-         fprintf(fp, "\n");
-         fprintf(fp, "KKT.DE: max.abs.err. = %.2e on column %d\n",
+         xfprintf(fp, "\n");
+         xfprintf(fp, "KKT.DE: max.abs.err. = %.2e on column %d\n",
             kkt.de_ae_max, kkt.de_ae_col);
-         fprintf(fp, "        max.rel.err. = %.2e on column %d\n",
+         xfprintf(fp, "        max.rel.err. = %.2e on column %d\n",
             kkt.de_re_max, kkt.de_re_col);
          switch (kkt.de_quality)
          {  case 'H':
-               fprintf(fp, "        High quality\n");
+               xfprintf(fp, "        High quality\n");
                break;
             case 'M':
-               fprintf(fp, "        Medium quality\n");
+               xfprintf(fp, "        Medium quality\n");
                break;
             case 'L':
-               fprintf(fp, "        Low quality\n");
+               xfprintf(fp, "        Low quality\n");
                break;
             default:
-               fprintf(fp, "        DUAL SOLUTION IS WRONG\n");
+               xfprintf(fp, "        DUAL SOLUTION IS WRONG\n");
                break;
          }
-         fprintf(fp, "\n");
-         fprintf(fp, "KKT.DB: max.abs.err. = %.2e on %s %d\n",
+         xfprintf(fp, "\n");
+         xfprintf(fp, "KKT.DB: max.abs.err. = %.2e on %s %d\n",
             kkt.db_ae_max, kkt.db_ae_ind <= m ? "row" : "column",
             kkt.db_ae_ind <= m ? kkt.db_ae_ind : kkt.db_ae_ind - m);
-         fprintf(fp, "        max.rel.err. = %.2e on %s %d\n",
+         xfprintf(fp, "        max.rel.err. = %.2e on %s %d\n",
             kkt.db_re_max, kkt.db_re_ind <= m ? "row" : "column",
             kkt.db_re_ind <= m ? kkt.db_re_ind : kkt.db_re_ind - m);
          switch (kkt.db_quality)
          {  case 'H':
-               fprintf(fp, "        High quality\n");
+               xfprintf(fp, "        High quality\n");
                break;
             case 'M':
-               fprintf(fp, "        Medium quality\n");
+               xfprintf(fp, "        Medium quality\n");
                break;
             case 'L':
-               fprintf(fp, "        Low quality\n");
+               xfprintf(fp, "        Low quality\n");
                break;
             default:
-               fprintf(fp, "        DUAL SOLUTION IS INFEASIBLE\n");
+               xfprintf(fp, "        DUAL SOLUTION IS INFEASIBLE\n");
                break;
          }
-         fprintf(fp, "\n");
+         xfprintf(fp, "\n");
       }
 #endif
 #if 1
       if (lpx_get_status(lp) == LPX_UNBND)
       {  int m = lpx_get_num_rows(lp);
          int k = lpx_get_ray_info(lp);
-         fprintf(fp, "Unbounded ray: %s %d\n",
+         xfprintf(fp, "Unbounded ray: %s %d\n",
             k <= m ? "row" : "column", k <= m ? k : k - m);
-         fprintf(fp, "\n");
+         xfprintf(fp, "\n");
       }
 #endif
-      fprintf(fp, "End of output\n");
-      fflush(fp);
-      if (ferror(fp))
-      {  print("lpx_print_sol: can't write to `%s' - %s", fname,
+      xfprintf(fp, "End of output\n");
+      xfflush(fp);
+      if (xferror(fp))
+      {  xprintf("lpx_print_sol: can't write to `%s' - %s\n", fname,
             strerror(errno));
          goto fail;
       }
@@ -3126,13 +3146,13 @@ fail: if (fp != NULL) xfclose(fp);
 -- the routine prints an error message and returns non-zero. */
 
 int lpx_print_ips(LPX *lp, const char *fname)
-{     FILE *fp;
+{     XFILE *fp;
       int what, round;
-      print("lpx_print_ips: writing LP problem solution to `%s'...",
+      xprintf("lpx_print_ips: writing LP problem solution to `%s'...\n",
          fname);
       fp = xfopen(fname, "w");
       if (fp == NULL)
-      {  print("lpx_print_ips: can't create `%s' - %s", fname,
+      {  xprintf("lpx_print_ips: can't create `%s' - %s\n", fname,
             strerror(errno));
          goto fail;
       }
@@ -3140,27 +3160,27 @@ int lpx_print_ips(LPX *lp, const char *fname)
       {  const char *name;
          name = lpx_get_prob_name(lp);
          if (name == NULL) name = "";
-         fprintf(fp, "%-12s%s\n", "Problem:", name);
+         xfprintf(fp, "%-12s%s\n", "Problem:", name);
       }
       /* number of rows (auxiliary variables) */
       {  int nr;
          nr = lpx_get_num_rows(lp);
-         fprintf(fp, "%-12s%d\n", "Rows:", nr);
+         xfprintf(fp, "%-12s%d\n", "Rows:", nr);
       }
       /* number of columns (structural variables) */
       {  int nc;
          nc = lpx_get_num_cols(lp);
-         fprintf(fp, "%-12s%d\n", "Columns:", nc);
+         xfprintf(fp, "%-12s%d\n", "Columns:", nc);
       }
       /* number of non-zeros (constraint coefficients) */
       {  int nz;
          nz = lpx_get_num_nz(lp);
-         fprintf(fp, "%-12s%d\n", "Non-zeros:", nz);
+         xfprintf(fp, "%-12s%d\n", "Non-zeros:", nz);
       }
       /* solution status */
       {  int status;
          status = lpx_ipt_status(lp);
-         fprintf(fp, "%-12s%s\n", "Status:",
+         xfprintf(fp, "%-12s%s\n", "Status:",
             status == LPX_T_UNDEF  ? "INTERIOR UNDEFINED" :
             status == LPX_T_OPT    ? "INTERIOR OPTIMAL" : "???");
       }
@@ -3171,7 +3191,7 @@ int lpx_print_ips(LPX *lp, const char *fname)
          name = (void *)lpx_get_obj_name(lp);
          dir = lpx_get_obj_dir(lp);
          obj = lpx_ipt_obj_val(lp);
-         fprintf(fp, "%-12s%s%s%.10g %s\n", "Objective:",
+         xfprintf(fp, "%-12s%s%s%.10g %s\n", "Objective:",
             name == NULL ? "" : name,
             name == NULL ? "" : " = ", obj,
             dir == LPX_MIN ? "(MINimum)" :
@@ -3180,12 +3200,12 @@ int lpx_print_ips(LPX *lp, const char *fname)
       /* main sheet */
       for (what = 1; what <= 2; what++)
       {  int mn, ij;
-         fprintf(fp, "\n");
-         fprintf(fp, "   No. %-12s      Activity     Lower bound   Uppe"
-            "r bound    Marginal\n",
+         xfprintf(fp, "\n");
+         xfprintf(fp, "   No. %-12s      Activity     Lower bound   Upp"
+            "er bound    Marginal\n",
             what == 1 ? "  Row name" : "Column name");
-         fprintf(fp, "------ ------------    ------------- ------------"
-            "- ------------- -------------\n");
+         xfprintf(fp, "------ ------------    ------------- -----------"
+            "-- ------------- -------------\n");
          mn = (what == 1 ? lpx_get_num_rows(lp) : lpx_get_num_cols(lp));
          for (ij = 1; ij <= mn; ij++)
          {  const char *name;
@@ -3212,39 +3232,39 @@ int lpx_print_ips(LPX *lp, const char *fname)
                lpx_set_int_parm(lp, LPX_K_ROUND, round);
             }
             /* row/column ordinal number */
-            fprintf(fp, "%6d ", ij);
+            xfprintf(fp, "%6d ", ij);
             /* row column/name */
             if (strlen(name) <= 12)
-               fprintf(fp, "%-12s ", name);
+               xfprintf(fp, "%-12s ", name);
             else
-               fprintf(fp, "%s\n%20s", name, "");
+               xfprintf(fp, "%s\n%20s", name, "");
             /* two positions are currently not used */
-            fprintf(fp, "   ");
+            xfprintf(fp, "   ");
             /* row/column primal activity */
-            fprintf(fp, "%13.6g ", vx);
+            xfprintf(fp, "%13.6g ", vx);
             /* row/column lower bound */
             if (typx == LPX_LO || typx == LPX_DB || typx == LPX_FX)
-               fprintf(fp, "%13.6g ", lb);
+               xfprintf(fp, "%13.6g ", lb);
             else
-               fprintf(fp, "%13s ", "");
+               xfprintf(fp, "%13s ", "");
             /* row/column upper bound */
             if (typx == LPX_UP || typx == LPX_DB)
-               fprintf(fp, "%13.6g ", ub);
+               xfprintf(fp, "%13.6g ", ub);
             else if (typx == LPX_FX)
-               fprintf(fp, "%13s ", "=");
+               xfprintf(fp, "%13s ", "=");
             else
-               fprintf(fp, "%13s ", "");
+               xfprintf(fp, "%13s ", "");
             /* row/column dual activity */
-            fprintf(fp, "%13.6g", dx);
+            xfprintf(fp, "%13.6g", dx);
             /* end of line */
-            fprintf(fp, "\n");
+            xfprintf(fp, "\n");
          }
       }
-      fprintf(fp, "\n");
-      fprintf(fp, "End of output\n");
-      fflush(fp);
-      if (ferror(fp))
-      {  print("lpx_print_ips: can't write to `%s' - %s", fname,
+      xfprintf(fp, "\n");
+      xfprintf(fp, "End of output\n");
+      xfflush(fp);
+      if (xferror(fp))
+      {  xprintf("lpx_print_ips: can't write to `%s' - %s\n", fname,
             strerror(errno));
          goto fail;
       }
@@ -3277,17 +3297,18 @@ fail: if (fp != NULL) xfclose(fp);
 -- the routine prints an error message and returns non-zero. */
 
 int lpx_print_mip(LPX *lp, const char *fname)
-{     FILE *fp;
+{     XFILE *fp;
       int what, round;
 #if 0
       if (lpx_get_class(lp) != LPX_MIP)
          fault("lpx_print_mip: error -- not a MIP problem");
 #endif
-      print("lpx_print_mip: writing MIP problem solution to `%s'...",
+      xprintf(
+         "lpx_print_mip: writing MIP problem solution to `%s'...\n",
          fname);
       fp = xfopen(fname, "w");
       if (fp == NULL)
-      {  print("lpx_print_mip: can't create `%s' - %s", fname,
+      {  xprintf("lpx_print_mip: can't create `%s' - %s\n", fname,
             strerror(errno));
          goto fail;
       }
@@ -3295,30 +3316,30 @@ int lpx_print_mip(LPX *lp, const char *fname)
       {  const char *name;
          name = lpx_get_prob_name(lp);
          if (name == NULL) name = "";
-         fprintf(fp, "%-12s%s\n", "Problem:", name);
+         xfprintf(fp, "%-12s%s\n", "Problem:", name);
       }
       /* number of rows (auxiliary variables) */
       {  int nr;
          nr = lpx_get_num_rows(lp);
-         fprintf(fp, "%-12s%d\n", "Rows:", nr);
+         xfprintf(fp, "%-12s%d\n", "Rows:", nr);
       }
       /* number of columns (structural variables) */
       {  int nc, nc_int, nc_bin;
          nc = lpx_get_num_cols(lp);
          nc_int = lpx_get_num_int(lp);
          nc_bin = lpx_get_num_bin(lp);
-         fprintf(fp, "%-12s%d (%d integer, %d binary)\n", "Columns:",
+         xfprintf(fp, "%-12s%d (%d integer, %d binary)\n", "Columns:",
             nc, nc_int, nc_bin);
       }
       /* number of non-zeros (constraint coefficients) */
       {  int nz;
          nz = lpx_get_num_nz(lp);
-         fprintf(fp, "%-12s%d\n", "Non-zeros:", nz);
+         xfprintf(fp, "%-12s%d\n", "Non-zeros:", nz);
       }
       /* solution status */
       {  int status;
          status = lpx_mip_status(lp);
-         fprintf(fp, "%-12s%s\n", "Status:",
+         xfprintf(fp, "%-12s%s\n", "Status:",
             status == LPX_I_UNDEF  ? "INTEGER UNDEFINED" :
             status == LPX_I_OPT    ? "INTEGER OPTIMAL" :
             status == LPX_I_FEAS   ? "INTEGER NON-OPTIMAL" :
@@ -3331,7 +3352,7 @@ int lpx_print_mip(LPX *lp, const char *fname)
          name = (void *)lpx_get_obj_name(lp);
          dir = lpx_get_obj_dir(lp);
          mip_obj = lpx_mip_obj_val(lp);
-         fprintf(fp, "%-12s%s%s%.10g %s\n", "Objective:",
+         xfprintf(fp, "%-12s%s%s%.10g %s\n", "Objective:",
             name == NULL ? "" : name,
             name == NULL ? "" : " = ", mip_obj,
             dir == LPX_MIN ? "(MINimum)" :
@@ -3340,12 +3361,12 @@ int lpx_print_mip(LPX *lp, const char *fname)
       /* main sheet */
       for (what = 1; what <= 2; what++)
       {  int mn, ij;
-         fprintf(fp, "\n");
-         fprintf(fp, "   No. %-12s      Activity     Lower bound   Uppe"
-            "r bound\n",
+         xfprintf(fp, "\n");
+         xfprintf(fp, "   No. %-12s      Activity     Lower bound   Upp"
+            "er bound\n",
             what == 1 ? "  Row name" : "Column name");
-         fprintf(fp, "------ ------------    ------------- ------------"
-            "- -------------\n");
+         xfprintf(fp, "------ ------------    ------------- -----------"
+            "-- -------------\n");
          mn = (what == 1 ? lpx_get_num_rows(lp) : lpx_get_num_cols(lp));
          for (ij = 1; ij <= mn; ij++)
          {  const char *name;
@@ -3372,93 +3393,93 @@ int lpx_print_mip(LPX *lp, const char *fname)
                lpx_set_int_parm(lp, LPX_K_ROUND, round);
             }
             /* row/column ordinal number */
-            fprintf(fp, "%6d ", ij);
+            xfprintf(fp, "%6d ", ij);
             /* row column/name */
             if (strlen(name) <= 12)
-               fprintf(fp, "%-12s ", name);
+               xfprintf(fp, "%-12s ", name);
             else
-               fprintf(fp, "%s\n%20s", name, "");
+               xfprintf(fp, "%s\n%20s", name, "");
             /* row/column kind */
-            fprintf(fp, "%s  ",
+            xfprintf(fp, "%s  ",
                kind == LPX_CV ? " " : kind == LPX_IV ? "*" : "?");
             /* row/column primal activity */
-            fprintf(fp, "%13.6g", vx);
+            xfprintf(fp, "%13.6g", vx);
             /* row/column lower and upper bounds */
             switch (typx)
             {  case LPX_FR:
                   break;
                case LPX_LO:
-                  fprintf(fp, " %13.6g", lb);
+                  xfprintf(fp, " %13.6g", lb);
                   break;
                case LPX_UP:
-                  fprintf(fp, " %13s %13.6g", "", ub);
+                  xfprintf(fp, " %13s %13.6g", "", ub);
                   break;
                case LPX_DB:
-                  fprintf(fp, " %13.6g %13.6g", lb, ub);
+                  xfprintf(fp, " %13.6g %13.6g", lb, ub);
                   break;
                case LPX_FX:
-                  fprintf(fp, " %13.6g %13s", lb, "=");
+                  xfprintf(fp, " %13.6g %13s", lb, "=");
                   break;
                default:
                   xassert(typx != typx);
             }
             /* end of line */
-            fprintf(fp, "\n");
+            xfprintf(fp, "\n");
          }
       }
-      fprintf(fp, "\n");
+      xfprintf(fp, "\n");
 #if 1
       if (lpx_mip_status(lp) != LPX_I_UNDEF)
       {  int m = lpx_get_num_rows(lp);
          LPXKKT kkt;
-         fprintf(fp, "Integer feasibility conditions:\n\n");
+         xfprintf(fp, "Integer feasibility conditions:\n\n");
          lpx_check_int(lp, &kkt);
-         fprintf(fp, "INT.PE: max.abs.err. = %.2e on row %d\n",
+         xfprintf(fp, "INT.PE: max.abs.err. = %.2e on row %d\n",
             kkt.pe_ae_max, kkt.pe_ae_row);
-         fprintf(fp, "        max.rel.err. = %.2e on row %d\n",
+         xfprintf(fp, "        max.rel.err. = %.2e on row %d\n",
             kkt.pe_re_max, kkt.pe_re_row);
          switch (kkt.pe_quality)
          {  case 'H':
-               fprintf(fp, "        High quality\n");
+               xfprintf(fp, "        High quality\n");
                break;
             case 'M':
-               fprintf(fp, "        Medium quality\n");
+               xfprintf(fp, "        Medium quality\n");
                break;
             case 'L':
-               fprintf(fp, "        Low quality\n");
+               xfprintf(fp, "        Low quality\n");
                break;
             default:
-               fprintf(fp, "        SOLUTION IS WRONG\n");
+               xfprintf(fp, "        SOLUTION IS WRONG\n");
                break;
          }
-         fprintf(fp, "\n");
-         fprintf(fp, "INT.PB: max.abs.err. = %.2e on %s %d\n",
+         xfprintf(fp, "\n");
+         xfprintf(fp, "INT.PB: max.abs.err. = %.2e on %s %d\n",
             kkt.pb_ae_max, kkt.pb_ae_ind <= m ? "row" : "column",
             kkt.pb_ae_ind <= m ? kkt.pb_ae_ind : kkt.pb_ae_ind - m);
-         fprintf(fp, "        max.rel.err. = %.2e on %s %d\n",
+         xfprintf(fp, "        max.rel.err. = %.2e on %s %d\n",
             kkt.pb_re_max, kkt.pb_re_ind <= m ? "row" : "column",
             kkt.pb_re_ind <= m ? kkt.pb_re_ind : kkt.pb_re_ind - m);
          switch (kkt.pb_quality)
          {  case 'H':
-               fprintf(fp, "        High quality\n");
+               xfprintf(fp, "        High quality\n");
                break;
             case 'M':
-               fprintf(fp, "        Medium quality\n");
+               xfprintf(fp, "        Medium quality\n");
                break;
             case 'L':
-               fprintf(fp, "        Low quality\n");
+               xfprintf(fp, "        Low quality\n");
                break;
             default:
-               fprintf(fp, "        SOLUTION IS INFEASIBLE\n");
+               xfprintf(fp, "        SOLUTION IS INFEASIBLE\n");
                break;
          }
-         fprintf(fp, "\n");
+         xfprintf(fp, "\n");
       }
 #endif
-      fprintf(fp, "End of output\n");
-      fflush(fp);
-      if (ferror(fp))
-      {  print("lpx_print_mip: can't write to `%s' - %s", fname,
+      xfprintf(fp, "End of output\n");
+      xfflush(fp);
+      if (xferror(fp))
+      {  xprintf("lpx_print_mip: can't write to `%s' - %s\n", fname,
             strerror(errno));
          goto fail;
       }

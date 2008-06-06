@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,9 +21,9 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_STDIO
 #include "glpapi.h"
 #include "glpmpl.h"
-#define print xprint1
 
 /*----------------------------------------------------------------------
 -- lpx_extract_prob - extract problem instance from MathProg model.
@@ -74,7 +74,8 @@ LPX *lpx_extract_prob(void *_mpl)
          lpx_set_row_bnds(lp, i, type, lb, ub);
          /* warn about non-zero constant term */
          if (mpl_get_row_c0(mpl, i) != 0.0)
-            print("lpx_read_model: row %s; constant term %.12g ignored",
+            xprintf(
+               "lpx_read_model: row %s; constant term %.12g ignored\n",
                mpl_get_row_name(mpl, i), mpl_get_row_c0(mpl, i));
       }
       /* build columns (variables) */

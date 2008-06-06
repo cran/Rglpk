@@ -6,7 +6,7 @@
   linear as well as mixed integer linear programming problems (MILPs).
 }
 \usage{
-Rglpk_solve_LP(obj, mat, dir, rhs, int, max = FALSE,
+Rglpk_solve_LP(obj, mat, dir, rhs, types = NULL, max = FALSE,
                bounds = NULL, verbose = FALSE)
 }
 \arguments{
@@ -16,8 +16,10 @@ Rglpk_solve_LP(obj, mat, dir, rhs, int, max = FALSE,
     Each element must be one of \code{"<"}, \code{"<="}, \code{">"},
     \code{">="}, or \code{"=="}.}
   \item{rhs}{the right hand side of the constraints}
-  \item{int}{a vector with indices representing which objective
-    coefficients should be of type integer}
+  \item{types}{a vector indicating the types of the objective
+    variables. \code{types} can be either \code{"B"} for binary,
+    \code{"C"} for continuous or \code{"I"} for integer. By default all
+    variables are of type \code{"C"}.}
   \item{max}{a logical giving the direction of the optimization.
     \code{TRUE} means that the objective is to maximize the objective
     function, \code{FALSE} (default) means to minimize it.}
@@ -52,7 +54,7 @@ Rglpk_solve_LP(obj, mat, dir, rhs, int, max = FALSE,
   GLPK Interface to R 
   (\url{http://cran.R-project.org/src/contrib/Descriptions/glpk.html}).
 }
-\author{Kurt Hornik and Stefan Theussl}
+\author{Stefan Theussl and Kurt Hornik}
 \seealso{
   \code{\link[lpSolve]{lp}} in package \pkg{lpSolve};
   \code{\link[Rsymphony]{Rsymphony_solve_LP}} in package
@@ -86,10 +88,10 @@ obj <- c(3, 1, 3)
 mat <- matrix(c(-1, 0, 1, 2, 4, -3, 1, -3, 2), nrow = 3)
 dir <- c("<=", "<=", "<=")
 rhs <- c(4, 2, 3)
-int <- c(1, 3)
+types <- c("I", "C", "I")
 max <- TRUE
 
-Rglpk_solve_LP(obj, mat, dir, rhs, int, max)
+Rglpk_solve_LP(obj, mat, dir, rhs, types, max)
 
 ## Same as before but with bounds replaced by
 ## -Inf <  x_1 <= 4
@@ -98,6 +100,6 @@ Rglpk_solve_LP(obj, mat, dir, rhs, int, max)
 
 bounds <- list(lower = list(ind = c(1L, 3L), val = c(-Inf, 2)),
                upper = list(ind = c(1L, 2L), val = c(4, 100)))
-Rglpk_solve_LP(obj, mat, dir, rhs, int, max, bounds)
+Rglpk_solve_LP(obj, mat, dir, rhs, types, max, bounds)
 }
 \keyword{optimize}

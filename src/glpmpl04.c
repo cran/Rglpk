@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,9 +21,10 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_ERRNO
+#define _GLPSTD_STDIO
 #include "glpmpl.h"
-#define print xprint1
-#define fault xfault1
+#define xfault xerror
 #define dmp_create_poolx(size) dmp_create_pool()
 
 /**********************************************************************/
@@ -80,6 +81,9 @@ void alloc_content(MPL *mpl)
                stmt->u.con->array = create_array(mpl, A_ELEMCON,
                   stmt->u.con->dim);
                break;
+#if 1 /* 11/II-2008 */
+            case A_TABLE:
+#endif
             case A_SOLVE:
             case A_CHECK:
             case A_DISPLAY:
@@ -285,7 +289,7 @@ void open_input(MPL *mpl, char *file)
       memset(mpl->context, ' ', CONTEXT_SIZE);
       mpl->c_ptr = 0;
       xassert(mpl->in_fp == NULL);
-      mpl->in_fp = xfopen(file, "r");
+      mpl->in_fp = fopen(file, "r");
       if (mpl->in_fp == NULL)
          error(mpl, "unable to open %s - %s", file, strerror(errno));
       mpl->in_file = file;
@@ -320,7 +324,7 @@ int read_char(MPL *mpl)
 
 void close_input(MPL *mpl)
 {     xassert(mpl->in_fp != NULL);
-      xfclose(mpl->in_fp);
+      fclose(mpl->in_fp);
       mpl->in_fp = NULL;
       mpl->in_file = NULL;
       return;
@@ -339,7 +343,7 @@ void open_output(MPL *mpl, char *file)
          mpl->out_fp = stdout;
       }
       else
-      {  mpl->out_fp = xfopen(file, "w");
+      {  mpl->out_fp = fopen(file, "w");
          if (mpl->out_fp == NULL)
             error(mpl, "unable to create %s - %s", file,
                strerror(errno));
@@ -366,7 +370,7 @@ void write_char(MPL *mpl, int c)
       {  /* flush the output buffer */
          mpl->out_buf[mpl->out_cnt] = '\0';
          if (mpl->out_fp == stdout)
-            print("%s", mpl->out_buf);
+            xprintf("%s\n", mpl->out_buf);
          else
             fprintf(mpl->out_fp, "%s\n", mpl->out_buf);
          mpl->out_cnt = 0;
@@ -436,14 +440,14 @@ void error(MPL *mpl, char *fmt, ...)
       {  case 1:
          case 2:
             /* translation phase */
-            print("%s:%d: %s",
+            xprintf("%s:%d: %s\n",
                mpl->in_file == NULL ? "(unknown)" : mpl->in_file,
                mpl->line, msg);
             print_context(mpl);
             break;
          case 3:
             /* generation/postsolve phase */
-            print("%s:%d: %s",
+            xprintf("%s:%d: %s\n",
                mpl->mod_file == NULL ? "(unknown)" : mpl->mod_file,
                mpl->stmt == NULL ? 0 : mpl->stmt->line, msg);
             break;
@@ -472,13 +476,13 @@ void warning(MPL *mpl, char *fmt, ...)
       {  case 1:
          case 2:
             /* translation phase */
-            print("%s:%d: warning: %s",
+            xprintf("%s:%d: warning: %s\n",
                mpl->in_file == NULL ? "(unknown)" : mpl->in_file,
                mpl->line, msg);
             break;
          case 3:
             /* generation/postsolve phase */
-            print("%s:%d: warning: %s",
+            xprintf("%s:%d: warning: %s\n",
                mpl->mod_file == NULL ? "(unknown)" : mpl->mod_file,
                mpl->stmt == NULL ? 0 : mpl->stmt->line, msg);
             break;
@@ -559,6 +563,9 @@ MPL *mpl_initialize(void)
       mpl->rand = rng_create_rand();
       mpl->flag_p = 0;
       mpl->stmt = NULL;
+#if 1 /* 11/II-2008 */
+      mpl->dca = NULL;
+#endif
       mpl->m = 0;
       mpl->n = 0;
       mpl->row = NULL;
@@ -622,14 +629,14 @@ MPL *mpl_initialize(void)
 
 int mpl_read_model(MPL *mpl, char *file, int skip_data)
 {     if (mpl->phase != 0)
-         fault("mpl_read_model: invalid call sequence");
+         xfault("mpl_read_model: invalid call sequence\n");
       if (file == NULL)
-         fault("mpl_read_model: no input filename specified");
+         xfault("mpl_read_model: no input filename specified\n");
       /* set up error handler */
       if (setjmp(mpl->jump)) goto done;
       /* translate model section */
       mpl->phase = 1;
-      print("Reading model section from %s...", file);
+      xprintf("Reading model section from %s...\n", file);
       open_input(mpl, file);
       model_section(mpl);
       if (mpl->model == NULL)
@@ -653,13 +660,13 @@ int mpl_read_model(MPL *mpl, char *file, int skip_data)
          get_token(mpl /* ; */);
          /* translate data section */
          mpl->phase = 2;
-         print("Reading data section from %s...", file);
+         xprintf("Reading data section from %s...\n", file);
          data_section(mpl);
       }
       /* process end statement */
       end_statement(mpl);
-skip: print("%d line%s were read", mpl->line, mpl->line == 1 ? "" : "s")
-         ;
+skip: xprintf("%d line%s were read\n",
+         mpl->line, mpl->line == 1 ? "" : "s");
       close_input(mpl);
 done: /* return to the calling program */
       return mpl->phase;
@@ -693,14 +700,14 @@ done: /* return to the calling program */
 
 int mpl_read_data(MPL *mpl, char *file)
 {     if (mpl->phase != 1)
-         fault("mpl_read_data: invalid call sequence");
+         xfault("mpl_read_data: invalid call sequence\n");
       if (file == NULL)
-         fault("mpl_read_data: no input filename specified");
+         xfault("mpl_read_data: no input filename specified\n");
       /* set up error handler */
       if (setjmp(mpl->jump)) goto done;
       /* process data section */
       mpl->phase = 2;
-      print("Reading data section from %s...", file);
+      xprintf("Reading data section from %s...\n", file);
       mpl->flag_d = 1;
       open_input(mpl, file);
       /* in this case the keyword 'data' is optional */
@@ -713,8 +720,8 @@ int mpl_read_data(MPL *mpl, char *file)
       data_section(mpl);
       /* process end statement */
       end_statement(mpl);
-      print("%d line%s were read", mpl->line, mpl->line == 1 ? "" : "s")
-         ;
+      xprintf("%d line%s were read\n",
+         mpl->line, mpl->line == 1 ? "" : "s");
       close_input(mpl);
 done: /* return to the calling program */
       return mpl->phase;
@@ -757,7 +764,7 @@ done: /* return to the calling program */
 
 int mpl_generate(MPL *mpl, char *file)
 {     if (!(mpl->phase == 1 || mpl->phase == 2))
-         fault("mpl_generate: invalid call sequence");
+         xfault("mpl_generate: invalid call sequence\n");
       /* set up error handler */
       if (setjmp(mpl->jump)) goto done;
       /* generate model */
@@ -768,7 +775,7 @@ int mpl_generate(MPL *mpl, char *file)
       /* build problem instance */
       build_problem(mpl);
       /* generation phase has been finished */
-      print("Model has been successfully generated");
+      xprintf("Model has been successfully generated\n");
 done: /* return to the calling program */
       return mpl->phase;
 }
@@ -798,7 +805,7 @@ char *mpl_get_prob_name(MPL *mpl)
       char *file = mpl->mod_file;
       int k;
       if (mpl->phase != 3)
-         fault("mpl_get_prob_name: invalid call sequence");
+         xfault("mpl_get_prob_name: invalid call sequence\n");
       for (;;)
       {  if (strchr(file, '/') != NULL)
             file = strchr(file, '/') + 1;
@@ -837,7 +844,7 @@ char *mpl_get_prob_name(MPL *mpl)
 
 int mpl_get_num_rows(MPL *mpl)
 {     if (mpl->phase != 3)
-         fault("mpl_get_num_rows: invalid call sequence");
+         xfault("mpl_get_num_rows: invalid call sequence\n");
       return mpl->m;
 }
 
@@ -856,7 +863,7 @@ int mpl_get_num_rows(MPL *mpl)
 
 int mpl_get_num_cols(MPL *mpl)
 {     if (mpl->phase != 3)
-         fault("mpl_get_num_cols: invalid call sequence");
+         xfault("mpl_get_num_cols: invalid call sequence\n");
       return mpl->n;
 }
 
@@ -877,9 +884,10 @@ char *mpl_get_row_name(MPL *mpl, int i)
 {     char *name = mpl->mpl_buf, *t;
       int len;
       if (mpl->phase != 3)
-         fault("mpl_get_row_name: invalid call sequence");
+         xfault("mpl_get_row_name: invalid call sequence\n");
       if (!(1 <= i && i <= mpl->m))
-         fault("mpl_get_row_name: i = %d; row number out of range", i);
+         xfault("mpl_get_row_name: i = %d; row number out of range\n",
+            i);
       strcpy(name, mpl->row[i]->con->name);
       len = strlen(name);
       xassert(len <= 255);
@@ -914,9 +922,10 @@ char *mpl_get_row_name(MPL *mpl, int i)
 int mpl_get_row_kind(MPL *mpl, int i)
 {     int kind;
       if (mpl->phase != 3)
-         fault("mpl_get_row_kind: invalid call sequence");
+         xfault("mpl_get_row_kind: invalid call sequence\n");
       if (!(1 <= i && i <= mpl->m))
-         fault("mpl_get_row_kind: i = %d; row number out of range", i);
+         xfault("mpl_get_row_kind: i = %d; row number out of range\n",
+            i);
       switch (mpl->row[i]->con->type)
       {  case A_CONSTRAINT:
             kind = MPL_ST; break;
@@ -974,9 +983,10 @@ int mpl_get_row_bnds(MPL *mpl, int i, double *_lb, double *_ub)
       int type;
       double lb, ub;
       if (mpl->phase != 3)
-         fault("mpl_get_row_bnds: invalid call sequence");
+         xfault("mpl_get_row_bnds: invalid call sequence\n");
       if (!(1 <= i && i <= mpl->m))
-         fault("mpl_get_row_bnds: i = %d; row number out of range", i);
+         xfault("mpl_get_row_bnds: i = %d; row number out of range\n",
+            i);
       con = mpl->row[i];
 #if 0 /* 21/VII-2006 */
       if (con->con->lbnd == NULL && con->con->ubnd == NULL)
@@ -1041,9 +1051,10 @@ int mpl_get_mat_row(MPL *mpl, int i, int ndx[], double val[])
 {     FORMULA *term;
       int len = 0;
       if (mpl->phase != 3)
-         fault("mpl_get_mat_row: invalid call sequence");
+         xfault("mpl_get_mat_row: invalid call sequence\n");
       if (!(1 <= i && i <= mpl->m))
-         fault("mpl_get_mat_row: i = %d; row number out of range", i);
+         xfault("mpl_get_mat_row: i = %d; row number out of range\n",
+            i);
       for (term = mpl->row[i]->form; term != NULL; term = term->next)
       {  xassert(term->var != NULL);
          len++;
@@ -1074,9 +1085,10 @@ double mpl_get_row_c0(MPL *mpl, int i)
 {     ELEMCON *con;
       double c0;
       if (mpl->phase != 3)
-         fault("mpl_get_row_c0: invalid call sequence");
+         xfault("mpl_get_row_c0: invalid call sequence\n");
       if (!(1 <= i && i <= mpl->m))
-         fault("mpl_get_row_c0: i = %d; row number out of range", i);
+         xfault("mpl_get_row_c0: i = %d; row number out of range\n",
+            i);
       con = mpl->row[i];
       if (con->con->lbnd == NULL && con->con->ubnd == NULL)
          c0 = - con->lbnd;
@@ -1102,10 +1114,10 @@ char *mpl_get_col_name(MPL *mpl, int j)
 {     char *name = mpl->mpl_buf, *t;
       int len;
       if (mpl->phase != 3)
-         fault("mpl_get_col_name: invalid call sequence");
+         xfault("mpl_get_col_name: invalid call sequence\n");
       if (!(1 <= j && j <= mpl->n))
-         fault("mpl_get_col_name: j = %d; column number out of range",
-            j);
+         xfault("mpl_get_col_name: j = %d; column number out of range\n"
+            , j);
       strcpy(name, mpl->col[j]->var->name);
       len = strlen(name);
       xassert(len <= 255);
@@ -1146,10 +1158,10 @@ char *mpl_get_col_name(MPL *mpl, int j)
 int mpl_get_col_kind(MPL *mpl, int j)
 {     int kind;
       if (mpl->phase != 3)
-         fault("mpl_get_col_kind: invalid call sequence");
+         xfault("mpl_get_col_kind: invalid call sequence\n");
       if (!(1 <= j && j <= mpl->n))
-         fault("mpl_get_col_kind: j = %d; column number out of range",
-            j);
+         xfault("mpl_get_col_kind: j = %d; column number out of range\n"
+            , j);
       switch (mpl->col[j]->var->type)
       {  case A_NUMERIC:
             kind = MPL_NUM; break;
@@ -1207,10 +1219,10 @@ int mpl_get_col_bnds(MPL *mpl, int j, double *_lb, double *_ub)
       int type;
       double lb, ub;
       if (mpl->phase != 3)
-         fault("mpl_get_col_bnds: invalid call sequence");
+         xfault("mpl_get_col_bnds: invalid call sequence\n");
       if (!(1 <= j && j <= mpl->n))
-         fault("mpl_get_col_bnds: j = %d; column number out of range",
-            j);
+         xfault("mpl_get_col_bnds: j = %d; column number out of range\n"
+            , j);
       var = mpl->col[j];
 #if 0 /* 21/VII-2006 */
       if (var->var->lbnd == NULL && var->var->ubnd == NULL)
@@ -1257,7 +1269,7 @@ int mpl_get_col_bnds(MPL *mpl, int j, double *_lb, double *_ub)
 
 int mpl_has_solve_stmt(MPL *mpl)
 {     if (mpl->phase != 3)
-         fault("mpl_has_solve_stmt: invalid call sequence");
+         xfault("mpl_has_solve_stmt: invalid call sequence\n");
       return mpl->flag_s;
 }
 
@@ -1277,10 +1289,10 @@ int mpl_has_solve_stmt(MPL *mpl)
 
 void mpl_put_col_value(MPL *mpl, int j, double val)
 {     if (mpl->phase != 3)
-         fault("mpl_put_col_value: invalid call sequence");
+         xfault("mpl_put_col_value: invalid call sequence\n");
       if (!(1 <= j && j <= mpl->n))
-         fault("mpl_put_col_value: j = %d; column number out of range",
-            j);
+         xfault(
+         "mpl_put_col_value: j = %d; column number out of range\n", j);
       mpl->col[j]->value = val;
       return;
 }
@@ -1313,14 +1325,14 @@ void mpl_put_col_value(MPL *mpl, int j, double val)
 
 int mpl_postsolve(MPL *mpl)
 {     if (!(mpl->phase == 3 && !mpl->flag_p))
-         fault("mpl_postsolve: invalid call sequence");
+         xfault("mpl_postsolve: invalid call sequence\n");
       /* set up error handler */
       if (setjmp(mpl->jump)) goto done;
       /* perform postsolving */
       postsolve_model(mpl);
       flush_output(mpl);
       /* postsolving phase has been finished */
-      print("Model has been successfully processed");
+      xprintf("Model has been successfully processed\n");
 done: /* return to the calling program */
       return mpl->phase;
 }
@@ -1348,14 +1360,20 @@ void mpl_terminate(MPL *mpl)
             /* there were no errors; clean the model content */
             clean_model(mpl);
             xassert(mpl->a_list == NULL);
+#if 1 /* 11/II-2008 */
+            xassert(mpl->dca == NULL);
+#endif
             break;
          case 4:
-            /* model processing has been finihed due to error; delete
+            /* model processing has been finished due to error; delete
                search trees, which may be created for some arrays */
             {  ARRAY *a;
                for (a = mpl->a_list; a != NULL; a = a->next)
                   if (a->tree != NULL) avl_delete_tree(a->tree);
             }
+#if 1 /* 11/II-2008 */
+            free_dca(mpl);
+#endif
             break;
          default:
             xassert(mpl != mpl);
@@ -1380,13 +1398,13 @@ void mpl_terminate(MPL *mpl)
       rng_delete_rand(mpl->rand);
       if (mpl->row != NULL) xfree(mpl->row);
       if (mpl->col != NULL) xfree(mpl->col);
-      if (mpl->in_fp != NULL) xfclose(mpl->in_fp);
+      if (mpl->in_fp != NULL) fclose(mpl->in_fp);
       if (mpl->out_fp != NULL && mpl->out_fp != stdout)
-         xfclose(mpl->out_fp);
+         fclose(mpl->out_fp);
       if (mpl->out_file != NULL) xfree(mpl->out_file);
       if (mpl->out_buf != NULL) xfree(mpl->out_buf);
 #if 1 /* 14/VII-2006 */
-      if (mpl->prt_fp != NULL) xfclose(mpl->prt_fp);
+      if (mpl->prt_fp != NULL) fclose(mpl->prt_fp);
       if (mpl->prt_file != NULL) xfree(mpl->prt_file);
 #endif
       if (mpl->mod_file != NULL) xfree(mpl->mod_file);

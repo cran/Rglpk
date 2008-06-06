@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,10 +21,11 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_ERRNO
+#define _GLPSTD_STDIO
 #include "glplib.h"
 #include "glptsp.h"
-#define print xprint1
-#define fault xfault1
+#define xfault xerror
 
 /*----------------------------------------------------------------------
 -- tsp_read_data - read TSP instance data.
@@ -65,8 +66,8 @@ struct dsa
 static int get_char(struct dsa *dsa)
 {     dsa->c = fgetc(dsa->fp);
       if (ferror(dsa->fp))
-      {  print("%s:%d: read error - %s", dsa->fname, dsa->seqn,
-            strerror(errno));
+      {  xprintf("%s:%d: read error - %s\n",
+            dsa->fname, dsa->seqn, strerror(errno));
          return 1;
       }
       if (feof(dsa->fp))
@@ -76,8 +77,8 @@ static int get_char(struct dsa *dsa)
       else if (isspace(dsa->c))
          dsa->c = ' ';
       else if (iscntrl(dsa->c))
-      {  print("%s:%d: invalid control character 0x%02X", dsa->fname,
-            dsa->seqn, dsa->c);
+      {  xprintf("%s:%d: invalid control character 0x%02X\n",
+            dsa->fname, dsa->seqn, dsa->c);
          return 1;
       }
       return 0;
@@ -95,7 +96,7 @@ static int scan_keyword(struct dsa *dsa)
       dsa->token[0] = '\0';
       while (isalnum(dsa->c) || dsa->c == '_')
       {  if (len == 31)
-         {  print("%s:%d: keyword `%s...' too long", dsa->fname,
+         {  xprintf("%s:%d: keyword `%s...' too long\n", dsa->fname,
                dsa->seqn, dsa->token);
             return 1;
          }
@@ -103,7 +104,7 @@ static int scan_keyword(struct dsa *dsa)
          if (get_char(dsa)) return 1;
       }
       if (len == 0)
-      {  print("%s:%d: missing keyword", dsa->fname, dsa->seqn);
+      {  xprintf("%s:%d: missing keyword\n", dsa->fname, dsa->seqn);
          return 1;
       }
       return 0;
@@ -112,7 +113,7 @@ static int scan_keyword(struct dsa *dsa)
 static int check_colon(struct dsa *dsa)
 {     if (skip_spaces(dsa, 0)) return 1;
       if (dsa->c != ':')
-      {  print("%s:%d: missing colon after `%s'", dsa->fname,
+      {  xprintf("%s:%d: missing colon after `%s'\n", dsa->fname,
             dsa->seqn, dsa->token);
          return 1;
       }
@@ -127,7 +128,7 @@ static int scan_token(struct dsa *dsa, int across)
       while (!(dsa->c == EOF || dsa->c == '\n' || dsa->c == ' '))
       {  if (len == 255)
          {  dsa->token[31] = '\0';
-            print("%s:%d: token `%s...' too long", dsa->fname,
+            xprintf("%s:%d: token `%s...' too long\n", dsa->fname,
                dsa->seqn, dsa->token);
             return 1;
          }
@@ -140,7 +141,8 @@ static int scan_token(struct dsa *dsa, int across)
 static int check_newline(struct dsa *dsa)
 {     if (skip_spaces(dsa, 0)) return 1;
       if (!(dsa->c == EOF || dsa->c == '\n'))
-      {  print("%s:%d: extra symbols detected", dsa->fname, dsa->seqn);
+      {  xprintf("%s:%d: extra symbols detected\n", dsa->fname,
+            dsa->seqn);
          return 1;
       }
       if (get_char(dsa)) return 1;
@@ -153,7 +155,8 @@ static int scan_comment(struct dsa *dsa)
       dsa->token[0] = '\0';
       while (!(dsa->c == EOF || dsa->c == '\n'))
       {  if (len == 255)
-         {  print("%s:%d: comment too long", dsa->fname, dsa->seqn);
+         {  xprintf("%s:%d: comment too long\n", dsa->fname, dsa->seqn)
+               ;
             return 1;
          }
          dsa->token[len++] = (char)dsa->c, dsa->token[len] = '\0';
@@ -165,12 +168,12 @@ static int scan_comment(struct dsa *dsa)
 static int scan_integer(struct dsa *dsa, int across, int *val)
 {     if (scan_token(dsa, across)) return 1;
       if (strlen(dsa->token) == 0)
-      {  print("%s:%d: missing integer", dsa->fname, dsa->seqn);
+      {  xprintf("%s:%d: missing integer\n", dsa->fname, dsa->seqn);
          return 1;
       }
       if (str2int(dsa->token, val))
-      {  print("%s:%d: integer `%s' invalid", dsa->fname, dsa->seqn,
-            dsa->token);
+      {  xprintf("%s:%d: integer `%s' invalid\n", dsa->fname, dsa->seqn
+            , dsa->token);
          return 1;
       }
       return 0;
@@ -179,11 +182,11 @@ static int scan_integer(struct dsa *dsa, int across, int *val)
 static int scan_number(struct dsa *dsa, int across, double *val)
 {     if (scan_token(dsa, across)) return 1;
       if (strlen(dsa->token) == 0)
-      {  print("%s:%d: missing number", dsa->fname, dsa->seqn);
+      {  xprintf("%s:%d: missing number\n", dsa->fname, dsa->seqn);
          return 1;
       }
       if (str2num(dsa->token, val))
-      {  print("%s:%d: number `%s' invalid", dsa->fname, dsa->seqn,
+      {  xprintf("%s:%d: number `%s' invalid\n", dsa->fname, dsa->seqn,
             dsa->token);
          return 1;
       }
@@ -194,11 +197,12 @@ TSP *tsp_read_data(char *fname)
 {     struct dsa _dsa, *dsa = &_dsa;
       TSP *tsp = NULL;
       dsa->fname = fname;
-      print("tsp_read_data: reading TSP data from `%s'...", dsa->fname);
-      dsa->fp = xfopen(dsa->fname, "r");
+      xprintf("tsp_read_data: reading TSP data from `%s'...\n",
+         dsa->fname);
+      dsa->fp = fopen(dsa->fname, "r");
       if (dsa->fp == NULL)
-      {  print("tsp_read_data: unable to open `%s' - %s", dsa->fname,
-            strerror(errno));
+      {  xprintf("tsp_read_data: unable to open `%s' - %s\n",
+            dsa->fname, strerror(errno));
          goto fail;
       }
       tsp = xmalloc(sizeof(TSP));
@@ -220,25 +224,25 @@ TSP *tsp_read_data(char *fname)
 loop: if (scan_keyword(dsa)) goto fail;
       if (strcmp(dsa->token, "NAME") == 0)
       {  if (tsp->name != NULL)
-         {  print("%s:%d: NAME entry multiply defined", dsa->fname,
+         {  xprintf("%s:%d: NAME entry multiply defined\n", dsa->fname,
                dsa->seqn);
             goto fail;
          }
          if (check_colon(dsa)) goto fail;
          if (scan_token(dsa, 0)) goto fail;
          if (strlen(dsa->token) == 0)
-         {  print("%s:%d: NAME entry incomplete", dsa->fname,
+         {  xprintf("%s:%d: NAME entry incomplete\n", dsa->fname,
                dsa->seqn);
             goto fail;
          }
          tsp->name = xmalloc(strlen(dsa->token) + 1);
          strcpy(tsp->name, dsa->token);
-         print("tsp_read_data: NAME: %s", tsp->name);
+         xprintf("tsp_read_data: NAME: %s\n", tsp->name);
          if (check_newline(dsa)) goto fail;
       }
       else if (strcmp(dsa->token, "TYPE") == 0)
       {  if (tsp->type != TSP_UNDEF)
-         {  print("%s:%d: TYPE entry multiply defined", dsa->fname,
+         {  xprintf("%s:%d: TYPE entry multiply defined\n", dsa->fname,
                dsa->seqn);
             goto fail;
          }
@@ -251,44 +255,45 @@ loop: if (scan_keyword(dsa)) goto fail;
          else if (strcmp(dsa->token, "TOUR") == 0)
             tsp->type = TSP_TOUR;
          else
-         {  print("%s:%d: data type `%s' not recognized", dsa->fname,
-               dsa->seqn, dsa->token);
+         {  xprintf("%s:%d: data type `%s' not recognized\n",
+               dsa->fname, dsa->seqn, dsa->token);
             goto fail;
          }
-         print("tsp_read_data: TYPE: %s", dsa->token);
+         xprintf("tsp_read_data: TYPE: %s\n", dsa->token);
          if (check_newline(dsa)) goto fail;
       }
       else if (strcmp(dsa->token, "COMMENT") == 0)
       {  if (tsp->comment != NULL)
-         {  print("%s:%d: COMMENT entry multiply defined", dsa->fname,
-               dsa->seqn);
+         {  xprintf("%s:%d: COMMENT entry multiply defined\n",
+               dsa->fname, dsa->seqn);
             goto fail;
          }
          if (check_colon(dsa)) goto fail;
          if (scan_comment(dsa)) goto fail;
          tsp->comment = xmalloc(strlen(dsa->token) + 1);
          strcpy(tsp->comment, dsa->token);
-         print("tsp_read_data: COMMENT: %s", tsp->comment);
+         xprintf("tsp_read_data: COMMENT: %s\n", tsp->comment);
          if (check_newline(dsa)) goto fail;
       }
       else if (strcmp(dsa->token, "DIMENSION") == 0)
       {  if (tsp->dimension != 0)
-         {  print("%s:%d: DIMENSION entry multiply defined", dsa->fname,
-               dsa->seqn);
+         {  xprintf("%s:%d: DIMENSION entry multiply defined\n",
+               dsa->fname, dsa->seqn);
             goto fail;
          }
          if (check_colon(dsa)) goto fail;
          if (scan_integer(dsa, 0, &tsp->dimension)) goto fail;
          if (tsp->dimension < 1)
-         {  print("%s:%d: invalid dimension", dsa->fname, dsa->seqn);
+         {  xprintf("%s:%d: invalid dimension\n", dsa->fname,
+               dsa->seqn);
             goto fail;
          }
-         print("tsp_read_data: DIMENSION: %d", tsp->dimension);
+         xprintf("tsp_read_data: DIMENSION: %d\n", tsp->dimension);
          if (check_newline(dsa)) goto fail;
       }
       else if (strcmp(dsa->token, "EDGE_WEIGHT_TYPE") == 0)
       {  if (tsp->edge_weight_type != TSP_UNDEF)
-         {  print("%s:%d: EDGE_WEIGHT_TYPE entry multiply defined",
+         {  xprintf("%s:%d: EDGE_WEIGHT_TYPE entry multiply defined\n",
                dsa->fname, dsa->seqn);
             goto fail;
          }
@@ -305,16 +310,17 @@ loop: if (scan_keyword(dsa)) goto fail;
          else if (strcmp(dsa->token, "CEIL_2D") == 0)
             tsp->edge_weight_type = TSP_CEIL_2D;
          else
-         {  print("%s:%d: edge weight type `%s' not recognized",
+         {  xprintf("%s:%d: edge weight type `%s' not recognized\n",
                dsa->fname, dsa->seqn, dsa->token);
             goto fail;
          }
-         print("tsp_read_data: EDGE_WEIGHT_TYPE: %s", dsa->token);
+         xprintf("tsp_read_data: EDGE_WEIGHT_TYPE: %s\n", dsa->token);
          if (check_newline(dsa)) goto fail;
       }
       else if (strcmp(dsa->token, "EDGE_WEIGHT_FORMAT") == 0)
       {  if (tsp->edge_weight_format != TSP_UNDEF)
-         {  print("%s:%d: EDGE_WEIGHT_FORMAT entry multiply defined",
+         {  xprintf(
+               "%s:%d: EDGE_WEIGHT_FORMAT entry multiply defined\n",
                dsa->fname, dsa->seqn);
             goto fail;
          }
@@ -329,16 +335,16 @@ loop: if (scan_keyword(dsa)) goto fail;
          else if (strcmp(dsa->token, "LOWER_DIAG_ROW") == 0)
             tsp->edge_weight_format = TSP_LOWER_DIAG_ROW;
          else
-         {  print("%s:%d: edge weight format `%s' not recognized",
+         {  xprintf("%s:%d: edge weight format `%s' not recognized\n",
                dsa->fname, dsa->seqn, dsa->token);
             goto fail;
          }
-         print("tsp_read_data: EDGE_WEIGHT_FORMAT: %s", dsa->token);
+         xprintf("tsp_read_data: EDGE_WEIGHT_FORMAT: %s\n", dsa->token);
          if (check_newline(dsa)) goto fail;
       }
       else if (strcmp(dsa->token, "DISPLAY_DATA_TYPE") == 0)
       {  if (tsp->display_data_type != TSP_UNDEF)
-         {  print("%s:%d: DISPLAY_DATA_TYPE entry multiply defined",
+         {  xprintf("%s:%d: DISPLAY_DATA_TYPE entry multiply defined\n",
                dsa->fname, dsa->seqn);
             goto fail;
          }
@@ -349,22 +355,22 @@ loop: if (scan_keyword(dsa)) goto fail;
          else if (strcmp(dsa->token, "TWOD_DISPLAY") == 0)
             tsp->display_data_type = TSP_TWOD_DISPLAY;
          else
-         {  print("%s:%d: display data type `%s' not recognized",
+         {  xprintf("%s:%d: display data type `%s' not recognized\n",
                dsa->fname, dsa->seqn, dsa->token);
             goto fail;
          }
-         print("tsp_read_data: DISPLAY_DATA_TYPE: %s", dsa->token);
+         xprintf("tsp_read_data: DISPLAY_DATA_TYPE: %s\n", dsa->token);
          if (check_newline(dsa)) goto fail;
       }
       else if (strcmp(dsa->token, "NODE_COORD_SECTION") == 0)
       {  int n = tsp->dimension, k, node;
          if (n == 0)
-         {  print("%s:%d: DIMENSION entry not specified", dsa->fname,
-               dsa->seqn);
+         {  xprintf("%s:%d: DIMENSION entry not specified\n",
+               dsa->fname, dsa->seqn);
             goto fail;
          }
          if (tsp->node_x_coord != NULL)
-         {  print("%s:%d: NODE_COORD_SECTION multiply specified",
+         {  xprintf("%s:%d: NODE_COORD_SECTION multiply specified\n",
                dsa->fname, dsa->seqn);
             goto fail;
          }
@@ -376,12 +382,12 @@ loop: if (scan_keyword(dsa)) goto fail;
          for (k = 1; k <= n; k++)
          {  if (scan_integer(dsa, 0, &node)) goto fail;
             if (!(1 <= node && node <= n))
-            {  print("%s:%d: invalid node number %d", dsa->fname,
+            {  xprintf("%s:%d: invalid node number %d\n", dsa->fname,
                   dsa->seqn, node);
                goto fail;
             }
             if (tsp->node_x_coord[node] != DBL_MAX)
-            {  print("%s:%d: node number %d multiply specified",
+            {  xprintf("%s:%d: node number %d multiply specified\n",
                   dsa->fname, dsa->seqn, node);
                goto fail;
             }
@@ -395,12 +401,12 @@ loop: if (scan_keyword(dsa)) goto fail;
       else if (strcmp(dsa->token, "DISPLAY_DATA_SECTION") == 0)
       {  int n = tsp->dimension, k, node;
          if (n == 0)
-         {  print("%s:%d: DIMENSION entry not specified", dsa->fname,
-               dsa->seqn);
+         {  xprintf("%s:%d: DIMENSION entry not specified\n",
+               dsa->fname, dsa->seqn);
             goto fail;
          }
          if (tsp->dply_x_coord != NULL)
-         {  print("%s:%d: DISPLAY_DATA_SECTION multiply specified",
+         {  xprintf("%s:%d: DISPLAY_DATA_SECTION multiply specified\n",
                dsa->fname, dsa->seqn);
             goto fail;
          }
@@ -412,12 +418,12 @@ loop: if (scan_keyword(dsa)) goto fail;
          for (k = 1; k <= n; k++)
          {  if (scan_integer(dsa, 0, &node)) goto fail;
             if (!(1 <= node && node <= n))
-            {  print("%s:%d: invalid node number %d", dsa->fname,
+            {  xprintf("%s:%d: invalid node number %d\n", dsa->fname,
                   dsa->seqn, node);
                goto fail;
             }
             if (tsp->dply_x_coord[node] != DBL_MAX)
-            {  print("%s:%d: node number %d multiply specified",
+            {  xprintf("%s:%d: node number %d multiply specified\n",
                   dsa->fname, dsa->seqn, node);
                goto fail;
             }
@@ -431,13 +437,13 @@ loop: if (scan_keyword(dsa)) goto fail;
       else if (strcmp(dsa->token, "TOUR_SECTION") == 0)
       {  int n = tsp->dimension, k, node;
          if (n == 0)
-         {  print("%s:%d: DIMENSION entry not specified", dsa->fname,
-               dsa->seqn);
+         {  xprintf("%s:%d: DIMENSION entry not specified\n",
+               dsa->fname, dsa->seqn);
             goto fail;
          }
          if (tsp->tour != NULL)
-         {  print("%s:%d: TOUR_SECTION multiply specified", dsa->fname,
-               dsa->seqn);
+         {  xprintf("%s:%d: TOUR_SECTION multiply specified\n",
+               dsa->fname, dsa->seqn);
             goto fail;
          }
          if (check_newline(dsa)) goto fail;
@@ -445,7 +451,7 @@ loop: if (scan_keyword(dsa)) goto fail;
          for (k = 1; k <= n; k++)
          {  if (scan_integer(dsa, 1, &node)) goto fail;
             if (!(1 <= node && node <= n))
-            {  print("%s:%d: invalid node number %d", dsa->fname,
+            {  xprintf("%s:%d: invalid node number %d\n", dsa->fname,
                   dsa->seqn, node);
                goto fail;
             }
@@ -453,7 +459,7 @@ loop: if (scan_keyword(dsa)) goto fail;
          }
          if (scan_integer(dsa, 1, &node)) goto fail;
          if (node != -1)
-         {  print("%s:%d: extra node(s) detected", dsa->fname,
+         {  xprintf("%s:%d: extra node(s) detected\n", dsa->fname,
                dsa->seqn);
             goto fail;
          }
@@ -462,17 +468,17 @@ loop: if (scan_keyword(dsa)) goto fail;
       else if (strcmp(dsa->token, "EDGE_WEIGHT_SECTION") == 0)
       {  int n = tsp->dimension, i, j, temp;
          if (n == 0)
-         {  print("%s:%d: DIMENSION entry not specified", dsa->fname,
-               dsa->seqn);
+         {  xprintf("%s:%d: DIMENSION entry not specified\n",
+               dsa->fname, dsa->seqn);
             goto fail;
          }
          if (tsp->edge_weight_format == TSP_UNDEF)
-         {  print("%s:%d: EDGE_WEIGHT_FORMAT entry not specified",
+         {  xprintf("%s:%d: EDGE_WEIGHT_FORMAT entry not specified\n",
                dsa->fname, dsa->seqn);
             goto fail;
          }
          if (tsp->edge_weight != NULL)
-         {  print("%s:%d: EDGE_WEIGHT_SECTION multiply specified",
+         {  xprintf("%s:%d: EDGE_WEIGHT_SECTION multiply specified\n",
                dsa->fname, dsa->seqn);
             goto fail;
          }
@@ -516,13 +522,13 @@ loop: if (scan_keyword(dsa)) goto fail;
          goto done;
       }
       else
-      {  print("%s:%d: keyword `%s' not recognized", dsa->fname,
+      {  xprintf("%s:%d: keyword `%s' not recognized\n", dsa->fname,
             dsa->seqn, dsa->token);
          goto fail;
       }
       goto loop;
-done: print("tsp_read_data: %d lines were read", dsa->seqn - 1);
-      xfclose(dsa->fp);
+done: xprintf("tsp_read_data: %d lines were read\n", dsa->seqn-1);
+      fclose(dsa->fp);
       return tsp;
 fail: if (tsp != NULL)
       {  if (tsp->name != NULL) xfree(tsp->name);
@@ -535,7 +541,7 @@ fail: if (tsp != NULL)
          if (tsp->edge_weight != NULL) xfree(tsp->edge_weight);
          xfree(tsp);
       }
-      if (dsa->fp != NULL) xfclose(dsa->fp);
+      if (dsa->fp != NULL) fclose(dsa->fp);
       return NULL;
 }
 
@@ -595,20 +601,20 @@ static double rad(double x)
 int tsp_distance(TSP *tsp, int i, int j)
 {     int n = tsp->dimension, dij;
       if (!(tsp->type == TSP_TSP || tsp->type == TSP_ATSP))
-         fault("tsp_distance: invalid TSP instance");
+         xfault("tsp_distance: invalid TSP instance\n");
       if (!(1 <= i && i <= n && 1 <= j && j <= n))
-         fault("tsp_distance: node number out of range");
+         xfault("tsp_distance: node number out of range\n");
       switch (tsp->edge_weight_type)
       {  case TSP_UNDEF:
-            fault("tsp_distance: edge weight type not specified");
+            xfault("tsp_distance: edge weight type not specified\n");
          case TSP_EXPLICIT:
             if (tsp->edge_weight == NULL)
-               fault("tsp_distance: edge weights not specified");
+               xfault("tsp_distance: edge weights not specified\n");
             dij = tsp->edge_weight[(i - 1) * n + j];
             break;
          case TSP_EUC_2D:
             if (tsp->node_x_coord == NULL || tsp->node_y_coord == NULL)
-               fault("tsp_distance: node coordinates not specified");
+               xfault("tsp_distance: node coordinates not specified\n");
             {  double xd, yd;
                xd = tsp->node_x_coord[i] - tsp->node_x_coord[j];
                yd = tsp->node_y_coord[i] - tsp->node_y_coord[j];
@@ -617,7 +623,7 @@ int tsp_distance(TSP *tsp, int i, int j)
             break;
          case TSP_CEIL_2D:
             if (tsp->node_x_coord == NULL || tsp->node_y_coord == NULL)
-               fault("tsp_distance: node coordinates not specified");
+               xfault("tsp_distance: node coordinates not specified\n");
             {  double xd, yd;
                xd = tsp->node_x_coord[i] - tsp->node_x_coord[j];
                yd = tsp->node_y_coord[i] - tsp->node_y_coord[j];
@@ -626,7 +632,7 @@ int tsp_distance(TSP *tsp, int i, int j)
             break;
          case TSP_GEO:
             if (tsp->node_x_coord == NULL || tsp->node_y_coord == NULL)
-               fault("tsp_distance: node coordinates not specified");
+               xfault("tsp_distance: node coordinates not specified\n");
             {  double rrr = 6378.388;
                double latitude_i = rad(tsp->node_x_coord[i]);
                double latitude_j = rad(tsp->node_x_coord[j]);
@@ -641,7 +647,7 @@ int tsp_distance(TSP *tsp, int i, int j)
             break;
          case TSP_ATT:
             if (tsp->node_x_coord == NULL || tsp->node_y_coord == NULL)
-               fault("tsp_distance: node coordinates not specified");
+               xfault("tsp_distance: node coordinates not specified\n");
             {  int tij;
                double xd, yd, rij;
                xd = tsp->node_x_coord[i] - tsp->node_x_coord[j];

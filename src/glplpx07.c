@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -24,7 +24,6 @@
 #include "glpapi.h"
 #include "glpipm.h"
 #include "glplib.h"
-#define print xprint1
 #define lpx_get_rii glp_get_rii
 #define lpx_get_sjj glp_get_sjj
 
@@ -489,7 +488,7 @@ int lpx_interior(LPX *_lp)
       dsa->z = NULL;
       /* check if the problem is empty */
       if (!(dsa->orig_m > 0 && dsa->orig_n > 0))
-      {  print("lpx_interior: problem has no rows and/or columns");
+      {  xprintf("lpx_interior: problem has no rows and/or columns\n");
          ret = LPX_E_FAULT;
          goto done;
       }
@@ -501,18 +500,18 @@ int lpx_interior(LPX *_lp)
             if ((double)len > 0.30 * (double)dsa->orig_m) ndc++;
          }
          if (ndc == 1)
-            print("lpx_interior: WARNING: PROBLEM HAS ONE DENSE COLUMN")
-               ;
+            xprintf("lpx_interior: WARNING: PROBLEM HAS ONE DENSE COLUM"
+               "N\n");
          else if (ndc > 0)
-            print("lpx_interior: WARNING: PROBLEM HAS %d DENSE COLUMNS",
-               ndc);
+            xprintf("lpx_interior: WARNING: PROBLEM HAS %d DENSE COLUMN"
+               "S\n", ndc);
       }
       /* determine dimension of transformed LP */
-      print("lpx_interior: original LP problem has %d rows and %d colum"
-         "ns", dsa->orig_m, dsa->orig_n);
+      xprintf("lpx_interior: original LP problem has %d rows and %d col"
+         "umns\n", dsa->orig_m, dsa->orig_n);
       calc_mn(dsa);
-      print("lpx_interior: transformed LP problem has %d rows and %d co"
-         "lumns", dsa->m, dsa->n);
+      xprintf("lpx_interior: transformed LP problem has %d rows and %d "
+         "columns\n", dsa->m, dsa->n);
       /* transform original LP to standard formulation */
       dsa->ref = xcalloc(1+dsa->orig_m+dsa->orig_n, sizeof(int));
       dsa->size = lpx_get_num_nz(dsa->lp);

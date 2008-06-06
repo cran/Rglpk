@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -23,7 +23,6 @@
 
 #include "glpapi.h"
 #include "glpssx.h"
-#define print xprint1
 
 /*----------------------------------------------------------------------
 // lpx_exact - easy-to-use driver to the exact simplex method.
@@ -232,7 +231,7 @@ int lpx_exact(LPX *lp)
       double lb, ub, *prim, *dual, sum;
       /* the problem must have at least one row and one column */
       if (!(m > 0 && n > 0))
-      {  print("lpx_exact: problem has no rows/columns");
+      {  xprintf("lpx_exact: problem has no rows/columns\n");
          return LPX_E_FAULT;
       }
       /* check that all double-bounded variables have correct bounds */
@@ -248,26 +247,27 @@ int lpx_exact(LPX *lp)
             ub = lpx_get_col_ub(lp, k-m);
          }
          if (type == LPX_DB && lb >= ub)
-         {  print("lpx_exact: %s %d has invalid bounds",
+         {  xprintf("lpx_exact: %s %d has invalid bounds\n",
                k <= m ? "row" : "column", k <= m ? k : k-m);
             return LPX_E_FAULT;
          }
       }
       /* create the simplex solver workspace */
-      print("lpx_exact: %d rows, %d columns, %d non-zeros", m, n, nnz);
-#ifdef HAVE_GMP_H
-      print("GNU MP library is being used");
+      xprintf("lpx_exact: %d rows, %d columns, %d non-zeros\n",
+         m, n, nnz);
+#ifdef HAVE_GMP
+      xprintf("GNU MP bignum library is being used\n");
 #else
-      print("GLPK bignum module is being used");
-      print("(Consider installing GNU MP to attain a much better perfor"
-         "mance.)");
+      xprintf("GLPK bignum module is being used\n");
+      xprintf("(Consider installing GNU MP to attain a much better perf"
+         "ormance.)\n");
 #endif
       ssx = ssx_create(m, n, nnz);
       /* load LP problem data into the workspace */
       load_data(ssx, lp);
       /* load current LP basis into the workspace */
       if (load_basis(ssx, lp))
-      {  print("lpx_exact: initial LP basis is invalid");
+      {  xprintf("lpx_exact: initial LP basis is invalid\n");
          ret = LPX_E_FAULT;
          goto done;
       }
@@ -277,7 +277,7 @@ int lpx_exact(LPX *lp)
       ssx->tm_lim = lpx_get_real_parm(lp, LPX_K_TMLIM);
       ssx->out_frq = 5.0;
       ssx->tm_beg = xtime();
-      ssx->tm_lag = ulset(0, 0);
+      ssx->tm_lag = xlset(0);
       /* solve LP */
       ret = ssx_driver(ssx);
       /* copy back some statistics to the LP object */

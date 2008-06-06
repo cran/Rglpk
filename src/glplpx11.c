@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -23,7 +23,7 @@
 
 #include "glpapi.h"
 #include "glplib.h"
-#define fault xfault1
+#define xfault xerror
 #define lpx_get_b_info glp_get_bhead
 #define lpx_get_row_b_ind glp_get_row_bind
 #define lpx_get_col_b_ind glp_get_col_bind
@@ -66,7 +66,7 @@ void lpx_eval_b_prim(LPX *lp, double row_prim[], double col_prim[])
 {     int i, j, k, m, n, stat, len, *ind;
       double xN, *NxN, *xB, *val;
       if (!lpx_is_b_avail(lp))
-         fault("lpx_eval_b_prim: LP basis is not available");
+         xfault("lpx_eval_b_prim: LP basis is not available\n");
       m = lpx_get_num_rows(lp);
       n = lpx_get_num_cols(lp);
       /* store values of non-basic auxiliary and structural variables
@@ -199,7 +199,7 @@ void lpx_eval_b_dual(LPX *lp, double row_dual[], double col_dual[])
 {     int i, j, k, m, n, len, *ind;
       double dj, *cB, *pi, *val;
       if (!lpx_is_b_avail(lp))
-         fault("lpx_eval_b_dual: LP basis is not available");
+         xfault("lpx_eval_b_dual: LP basis is not available\n");
       m = lpx_get_num_rows(lp);
       n = lpx_get_num_cols(lp);
       /* store zero reduced costs of basic auxiliary and structural
@@ -494,25 +494,26 @@ int lpx_transform_row(LPX *lp, int len, int ind[], double val[])
 {     int i, j, k, m, n, t, lll, *iii;
       double alfa, *a, *aB, *rho, *vvv;
       if (!lpx_is_b_avail(lp))
-         fault("lpx_transform_row: LP basis is not available");
+         xfault("lpx_transform_row: LP basis is not available\n");
       m = lpx_get_num_rows(lp);
       n = lpx_get_num_cols(lp);
       /* unpack the row to be transformed to the array a */
       a = xcalloc(1+n, sizeof(double));
       for (j = 1; j <= n; j++) a[j] = 0.0;
       if (!(0 <= len && len <= n))
-         fault("lpx_transform_row: len = %d; invalid row length", len);
+         xfault("lpx_transform_row: len = %d; invalid row length\n",
+            len);
       for (t = 1; t <= len; t++)
       {  j = ind[t];
          if (!(1 <= j && j <= n))
-            fault("lpx_transform_row: ind[%d] = %d; column index out of"
-               " range", t, j);
+            xfault("lpx_transform_row: ind[%d] = %d; column index out o"
+               "f range\n", t, j);
          if (val[t] == 0.0)
-            fault("lpx_transform_row: val[%d] = 0; zero coefficient not"
-               " allowed", t);
+            xfault("lpx_transform_row: val[%d] = 0; zero coefficient no"
+               "t allowed\n", t);
          if (a[j] != 0.0)
-            fault("lpx_transform_row: ind[%d] = %d; duplicate column in"
-               "dices not allowed", t, j);
+            xfault("lpx_transform_row: ind[%d] = %d; duplicate column i"
+               "ndices not allowed\n", t, j);
          a[j] = val[t];
       }
       /* construct the vector aB */
@@ -631,25 +632,25 @@ int lpx_transform_col(LPX *lp, int len, int ind[], double val[])
 {     int i, m, t;
       double *a, *alfa;
       if (!lpx_is_b_avail(lp))
-         fault("lpx_transform_col: LP basis is not available");
+         xfault("lpx_transform_col: LP basis is not available\n");
       m = lpx_get_num_rows(lp);
       /* unpack the column to be transformed to the array a */
       a = xcalloc(1+m, sizeof(double));
       for (i = 1; i <= m; i++) a[i] = 0.0;
       if (!(0 <= len && len <= m))
-         fault("lpx_transform_col: len = %d; invalid column length",
+         xfault("lpx_transform_col: len = %d; invalid column length\n",
             len);
       for (t = 1; t <= len; t++)
       {  i = ind[t];
          if (!(1 <= i && i <= m))
-            fault("lpx_transform_col: ind[%d] = %d; row index out of ra"
-               "nge", t, i);
+            xfault("lpx_transform_col: ind[%d] = %d; row index out of r"
+               "ange\n", t, i);
          if (val[t] == 0.0)
-            fault("lpx_transform_col: val[%d] = 0; zero coefficient not"
-               " allowed", t);
+            xfault("lpx_transform_col: val[%d] = 0; zero coefficient no"
+               "t allowed\n", t);
          if (a[i] != 0.0)
-            fault("lpx_transform_col: ind[%d] = %d; duplicate row indic"
-               "es not allowed", t, i);
+            xfault("lpx_transform_col: ind[%d] = %d; duplicate row indi"
+               "ces not allowed\n", t, i);
          a[i] = val[t];
       }
       /* solve the system B*a = alfa to compute the vector alfa */
@@ -735,12 +736,13 @@ int lpx_prim_ratio_test(LPX *lp, int len, const int ind[],
       double alfa_i, abs_alfa_i, big, eps, bbar_i, lb_i, ub_i, temp,
          teta;
       if (!lpx_is_b_avail(lp))
-         fault("lpx_prim_ratio_test: LP basis is not available");
+         xfault("lpx_prim_ratio_test: LP basis is not available\n");
       if (lpx_get_prim_stat(lp) != LPX_P_FEAS)
-         fault("lpx_prim_ratio_test: current basic solution is not prim"
-            "al feasible");
+         xfault("lpx_prim_ratio_test: current basic solution is not pri"
+            "mal feasible\n");
       if (!(how == +1 || how == -1))
-         fault("lpx_prim_ratio_test: how = %d; invalid parameter", how);
+         xfault("lpx_prim_ratio_test: how = %d; invalid parameter\n",
+            how);
       m = lpx_get_num_rows(lp);
       n = lpx_get_num_cols(lp);
       /* compute the largest absolute value of the specified influence
@@ -754,7 +756,8 @@ int lpx_prim_ratio_test(LPX *lp, int len, const int ind[],
       /* compute the absolute tolerance eps used to skip small entries
          of the column */
       if (!(0.0 < tol && tol < 1.0))
-         fault("lpx_prim_ratio_test: tol = %g; invalid tolerance", tol);
+         xfault("lpx_prim_ratio_test: tol = %g; invalid tolerance\n",
+            tol);
       eps = tol * (1.0 + big);
       /* initial settings */
       p = 0, teta = DBL_MAX, big = 0.0;
@@ -763,15 +766,15 @@ int lpx_prim_ratio_test(LPX *lp, int len, const int ind[],
       {  /* get the ordinal number of basic variable */
          k = ind[t];
          if (!(1 <= k && k <= m+n))
-            fault("lpx_prim_ratio_test: ind[%d] = %d; variable number o"
-               "ut of range", t, k);
+            xfault("lpx_prim_ratio_test: ind[%d] = %d; variable number "
+               "out of range\n", t, k);
          if (k <= m)
             tagx = lpx_get_row_stat(lp, k);
          else
             tagx = lpx_get_col_stat(lp, k-m);
          if (tagx != LPX_BS)
-            fault("lpx_prim_ratio_test: ind[%d] = %d; non-basic variabl"
-               "e not allowed", t, k);
+            xfault("lpx_prim_ratio_test: ind[%d] = %d; non-basic variab"
+               "le not allowed\n", t, k);
          /* determine index of the variable x[k] in the vector xB */
          if (k <= m)
             i = lpx_get_row_b_ind(lp, k);
@@ -901,12 +904,13 @@ int lpx_dual_ratio_test(LPX *lp, int len, const int ind[],
 {     int k, m, n, t, q, tagx;
       double dir, alfa_j, abs_alfa_j, big, eps, cbar_j, temp, teta;
       if (!lpx_is_b_avail(lp))
-         fault("lpx_dual_ratio_test: LP basis is not available");
+         xfault("lpx_dual_ratio_test: LP basis is not available\n");
       if (lpx_get_dual_stat(lp) != LPX_D_FEAS)
-         fault("lpx_dual_ratio_test: current basic solution is not dual"
-            " feasible");
+         xfault("lpx_dual_ratio_test: current basic solution is not dua"
+            "l feasible\n");
       if (!(how == +1 || how == -1))
-         fault("lpx_dual_ratio_test: how = %d; invalid parameter", how);
+         xfault("lpx_dual_ratio_test: how = %d; invalid parameter\n",
+            how);
       m = lpx_get_num_rows(lp);
       n = lpx_get_num_cols(lp);
       dir = (lpx_get_obj_dir(lp) == LPX_MIN ? +1.0 : -1.0);
@@ -921,7 +925,8 @@ int lpx_dual_ratio_test(LPX *lp, int len, const int ind[],
       /* compute the absolute tolerance eps used to skip small entries
          of the row */
       if (!(0.0 < tol && tol < 1.0))
-         fault("lpx_dual_ratio_test: tol = %g; invalid tolerance", tol);
+         xfault("lpx_dual_ratio_test: tol = %g; invalid tolerance\n",
+            tol);
       eps = tol * (1.0 + big);
       /* initial settings */
       q = 0, teta = DBL_MAX, big = 0.0;
@@ -930,15 +935,15 @@ int lpx_dual_ratio_test(LPX *lp, int len, const int ind[],
       {  /* get ordinal number of non-basic variable */
          k = ind[t];
          if (!(1 <= k && k <= m+n))
-            fault("lpx_dual_ratio_test: ind[%d] = %d; variable number o"
-               "ut of range", t, k);
+            xfault("lpx_dual_ratio_test: ind[%d] = %d; variable number "
+               "out of range\n", t, k);
          if (k <= m)
             tagx = lpx_get_row_stat(lp, k);
          else
             tagx = lpx_get_col_stat(lp, k-m);
          if (tagx == LPX_BS)
-            fault("lpx_dual_ratio_test: ind[%d] = %d; basic variable no"
-               "t allowed", t, k);
+            xfault("lpx_dual_ratio_test: ind[%d] = %d; basic variable n"
+               "ot allowed\n", t, k);
          /* determine unscaled reduced cost of the non-basic variable
             x[k] = xN[j] in the current basic solution */
          if (k <= m)

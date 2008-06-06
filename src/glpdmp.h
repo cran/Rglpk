@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -33,9 +33,11 @@ typedef struct DMP DMP;
 
 struct DMP
 {     /* dynamic memory pool */
+#if 0
       int size;
       /* size of atoms, in bytes, 1 <= size <= 256; if size = 0, atoms
          may have different sizes */
+#endif
       void *avail[32];
       /* avail[k], 0 <= k <= 31, is a pointer to the first available
          (free) cell of (k+1)*8 bytes long; in the beginning of each
@@ -48,7 +50,7 @@ struct DMP
       int used;
       /* number of bytes used in the most recently allocated memory
          block */
-      glp_ulong count;
+      xlong_t count;
       /* number of atoms which are currently in use */
 };
 
@@ -65,7 +67,7 @@ void dmp_free_atom(DMP *pool, void *atom, int size);
 /* return atom to dynamic memory pool */
 
 #define dmp_in_use _glp_dmp_in_use
-glp_ulong dmp_in_use(DMP *pool);
+xlong_t dmp_in_use(DMP *pool);
 /* determine how many atoms are still in use */
 
 #define dmp_delete_pool _glp_dmp_delete_pool

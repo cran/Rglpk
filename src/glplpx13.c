@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -23,7 +23,6 @@
 
 #include "glpapi.h"
 #include "glplib.h"
-#define print xprint1
 
 static double get_row_lb(LPX *lp, int i)
 {     /* this routine returns lower bound of row i or -DBL_MAX if the
@@ -366,7 +365,7 @@ void *lpx_create_cog(LPX *lp)
 {     struct COG *cog = NULL;
       int m, n, nb, i, j, p, q, len, *ind, *vert, *orig;
       double L, U, lf_min, lf_max, *val;
-      print("Creating the conflict graph...");
+      xprintf("Creating the conflict graph...\n");
       m = lpx_get_num_rows(lp);
       n = lpx_get_num_cols(lp);
       /* determine which binary variables should be included in the
@@ -405,7 +404,7 @@ void *lpx_create_cog(LPX *lp)
       /* if the graph is either empty or has too many vertices, do not
          create it */
       if (nb == 0 || nb > MAX_NB)
-      {  print("The conflict graph is either empty or too big");
+      {  xprintf("The conflict graph is either empty or too big\n");
          xfree(vert);
          xfree(orig);
          goto done;
@@ -473,7 +472,7 @@ void *lpx_create_cog(LPX *lp)
             }
          }
       }
-      print("The conflict graph has 2*%d vertices and %d edges",
+      xprintf("The conflict graph has 2*%d vertices and %d edges\n",
          cog->nb, cog->ne);
 done: xfree(ind);
       xfree(val);
@@ -646,7 +645,7 @@ done: xfree(newtable);
 static int wclique(int _n, int w[], unsigned char _a[], int sol[])
 {     struct dsa _dsa, *dsa = &_dsa;
       int i, j, p, max_wt, max_nwt, wth, *used, *nwt, *pos;
-      glp_ulong timer;
+      xlong_t timer;
       n = _n;
       wt = &w[1];
       a = _a;
@@ -697,7 +696,7 @@ static int wclique(int _n, int w[], unsigned char _a[], int sol[])
          if (xdifftime(xtime(), timer) >= 5.0 - 0.001)
 #endif
          {  /* print current record and reset timer */
-            print("level = %d (%d); best = %d", i+1, n, record);
+            xprintf("level = %d (%d); best = %d\n", i+1, n, record);
 #if 0
             timer = utime();
 #else

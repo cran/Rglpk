@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -24,7 +24,6 @@
 #include "glpapi.h"
 #include "glplib.h"
 #include "glpspx.h"
-#define print xprint1
 
 /*----------------------------------------------------------------------
 -- spx_invert - reinvert the basis matrix.
@@ -97,12 +96,13 @@ int spx_invert(SPX *spx)
             break;
          case 1:
             if (spx->msg_lev >= 1)
-               print("spx_invert: the basis matrix is singular");
+               xprintf("spx_invert: the basis matrix is singular\n");
             spx->valid = 0;
             break;
          case 2:
             if (spx->msg_lev >= 1)
-               print("spx_invert: the basis matrix is ill-conditioned");
+               xprintf("spx_invert: the basis matrix is ill-conditioned"
+                  "\n");
             spx->valid = 0;
             break;
          default:
@@ -820,8 +820,8 @@ loop: /* recompute basic solution components (if required) */
                   numeric instability; therefore the vector of reduced
                   costs should be recomputed more accurately */
                if (spx->msg_lev >= 3)
-                  print("spx_prim_chuzc: recomputing basic solution com"
-                     "ponents");
+                  xprintf("spx_prim_chuzc: recomputing basic solution c"
+                     "omponents\n");
                retry = 1;
             }
          }

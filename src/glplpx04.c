@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -23,8 +23,7 @@
 
 #include "glpapi.h"
 #include "glplib.h"
-#define print xprint1
-#define fault xfault1
+#define xfault xerror
 #define lpx_set_rii glp_set_rii
 #define lpx_set_sjj glp_set_sjj
 
@@ -87,7 +86,7 @@ static void eq_scal(int m, int n, void *info,
 {     int i, j, len, t, pass, *ndx;
       double big, temp, *val;
       if (!(m > 0 && n > 0))
-         fault("eq_scal: m = %d; n = %d; invalid parameters", m, n);
+         xfault("eq_scal: m = %d; n = %d; invalid parameters\n", m, n);
       ndx = xcalloc(1 + (m >= n ? m : n), sizeof(int));
       val = xcalloc(1 + (m >= n ? m : n), sizeof(double));
       for (pass = 0; pass <= 1; pass++)
@@ -98,14 +97,14 @@ static void eq_scal(int m, int n, void *info,
                /* obtain the i-th row of the matrix A */
                len = mat(info, +i, ndx, val);
                if (!(0 <= len && len <= n))
-                  fault("eq_scal: i = %d; len = %d; invalid row length",
-                     i, len);
+                  xfault("eq_scal: i = %d; len = %d; invalid row length"
+                     "\n", i, len);
                /* compute big = max(a[i,j]) for the i-th row */
                for (t = 1; t <= len; t++)
                {  j = ndx[t];
                   if (!(1 <= j && j <= n))
-                     fault("eq_scal: i = %d; j = %d; invalid column ind"
-                        "ex", i, j);
+                     xfault("eq_scal: i = %d; j = %d; invalid column in"
+                        "dex\n", i, j);
                   temp = R[i] * fabs(val[t]) * S[j];
                   if (big < temp) big = temp;
                }
@@ -120,14 +119,14 @@ static void eq_scal(int m, int n, void *info,
                /* obtain the j-th column of the matrix A */
                len = mat(info, -j, ndx, val);
                if (!(0 <= len && len <= m))
-                  fault("eq_scal: j = %d; len = %d; invalid column leng"
-                     "th", j, len);
+                  xfault("eq_scal: j = %d; len = %d; invalid column len"
+                     "gth\n", j, len);
                /* compute big = max(a[i,j]) for the j-th column */
                for (t = 1; t <= len; t++)
                {  i = ndx[t];
                   if (!(1 <= i && i <= m))
-                     fault("eq_scal: i = %d; j = %d; invalid row index",
-                        i, j);
+                     xfault("eq_scal: i = %d; j = %d; invalid row index"
+                        "\n", i, j);
                   temp = R[i] * fabs(val[t]) * S[j];
                   if (big < temp) big = temp;
                }
@@ -222,7 +221,7 @@ static void gm_scal(int m, int n, void *info,
 {     int iter, i, j, len, t, pass, *ndx;
       double alfa, beta, told, tnew, temp, *val;
       if (!(m > 0 && n > 0))
-         fault("gm_scal: m = %d; n = %d; invalid parameters", m, n);
+         xfault("gm_scal: m = %d; n = %d; invalid parameters\n", m, n);
       ndx = xcalloc(1 + (m >= n ? m : n), sizeof(int));
       val = xcalloc(1 + (m >= n ? m : n), sizeof(double));
       told = DBL_MAX;
@@ -246,11 +245,11 @@ static void gm_scal(int m, int n, void *info,
          tnew = (beta == 0.0 ? 1.0 : beta / alfa);
          /* print the initial scaling "quality" */
          if (iter == 1)
-            print("gm_scal: max / min = %9.3e", tnew);
+            xprintf("gm_scal: max / min = %9.3e\n", tnew);
          /* check if the scaling process should stop */
          if (iter > it_max || told - tnew < eps * told)
          {  /* print the final scaling "quality" and leave the loop */
-            print("gm_scal: max / min = %9.3e", tnew);
+            xprintf("gm_scal: max / min = %9.3e\n", tnew);
             break;
          }
          told = tnew;
@@ -263,15 +262,15 @@ static void gm_scal(int m, int n, void *info,
                   /* obtain the i-th row of the matrix A */
                   len = mat(info, +i, ndx, val);
                   if (!(0 <= len && len <= n))
-err1:                fault("gm_scal: i = %d; len = %d; invalid row leng"
-                        "th", i, len);
+err1:                xfault("gm_scal: i = %d; len = %d; invalid row len"
+                        "gth", i, len);
                   /* compute alfa = min(a[i,j]) and beta = max(a[i,j])
                      for non-zero elements in the i-th row */
                   for (t = 1; t <= len; t++)
                   {  j = ndx[t];
                      if (!(1 <= j && j <= n))
-err2:                   fault("gm_scal: i = %d; j = %d; invalid column "
-                           "index", i, j);
+err2:                   xfault("gm_scal: i = %d; j = %d; invalid column"
+                           " index\n", i, j);
                      temp = R[i] * fabs(val[t]) * S[j];
                      if (temp == 0.0) continue;
                      if (alfa > temp) alfa = temp;
@@ -288,15 +287,15 @@ err2:                   fault("gm_scal: i = %d; j = %d; invalid column "
                   /* obtain the j-th column of the matrix A */
                   len = mat(info, -j, ndx, val);
                   if (!(0 <= len && len <= m))
-                     fault("gm_scal: j = %d; len = %d; invalid column l"
-                        "ength", j, len);
+                     xfault("gm_scal: j = %d; len = %d; invalid column "
+                        "length\n", j, len);
                   /* compute alfa = min(a[i,j]) and beta = max(a[i,j])
                      for non-zero elements in the j-th column */
                   for (t = 1; t <= len; t++)
                   {  i = ndx[t];
                      if (!(1 <= i && i <= m))
-                        fault("gm_scal: i = %d; j = %d; invalid row ind"
-                           "ex", i, j);
+                        xfault("gm_scal: i = %d; j = %d; invalid row in"
+                           "dex\n", i, j);
                      temp = R[i] * fabs(val[t]) * S[j];
                      if (temp == 0.0) continue;
                      if (alfa > temp) alfa = temp;

@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -22,9 +22,7 @@
 ***********************************************************************/
 
 #include "glpapi.h"
-#include "glplib.h"
-#define print xprint1
-#define fault xfault1
+#define xfault xerror
 
 /*----------------------------------------------------------------------
 -- lpx_std_basis - construct standard initial LP basis.
@@ -203,7 +201,7 @@ static int triang(int m, int n,
       int i, j, ii, jj, k1, k2, len, t, size = 0;
       int *head, *rn_inv, *cn_inv;
       if (!(m > 0 && n > 0))
-         fault("triang: m = %d; n = %d; invalid dimension", m, n);
+         xfault("triang: m = %d; n = %d; invalid dimension\n", m, n);
       /* allocate working arrays */
       ndx = xcalloc(1+(m >= n ? m : n), sizeof(int));
       rs_len = xcalloc(1+m, sizeof(int));
@@ -494,9 +492,9 @@ void lpx_adv_basis(LPX *lp)
       int typx, *tagx = xcalloc(1+m+n, sizeof(int));
       double lb, ub;
       if (m == 0)
-         fault("lpx_adv_basis: problem has no rows");
+         xfault("lpx_adv_basis: problem has no rows\n");
       if (n == 0)
-         fault("lpx_adv_basis: problem has no columns");
+         xfault("lpx_adv_basis: problem has no columns\n");
       /* use the routine triang (see above) to find maximal triangular
          part of the augmented constraint matrix A~ = (I|-A); in order
          to prevent columns of fixed variables to be included in the
@@ -506,7 +504,8 @@ void lpx_adv_basis(LPX *lp)
       cn = xcalloc(1+m+n, sizeof(int));
       size = triang(m, m+n, lp, mat, rn, cn);
       if (lpx_get_int_parm(lp, LPX_K_MSGLEV) >= 3)
-         print("lpx_adv_basis: size of triangular part = %d", size);
+         xprintf("lpx_adv_basis: size of triangular part = %d\n",
+            size);
       /* the first size rows and columns of the matrix P*A~*Q (where
          P and Q are permutation matrices defined by the arrays rn and
          cn) form a lower triangular matrix; build the arrays (rn_inv

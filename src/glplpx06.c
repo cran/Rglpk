@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -22,9 +22,7 @@
 ***********************************************************************/
 
 #include "glpapi.h"
-
-#define print xprint1
-#define fault xfault1
+#define xfault xerror
 #define lpx_get_rii glp_get_rii
 #define lpx_get_sjj glp_get_sjj
 
@@ -259,9 +257,9 @@ void lpx_check_kkt(LPX *lp, int scaled, LPXKKT *kkt)
       double cR_i, cS_j, c_k, xR_i, xS_j, x_k, dR_i, dS_j, d_k;
       double g_i, h_k, u_j, v_k, temp, rii, sjj;
       if (lpx_get_prim_stat(lp) == LPX_P_UNDEF)
-         fault("lpx_check_kkt: primal basic solution is undefined");
+         xfault("lpx_check_kkt: primal basic solution is undefined\n");
       if (lpx_get_dual_stat(lp) == LPX_D_UNDEF)
-         fault("lpx_check_kkt: dual basic solution is undefined");
+         xfault("lpx_check_kkt: dual basic solution is undefined\n");
       /*--------------------------------------------------------------*/
       /* compute largest absolute and relative errors and corresponding
          row indices for the condition (KKT.PE) */

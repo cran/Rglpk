@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -24,6 +24,7 @@
 #include "glpapi.h"
 #include "glplpp.h"
 #include "glpspx.h"
+#define xfault xerror
 
 /***********************************************************************
 *  NAME
@@ -160,7 +161,7 @@ up:            col->stat = GLP_NU;
       }
       if (parm->msg_lev >= GLP_MSG_ON && parm->out_dly == 0)
       {  xprintf("~%6d:   objval = %17.9e   infeas = %17.9e\n",
-            lp->it_cnt, lp->obj_val);
+            lp->it_cnt, lp->obj_val, 0.0);
          if (parm->msg_lev >= GLP_MSG_ALL)
          {  if (lp->dbs_stat == GLP_FEAS)
                xprintf("OPTIMAL SOLUTION FOUND\n");

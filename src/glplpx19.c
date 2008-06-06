@@ -5,7 +5,7 @@
 *
 *  Author: Oscar Gustafsson <oscarg@isy.liu.se>.
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -23,8 +23,9 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_ERRNO
+#define _GLPSTD_STDIO
 #include "glpapi.h"
-#define print xprint1
 
 /*----------------------------------------------------------------------
 -- lpx_write_pb - write problem data in (normalized) OPB format.
@@ -52,11 +53,12 @@ int lpx_write_pb(LPX *lp, const char *fname, int normalized)
    int m,n,i,j,k,o,nonfree=0, obj_dir, dbl, *ndx, row_type;
    double coeff, *val, bound;
 
-   fp = xfopen(fname, "w");
+   fp = fopen(fname, "w");
 
    if(fp!= NULL)
      {
-       print("lpx_write_pb: writing problem in %sOPB format to `%s'...",
+       xprintf(
+         "lpx_write_pb: writing problem in %sOPB format to `%s'...\n",
             (normalized?"normalized ":""), fname);
 
        m = glp_get_num_rows(lp);
@@ -190,18 +192,18 @@ glp_get_col_name(lp,ndx[i]));
      }
    else
      {
-       print("Problems opening file for writing: %s", fname);
+       xprintf("Problems opening file for writing: %s\n", fname);
        return(1);
      }
    fflush(fp);
    if (ferror(fp))
-     {  print("lpx_write_pb: can't write to `%s' - %s", fname,
+     {  xprintf("lpx_write_pb: can't write to `%s' - %s\n", fname,
              strerror(errno));
      goto fail;
      }
-   xfclose(fp);
+   fclose(fp);
    return 0;
-  fail: if (fp != NULL) xfclose(fp);
+  fail: if (fp != NULL) fclose(fp);
    return 1;
 }
 

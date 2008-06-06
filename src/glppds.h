@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -32,7 +32,7 @@ struct PDS
 {     /* plain data stream */
       char *fname;
       /* name of input text file */
-      FILE *fp;
+      void *fp; /* FILE *fp; */
       /* stream assigned to input text file */
       void *jump; /* jmp_buf jump; */
       /* address for non-local go to on error */

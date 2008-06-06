@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,9 +21,10 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_ERRNO
+#define _GLPSTD_STDIO
 #include "glpapi.h"
 #include "glplib.h"
-#define print xprint1
 
 /*----------------------------------------------------------------------
 -- lpx_read_prob - read problem data in GNU LP format.
@@ -60,8 +61,8 @@ static int read_char(struct dsa *dsa)
       if (dsa->c == '\n') dsa->count++;
       c = fgetc(dsa->fp);
       if (ferror(dsa->fp))
-      {  print("%s:%d: read error - %s", dsa->fname, dsa->count,
-            strerror(errno));
+      {  xprintf("%s:%d: read error - %s\n",
+            dsa->fname, dsa->count, strerror(errno));
          return 1;
       }
       if (feof(dsa->fp))
@@ -71,8 +72,8 @@ static int read_char(struct dsa *dsa)
       else if (isspace(c))
          c = ' ';
       else if (iscntrl(c))
-      {  print("%s:%d: invalid control character 0x%02X", dsa->fname,
-            dsa->count, c);
+      {  xprintf("%s:%d: invalid control character 0x%02X\n",
+            dsa->fname, dsa->count, c);
          return 1;
       }
       dsa->c = c;
@@ -89,21 +90,21 @@ static int skip_comment(struct dsa *dsa)
 static int read_item(struct dsa *dsa, char item[255+1])
 {     int len = 0;
       if (dsa->c == EOF)
-      {  print("%s:%d: unexpected end of file", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: unexpected end of file\n",
+            dsa->fname, dsa->count);
          return 1;
       }
       while (dsa->c == ' ')
          if (read_char(dsa)) return 1;
       if (dsa->c == '\n')
-      {  print("%s:%d: unexpected end of line", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: unexpected end of line\n",
+            dsa->fname, dsa->count);
          return 1;
       }
       while (!(dsa->c == ' ' || dsa->c == '\n'))
       {  if (len == 255)
-         {  print("%s:%d: data item `%.255s...' too long", dsa->fname,
-               dsa->count, item);
+         {  xprintf("%s:%d: data item `%.255s...' too long\n",
+               dsa->fname, dsa->count, item);
             return 1;
          }
          item[len++] = (char)dsa->c;
@@ -120,12 +121,12 @@ static int read_int(struct dsa *dsa, int *val)
       {  case 0:
             break;
          case 1:
-            print("%s:%d: integer value `%s' out of range", dsa->fname,
-               dsa->count, item);
+            xprintf("%s:%d: integer value `%s' out of range\n",
+               dsa->fname, dsa->count, item);
             return 1;
          case 2:
-            print("%s:%d: invalid integer value `%s'", dsa->fname,
-               dsa->count, item);
+            xprintf("%s:%d: invalid integer value `%s'\n",
+               dsa->fname, dsa->count, item);
             return 1;
          default:
             xassert(str2int != str2int);
@@ -140,11 +141,11 @@ static int read_num(struct dsa *dsa, double *val)
       {  case 0:
             break;
          case 1:
-            print("%s:%d: floating-point value `%s' out of range",
+            xprintf("%s:%d: floating-point value `%s' out of range\n",
                dsa->fname, dsa->count, item);
             return 1;
          case 2:
-            print("%s:%d: invalid floating-point value `%s'",
+            xprintf("%s:%d: invalid floating-point value `%s'\n",
                dsa->fname, dsa->count, item);
             return 1;
          default:
@@ -157,7 +158,7 @@ static int skip_until_nl(struct dsa *dsa)
 {     while (dsa->c == ' ')
          if (read_char(dsa)) return 1;
       if (dsa->c != '\n')
-      {  print("%s:%d: extra data item(s) detected", dsa->fname,
+      {  xprintf("%s:%d: extra data item(s) detected\n", dsa->fname,
             dsa->count);
          return 1;
       }
@@ -175,12 +176,12 @@ LPX *lpx_read_prob(char *fname)
       dsa->fp = NULL;
       dsa->count = 0;
       dsa->c = '\n';
-      print("lpx_read_prob: reading problem data from `%s'...",
+      xprintf("lpx_read_prob: reading problem data from `%s'...\n",
          dsa->fname);
-      dsa->fp = xfopen(dsa->fname, "r");
+      dsa->fp = fopen(dsa->fname, "r");
       if (dsa->fp == NULL)
-      {  print("lpx_read_prob: unable to open `%s' - %s", dsa->fname,
-            strerror(errno));
+      {  xprintf("lpx_read_prob: unable to open `%s' - %s\n",
+            dsa->fname, strerror(errno));
          goto fail;
       }
       lp = lpx_create_prob();
@@ -192,7 +193,8 @@ LPX *lpx_read_prob(char *fname)
       /* scan problem line */
       if (read_item(dsa, item)) goto fail;
       if (strcmp(item, "P") != 0)
-      {  print("%s:%d: problem line missing", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: problem line missing\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       if (read_item(dsa, item)) goto fail;
@@ -201,7 +203,8 @@ LPX *lpx_read_prob(char *fname)
       else if (strcmp(item, "MIP") == 0)
          /* lpx_set_class(lp, LPX_MIP) */ ;
       else
-      {  print("%s:%d: unknown problem class", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: unknown problem class\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       if (read_item(dsa, item)) goto fail;
@@ -210,31 +213,31 @@ LPX *lpx_read_prob(char *fname)
       else if (strcmp(item, "MAX") == 0)
          lpx_set_obj_dir(lp, LPX_MAX);
       else
-      {  print("%s:%d: invalid objective sense", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: invalid objective sense\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       if (read_int(dsa, &m)) goto fail;
       if (m < 0)
-      {  print("%s:%d: invalid number of rows", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: invalid number of rows\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       if (m > 0) lpx_add_rows(lp, m);
       if (read_int(dsa, &n)) goto fail;
       if (n < 0)
-      {  print("%s:%d: invalid number of columns", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: invalid number of columns\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       if (n > 0) lpx_add_cols(lp, n);
       if (read_int(dsa, &nnz)) goto fail;
       if (nnz < 0)
-      {  print("%s:%d: invalid number of non-zeros", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: invalid number of non-zeros\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
-      print("lpx_read_prob: %d row%s, %d column%s, %d non-zero%s",
+      xprintf("lpx_read_prob: %d row%s, %d column%s, %d non-zero%s\n",
          m, m == 1 ? "" : "s", n, n == 1 ? "" : "s", nnz, nnz == 1 ?
          "" : "s");
       ia = xcalloc(1+nnz, sizeof(int));
@@ -258,8 +261,8 @@ loop: /* skip optional comments */
       {  /* scan row attributes */
          if (read_int(dsa, &i)) goto fail;
          if (!(1 <= i && i <= m))
-         {  print("%s:%d: row number out of range", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: row number out of range\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          if (read_item(dsa, item)) goto fail;
@@ -283,7 +286,8 @@ loop: /* skip optional comments */
             lpx_set_row_bnds(lp, i, LPX_FX, lb, 0.0);
          }
          else
-         {  print("%s:%d: unknown row type", dsa->fname, dsa->count);
+         {  xprintf("%s:%d: unknown row type\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          if (skip_until_nl(dsa)) goto fail;
@@ -292,8 +296,8 @@ loop: /* skip optional comments */
       {  /* scan column attributes */
          if (read_int(dsa, &j)) goto fail;
          if (!(1 <= j && j <= n))
-         {  print("%s:%d: column number out of range", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: column number out of range\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          if (lpx_get_class(lp) == LPX_MIP)
@@ -303,8 +307,8 @@ loop: /* skip optional comments */
             else if (strcmp(item, "I") == 0)
                lpx_set_col_kind(lp, j, LPX_IV);
             else
-            {  print("%s:%d: unknown column kind", dsa->fname,
-                  dsa->count);
+            {  xprintf("%s:%d: unknown column kind\n",
+                  dsa->fname, dsa->count);
                goto fail;
             }
          }
@@ -329,8 +333,8 @@ loop: /* skip optional comments */
             lpx_set_col_bnds(lp, j, LPX_FX, lb, 0.0);
          }
          else
-         {  print("%s:%d: unknown column type", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: unknown column type\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          if (skip_until_nl(dsa)) goto fail;
@@ -339,14 +343,14 @@ loop: /* skip optional comments */
       {  /* constraint or objective coefficient or constant term */
          if (read_int(dsa, &i)) goto fail;
          if (!(0 <= i && i <= m))
-         {  print("%s:%d: row number out of range", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: row number out of range\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          if (read_int(dsa, &j)) goto fail;
          if (!((i == 0 ? 0 : 1) <= j && j <= n))
-         {  print("%s:%d: column number out of range", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: column number out of range\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          if (read_num(dsa, &coef)) goto fail;
@@ -355,7 +359,7 @@ loop: /* skip optional comments */
          else
          {  loc++;
             if (loc > nnz)
-            {  print("%s:%d: too many constraint coefficients",
+            {  xprintf("%s:%d: too many constraint coefficients\n",
                   dsa->fname, dsa->count);
                goto fail;
             }
@@ -367,8 +371,8 @@ loop: /* skip optional comments */
       {  /* row or objective function name */
          if (read_int(dsa, &i)) goto fail;
          if (!(0 <= i && i <= m))
-         {  print("%s:%d: row number out of range", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: row number out of range\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          if (read_item(dsa, item)) goto fail;
@@ -382,8 +386,8 @@ loop: /* skip optional comments */
       {  /* column name */
          if (read_int(dsa, &j)) goto fail;
          if (!(1 <= j && j <= n))
-         {  print("%s:%d: column number out of range", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: column number out of range\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          if (read_item(dsa, item)) goto fail;
@@ -393,8 +397,8 @@ loop: /* skip optional comments */
       else if (strcmp(item, "E") == 0)
       {  if (read_item(dsa, item)) goto fail;
          if (strcmp(item, "N") != 0)
-boo:     {  print("%s:%d: end line invalid or incomplete", dsa->fname,
-               dsa->count);
+boo:     {  xprintf("%s:%d: end line invalid or incomplete\n",
+               dsa->fname, dsa->count);
             goto fail;
          }
          if (read_item(dsa, item)) goto fail;
@@ -403,14 +407,15 @@ boo:     {  print("%s:%d: end line invalid or incomplete", dsa->fname,
          goto fini;
       }
       else
-      {  print("%s:%d: unknown line type", dsa->fname, dsa->count);
+      {  xprintf("%s:%d: unknown line type\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       goto loop;
 fini: /* load constraint matrix */
       if (loc < nnz)
-      {  print("%s:%d: too few constraint coefficients", dsa->fname,
-            dsa->count);
+      {  xprintf("%s:%d: too few constraint coefficients\n",
+            dsa->fname, dsa->count);
          goto fail;
       }
       xassert(loc == nnz);
@@ -418,10 +423,10 @@ fini: /* load constraint matrix */
       xfree(ia);
       xfree(ja);
       xfree(ar);
-      print("lpx_read_prob: %d lines were read", dsa->count - 1);
-      xfclose(dsa->fp);
+      xprintf("lpx_read_prob: %d lines were read\n", dsa->count-1);
+      fclose(dsa->fp);
       return lp;
-fail: if (dsa->fp != NULL) xfclose(dsa->fp);
+fail: if (dsa->fp != NULL) fclose(dsa->fp);
       if (lp != NULL) lpx_delete_prob(lp);
       if (ia != NULL) xfree(ia);
       if (ja != NULL) xfree(ja);
@@ -465,11 +470,12 @@ int lpx_write_prob(LPX *lp, char *fname)
       int m, n, klass, dir, i, j, t, type, len, *ind;
       double lb, ub, coef, *val;
       const char *name;
-      print("lpx_write_prob: writing problem data to `%s'...", fname);
-      fp = xfopen(fname, "w");
+      xprintf("lpx_write_prob: writing problem data to `%s'...\n",
+         fname);
+      fp = fopen(fname, "w");
       if (fp == NULL)
-      {  print("lpx_write_prob: unable to create `%s' - %s", fname,
-            strerror(errno));
+      {  xprintf("lpx_write_prob: unable to create `%s' - %s\n",
+            fname, strerror(errno));
          goto fail;
       }
       /* problem line */
@@ -585,13 +591,13 @@ int lpx_write_prob(LPX *lp, char *fname)
       fprintf(fp, "E N D\n");
       fflush(fp);
       if (ferror(fp))
-      {  print("lpx_write_prob: write error on `%s' - %s", fname,
-            strerror(errno));
+      {  xprintf("lpx_write_prob: write error on `%s' - %s\n",
+            fname, strerror(errno));
          goto fail;
       }
-      xfclose(fp);
+      fclose(fp);
       return 0;
-fail: if (fp != NULL) xfclose(fp);
+fail: if (fp != NULL) fclose(fp);
       return 1;
 }
 

@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -22,7 +22,7 @@
 ***********************************************************************/
 
 #include "glplux.h"
-#define fault xfault1
+#define xfault xerror
 #define dmp_create_poolx(size) dmp_create_pool()
 
 /*----------------------------------------------------------------------
@@ -48,7 +48,7 @@ LUX *lux_create(int n)
 {     LUX *lux;
       int k;
       if (n < 1)
-         fault("lux_create: n = %d; invalid parameter", n);
+         xfault("lux_create: n = %d; invalid parameter\n", n);
       lux = xmalloc(sizeof(LUX));
       lux->n = n;
       lux->pool = dmp_create_poolx(sizeof(LUXELM));
@@ -132,23 +132,23 @@ static void initialize(LUX *lux, int (*col)(void *info, int j,
       {  /* obtain j-th column of matrix A */
          len = col(info, j, ind, val);
          if (!(0 <= len && len <= n))
-            fault("lux_decomp: j = %d: len = %d; invalid column length",
-               j, len);
+            xfault("lux_decomp: j = %d: len = %d; invalid column length"
+               "\n", j, len);
          /* copy elements of j-th column to matrix V */
          for (k = 1; k <= len; k++)
          {  /* get row index of a[i,j] */
             i = ind[k];
             if (!(1 <= i && i <= n))
-               fault("lux_decomp: j = %d: i = %d; row index out of rang"
-                  "e", j, i);
+               xfault("lux_decomp: j = %d: i = %d; row index out of ran"
+                  "ge\n", j, i);
             /* check for duplicate indices */
             if (V_row[i] != NULL && V_row[i]->j == j)
-               fault("lux_decomp: j = %d: i = %d; duplicate row indices"
-                  " not allowed", j, i);
+               xfault("lux_decomp: j = %d: i = %d; duplicate row indice"
+                  "s not allowed\n", j, i);
             /* check for zero value */
             if (mpq_sgn(val[k]) == 0)
-               fault("lux_decomp: j = %d: i = %d; zero elements not all"
-                  "owed", j, i);
+               xfault("lux_decomp: j = %d: i = %d; zero elements not al"
+                  "lowed\n", j, i);
             /* add new element v[i,j] = a[i,j] to V */
             vij = dmp_get_atom(pool, sizeof(LUXELM));
             vij->i = i, vij->j = j;
@@ -971,7 +971,7 @@ void lux_v_solve(LUX *lux, int tr, mpq_t x[])
 
 void lux_solve(LUX *lux, int tr, mpq_t x[])
 {     if (lux->rank < lux->n)
-         fault("lux_solve: LU-factorization has incomplete rank");
+         xfault("lux_solve: LU-factorization has incomplete rank\n");
       if (!tr)
       {  /* A = F*V, therefore inv(A) = inv(V)*inv(F) */
          lux_f_solve(lux, 0, x);

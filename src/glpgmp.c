@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,12 +21,12 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_STDIO
 #include "glpdmp.h"
 #include "glpgmp.h"
-#define fault xfault1
-#define dmp_create_poolx(size) dmp_create_pool()
+#define xfault xerror
 
-#ifdef HAVE_GMP_H             /* use GNU MP library */
+#ifdef HAVE_GMP               /* use GNU MP bignum library */
 
 int gmp_pool_count(void) { return 0; }
 
@@ -38,20 +38,16 @@ static DMP *gmp_pool = NULL;
 static int gmp_size = 0;
 static unsigned short *gmp_work = NULL;
 
-void *gmp_get_atom(void)
+void *gmp_get_atom(int size)
 {     if (gmp_pool == NULL)
-      {  xassert(sizeof(short) == 2);
-         xassert(sizeof(int) == 4);
-         xassert(sizeof(struct mpz) <= sizeof(struct mpz_seg));
-         xassert(sizeof(struct mpq) <= sizeof(struct mpz_seg));
-         gmp_pool = dmp_create_poolx(sizeof(struct mpz_seg));
-      }
-      return dmp_get_atom(gmp_pool, sizeof(struct mpz_seg));
+         gmp_pool = dmp_create_pool();
+      return dmp_get_atom(gmp_pool, size);
 }
 
-void gmp_free_atom(void *ptr)
+void gmp_free_atom(void *ptr, int size)
 {     xassert(gmp_pool != NULL);
-      dmp_free_atom(gmp_pool, ptr, sizeof(struct mpz_seg));
+      dmp_free_atom(gmp_pool, ptr, size);
+      return;
 }
 
 int gmp_pool_count(void)
@@ -92,7 +88,7 @@ void gmp_free_mem(void)
 mpz_t _mpz_init(void)
 {     /* initialize x, and set its value to 0 */
       mpz_t x;
-      x = gmp_get_atom();
+      x = gmp_get_atom(sizeof(struct mpz));
       x->val = 0;
       x->ptr = NULL;
       return x;
@@ -103,7 +99,7 @@ void mpz_clear(mpz_t x)
       mpz_set_si(x, 0);
       xassert(x->ptr == NULL);
       /* free the number descriptor */
-      gmp_free_atom(x);
+      gmp_free_atom(x, sizeof(struct mpz));
       return;
 }
 
@@ -115,7 +111,7 @@ void mpz_set(mpz_t z, mpz_t x)
          z->val = x->val;
          xassert(z->ptr == NULL);
          for (e = x->ptr, es = NULL; e != NULL; e = e->next)
-         {  ee = gmp_get_atom();
+         {  ee = gmp_get_atom(sizeof(struct mpz_seg));
             memcpy(ee->d, e->d, 12);
             ee->next = NULL;
             if (z->ptr == NULL)
@@ -135,13 +131,13 @@ void mpz_set_si(mpz_t x, int val)
       while (x->ptr != NULL)
       {  e = x->ptr;
          x->ptr = e->next;
-         gmp_free_atom(e);
+         gmp_free_atom(e, sizeof(struct mpz_seg));
       }
       /* assign new value */
       if (val == 0x80000000)
       {  /* long format is needed */
          x->val = -1;
-         x->ptr = e = gmp_get_atom();
+         x->ptr = e = gmp_get_atom(sizeof(struct mpz_seg));
          memset(e->d, 0, 12);
          e->d[1] = 0x8000;
          e->next = NULL;
@@ -238,7 +234,7 @@ static void normalize(mpz_t x)
       while (es->next != NULL)
       {  e = es->next;
          es->next = e->next;
-         gmp_free_atom(e);
+         gmp_free_atom(e, sizeof(struct mpz_seg));
       }
       /* convert the integer to short format, if possible */
       e = x->ptr;
@@ -333,7 +329,7 @@ void mpz_add(mpz_t z, mpz_t x, mpz_t y)
          for (; ex || ey; ex = ex->next, ey = ey->next)
          {  if (ex == NULL) ex = &zero;
             if (ey == NULL) ey = &zero;
-            ee = gmp_get_atom();
+            ee = gmp_get_atom(sizeof(struct mpz_seg));
             for (k = 0; k <= 5; k++)
             {  t += (unsigned int)ex->d[k];
                t += (unsigned int)ey->d[k];
@@ -349,7 +345,7 @@ void mpz_add(mpz_t z, mpz_t x, mpz_t y)
          }
          if (t)
          {  /* overflow -- one extra digit is needed */
-            ee = gmp_get_atom();
+            ee = gmp_get_atom(sizeof(struct mpz_seg));
             ee->d[0] = 1;
             ee->d[1] = ee->d[2] = ee->d[3] = ee->d[4] = ee->d[5] = 0;
             ee->next = NULL;
@@ -363,7 +359,7 @@ void mpz_add(mpz_t z, mpz_t x, mpz_t y)
          for (; ex || ey; ex = ex->next, ey = ey->next)
          {  if (ex == NULL) ex = &zero;
             if (ey == NULL) ey = &zero;
-            ee = gmp_get_atom();
+            ee = gmp_get_atom(sizeof(struct mpz_seg));
             for (k = 0; k <= 5; k++)
             {  t += (unsigned int)ex->d[k];
                t += (0xFFFF - (unsigned int)ey->d[k]);
@@ -521,7 +517,7 @@ void mpz_mul(mpz_t z, mpz_t x, mpz_t y)
       k = 6;
       for (n = 0; n < nx+ny; n++)
       {  if (k > 5)
-         {  e = gmp_get_atom();
+         {  e = gmp_get_atom(sizeof(struct mpz_seg));
             e->d[0] = e->d[1] = e->d[2] = 0;
             e->d[3] = e->d[4] = e->d[5] = 0;
             e->next = NULL;
@@ -569,7 +565,7 @@ void mpz_div(mpz_t q, mpz_t r, mpz_t x, mpz_t y)
       /* divide by zero is not allowed */
       if (y->val == 0)
       {  xassert(y->ptr == NULL);
-         fault("mpz_div: divide by zero not allowed");
+         xfault("mpz_div: divide by zero not allowed\n");
       }
       /* if [x] = 0 then [q] = [r] = 0 */
       if (x->val == 0)
@@ -677,7 +673,7 @@ void mpz_div(mpz_t q, mpz_t r, mpz_t x, mpz_t y)
          k = 6;
          for (n = ny; n <= nx; n++)
          {  if (k > 5)
-            {  e = gmp_get_atom();
+            {  e = gmp_get_atom(sizeof(struct mpz_seg));
                e->d[0] = e->d[1] = e->d[2] = 0;
                e->d[3] = e->d[4] = e->d[5] = 0;
                e->next = NULL;
@@ -700,7 +696,7 @@ void mpz_div(mpz_t q, mpz_t r, mpz_t x, mpz_t y)
          k = 6;
          for (n = 0; n < ny; n++)
          {  if (k > 5)
-            {  e = gmp_get_atom();
+            {  e = gmp_get_atom(sizeof(struct mpz_seg));
                e->d[0] = e->d[1] = e->d[2] = 0;
                e->d[3] = e->d[4] = e->d[5] = 0;
                e->next = NULL;
@@ -844,7 +840,7 @@ int mpz_out_str(void *_fp, int base, mpz_t x)
       unsigned char *d;
       static char *set = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
       if (!(2 <= base && base <= 36))
-         fault("mpz_out_str: base = %d; invalid base", base);
+         xfault("mpz_out_str: base = %d; invalid base\n", base);
       mpz_init(b);
       mpz_set_si(b, base);
       mpz_init(y);
@@ -881,7 +877,7 @@ int mpz_out_str(void *_fp, int base, mpz_t x)
 mpq_t _mpq_init(void)
 {     /* initialize x, and set its value to 0/1 */
       mpq_t x;
-      x = gmp_get_atom();
+      x = gmp_get_atom(sizeof(struct mpq));
       x->p.val = 0;
       x->p.ptr = NULL;
       x->q.val = 1;
@@ -896,7 +892,7 @@ void mpq_clear(mpq_t x)
       mpz_set_si(&x->q, 0);
       xassert(x->q.ptr == NULL);
       /* free the number descriptor */
-      gmp_free_atom(x);
+      gmp_free_atom(x, sizeof(struct mpq));
       return;
 }
 
@@ -931,7 +927,7 @@ void mpq_set(mpq_t z, mpq_t x)
 void mpq_set_si(mpq_t x, int p, unsigned int q)
 {     /* set the value of x to p/q */
       if (q == 0)
-         fault("mpq_set_si: zero denominator not allowed");
+         xfault("mpq_set_si: zero denominator not allowed\n");
       mpz_set_si(&x->p, p);
       xassert(q <= 0x7FFFFFFF);
       mpz_set_si(&x->q, q);
@@ -1035,7 +1031,7 @@ void mpq_div(mpq_t z, mpq_t x, mpq_t y)
 {     /* set z to x / y */
       mpz_t p, q;
       if (mpq_sgn(y) == 0)
-         fault("mpq_div: zero divisor not allowed");
+         xfault("mpq_div: zero divisor not allowed\n");
       mpz_init(p);
       mpz_init(q);
       mpz_mul(p, &x->p, &y->q);
@@ -1093,7 +1089,7 @@ int mpq_out_str(void *_fp, int base, mpq_t x)
       FILE *fp = _fp;
       int nwr;
       if (!(2 <= base && base <= 36))
-         fault("mpq_out_str: base = %d; invalid base", base);
+         xfault("mpq_out_str: base = %d; invalid base\n", base);
       if (fp == NULL) fp = stdout;
       nwr = mpz_out_str(fp, base, &x->p);
       if (x->q.val == 1 && x->q.ptr == NULL)

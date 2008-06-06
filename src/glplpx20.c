@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,10 +21,10 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_STDIO
 #include "glpapi.h"
 #include "glpgmp.h"
 #include "glpmpl.h"
-#define print xprint1
 #define fault old_fault
 
 /*--------------------------------------------------------------------*/
@@ -217,172 +217,175 @@ static int use_cuts = 0;
 -- by the GNU Coding Standards. */
 
 static void display_help(const char *my_name)
-{     print("Usage: %s [options...] filename", my_name);
-      print("");
-      print("General options:");
+{     xprintf("Usage: %s [options...] filename\n", my_name);
+      xprintf("\n");
+      xprintf("General options:\n");
 #if 0
       print("   --glp             read LP/MIP model in GNU LP format");
 #endif
-      print("   --mps             read LP/MIP problem in Fixed MPS form"
-         "at");
-      print("   --freemps         read LP/MIP problem in Free MPS forma"
-         "t (default)");
-      print("   --cpxlp           read LP/MIP problem in CPLEX LP forma"
-         "t");
-      print("   --math            read LP/MIP model written in GNU Math"
-         "Prog modeling");
-      print("                     language");
-      print("   -m filename, --model filename");
-      print("                     read model section and optional data "
-         "section from");
-      print("                     filename (the same as --math)");
-      print("   -d filename, --data filename");
-      print("                     read data section from filename (for "
-         "--math only);");
-      print("                     if model file also has data section, "
-         "that section");
-      print("                     is ignored");
-      print("   -y filename, --display filename");
-      print("                     send display output to filename (for "
-         "--math only);");
-      print("                     by default the output is sent to term"
-         "inal");
-      print("   -r filename, --read filename");
-      print("                     read solution from filename rather to"
-         " find it with");
-      print("                     the solver");
-      print("   --min             minimization");
-      print("   --max             maximization");
-      print("   --scale           scale problem (default)");
-      print("   --noscale         do not scale problem");
-      print("   --simplex         use simplex method (default)");
-      print("   --interior        use interior point method (for pure L"
-         "P only)");
-      print("   -o filename, --output filename");
-      print("                     write solution to filename in printab"
-         "le format");
-      print("   -w filename, --write filename");
-      print("                     write solution to filename in plain t"
-         "ext format");
-      print("   --bounds filename");
-      print("                     write sensitivity bounds to filename "
-         "in printable");
-      print("                     format (LP only)");
-      print("   --tmlim nnn       limit solution time to nnn seconds");
-      print("   --memlim nnn      limit available memory to nnn megabyt"
-         "es");
-      print("   --check           do not solve problem, check input dat"
-         "a only");
-      print("   --name probname   change problem name to probname");
-      print("   --plain           use plain names of rows and columns ("
-         "default)");
-      print("   --orig            try using original names of rows and "
-         "columns");
-      print("                     (default for --mps)");
+    xprintf("   --mps             read LP/MIP problem in Fixed MPS form"
+         "at\n");
+    xprintf("   --freemps         read LP/MIP problem in Free MPS forma"
+         "t (default)\n");
+    xprintf("   --cpxlp           read LP/MIP problem in CPLEX LP forma"
+         "t\n");
+    xprintf("   --math            read LP/MIP model written in GNU Math"
+         "Prog modeling\n");
+    xprintf("                     language\n");
+    xprintf("   -m filename, --model filename\n");
+    xprintf("                     read model section and optional data "
+         "section from\n");
+    xprintf("                     filename (the same as --math)\n");
+    xprintf("   -d filename, --data filename\n");
+    xprintf("                     read data section from filename (for "
+         "--math only);\n");
+    xprintf("                     if model file also has data section, "
+         "that section\n");
+    xprintf("                     is ignored\n");
+    xprintf("   -y filename, --display filename\n");
+    xprintf("                     send display output to filename (for "
+         "--math only);\n");
+    xprintf("                     by default the output is sent to term"
+         "inal\n");
+    xprintf("   -r filename, --read filename\n");
+    xprintf("                     read solution from filename rather to"
+         " find it with\n");
+    xprintf("                     the solver\n");
+    xprintf("   --min             minimization\n");
+    xprintf("   --max             maximization\n");
+    xprintf("   --scale           scale problem (default)\n");
+    xprintf("   --noscale         do not scale problem\n");
+    xprintf("   --simplex         use simplex method (default)\n");
+    xprintf("   --interior        use interior point method (for pure L"
+         "P only)\n");
+    xprintf("   -o filename, --output filename\n");
+    xprintf("                     write solution to filename in printab"
+         "le format\n");
+    xprintf("   -w filename, --write filename\n");
+    xprintf("                     write solution to filename in plain t"
+         "ext format\n");
+    xprintf("   --bounds filename\n");
+    xprintf("                     write sensitivity bounds to filename "
+         "in printable\n");
+    xprintf("                     format (LP only)\n");
+    xprintf("   --tmlim nnn       limit solution time to nnn seconds\n")
+         ;
+    xprintf("   --memlim nnn      limit available memory to nnn megabyt"
+         "es\n");
+    xprintf("   --check           do not solve problem, check input dat"
+         "a only\n");
+    xprintf("   --name probname   change problem name to probname\n");
+    xprintf("   --plain           use plain names of rows and columns ("
+         "default)\n");
+    xprintf("   --orig            try using original names of rows and "
+         "columns\n");
+    xprintf("                     (default for --mps)\n");
 #if 0
       print("   --wglp filename   write problem to filename in GNU LP f"
          "ormat");
 #endif
-      print("   --wmps filename   write problem to filename in Fixed MP"
-         "S format");
-      print("   --wfreemps filename");
-      print("                     write problem to filename in Free MPS"
-         " format");
-      print("   --wcpxlp filename write problem to filename in CPLEX LP"
-         " format");
-      print("   --wtxt filename   write problem to filename in printabl"
-         "e format");
-      print("   --wpb filename    write problem to filename in OPB form"
-         "at");
-      print("   --wnpb filename   write problem to filename in normaliz"
-         "ed OPB format");
-      print("   --log filename    write copy of terminal output to file"
-         "name");
-      print("   -h, --help        display this help information and exi"
-         "t");
-      print("   -v, --version     display program version and exit");
-      print("");
-      print("LP basis factorization option:");
-      print("   --luf             LU + Forrest-Tomlin update");
-      print("                     (faster, less stable; default)");
-      print("   --cbg             LU + Schur complement + Bartels-Golub"
-         " update");
-      print("                     (slower, more stable)");
-      print("   --cgr             LU + Schur complement + Givens rotati"
-         "on update");
-      print("                     (slower, more stable)");
-      print("");
-      print("Options specific to simplex method:");
-      print("   --std             use standard initial basis of all sla"
-         "cks");
-      print("   --adv             use advanced initial basis (default)")
+    xprintf("   --wmps filename   write problem to filename in Fixed MP"
+         "S format\n");
+    xprintf("   --wfreemps filename\n");
+    xprintf("                     write problem to filename in Free MPS"
+         " format\n");
+    xprintf("   --wcpxlp filename write problem to filename in CPLEX LP"
+         " format\n");
+    xprintf("   --wtxt filename   write problem to filename in printabl"
+         "e format\n");
+    xprintf("   --wpb filename    write problem to filename in OPB form"
+         "at\n");
+    xprintf("   --wnpb filename   write problem to filename in normaliz"
+         "ed OPB format\n");
+    xprintf("   --log filename    write copy of terminal output to file"
+         "name\n");
+    xprintf("   -h, --help        display this help information and exi"
+         "t\n");
+    xprintf("   -v, --version     display program version and exit\n");
+    xprintf("\n");
+    xprintf("LP basis factorization option:\n");
+    xprintf("   --luf             LU + Forrest-Tomlin update\n");
+    xprintf("                     (faster, less stable; default)\n");
+    xprintf("   --cbg             LU + Schur complement + Bartels-Golub"
+         " update\n");
+    xprintf("                     (slower, more stable)\n");
+    xprintf("   --cgr             LU + Schur complement + Givens rotati"
+         "on update\n");
+    xprintf("                     (slower, more stable)\n");
+    xprintf("\n");
+    xprintf("Options specific to simplex method:\n");
+    xprintf("   --std             use standard initial basis of all sla"
+         "cks\n");
+      xprintf("   --adv             use advanced initial basis (default"
+         ")\n");
+      xprintf("   --bib             use Bixby's initial basis\n");
+    xprintf("   --bas filename    read initial basis from filename in M"
+         "PS format\n");
+      xprintf("   --steep           use steepest edge technique (defaul"
+         "t)\n");
+    xprintf("   --nosteep         use standard \"textbook\" pricing\n");
+    xprintf("   --relax           use Harris' two-pass ratio test (defa"
+         "ult)\n");
+      xprintf("   --norelax         use standard \"textbook\" ratio tes"
+         "t\n");
+    xprintf("   --presol          use presolver (default; assumes --sca"
+         "le and --adv)\n");
+    xprintf("   --nopresol        do not use presolver\n");
+    xprintf("   --exact           use simplex method based on exact ari"
+         "thmetic\n");
+    xprintf("   --xcheck          check final basis using exact arithme"
+         "tic\n");
+    xprintf("   --wbas filename   write final basis to filename in MPS "
+         "format\n");
+    xprintf("\n");
+    xprintf("Options specific to MIP:\n");
+    xprintf("   --nomip           consider all integer variables as con"
+         "tinuous\n");
+    xprintf("                     (allows solving MIP as pure LP)\n");
+    xprintf("   --first           branch on first integer variable\n");
+    xprintf("   --last            branch on last integer variable\n");
+    xprintf("   --drtom           branch using heuristic by Driebeck an"
+         "d Tomlin\n");
+    xprintf("                     (default)\n");
+    xprintf("   --mostf           branch on most fractional varaible\n")
          ;
-      print("   --bib             use Bixby's initial basis");
-      print("   --bas filename    read initial basis from filename in M"
-         "PS format");
-      print("   --steep           use steepest edge technique (default)"
-         );
-      print("   --nosteep         use standard \"textbook\" pricing");
-      print("   --relax           use Harris' two-pass ratio test (defa"
-         "ult)");
-      print("   --norelax         use standard \"textbook\" ratio test")
+    xprintf("   --dfs             backtrack using depth first search\n")
          ;
-      print("   --presol          use presolver (default; assumes --sca"
-         "le and --adv)");
-      print("   --nopresol        do not use presolver");
-      print("   --exact           use simplex method based on exact ari"
-         "thmetic");
-      print("   --xcheck          check final basis using exact arithme"
-         "tic");
-      print("   --wbas filename   write final basis to filename in MPS "
-         "format");
-      print("");
-      print("Options specific to MIP:");
-      print("   --nomip           consider all integer variables as con"
-         "tinuous");
-      print("                     (allows solving MIP as pure LP)");
-      print("   --first           branch on first integer variable");
-      print("   --last            branch on last integer variable");
-      print("   --drtom           branch using heuristic by Driebeck an"
-         "d Tomlin");
-      print("                     (default)");
-      print("   --mostf           branch on most fractional varaible");
-      print("   --dfs             backtrack using depth first search");
-      print("   --bfs             backtrack using breadth first search")
-         ;
-      print("   --bestp           backtrack using the best projection h"
-         "euristic");
-      print("   --bestb           backtrack using node with best local "
-         "bound");
-      print("                     (default)");
-      print("   --mipgap tol      set relative gap tolerance to tol");
-      print("   --intopt          use advanced MIP solver");
-      print("   --binarize        replace general integer variables by "
-         "binary ones");
-      print("                     (assumes --intopt)");
-      print("   --cover           generate mixed cover cuts");
-      print("   --clique          generate clique cuts");
-      print("   --gomory          generate Gomory's mixed integer cuts")
-         ;
-      print("   --mir             generate MIR (mixed integer rounding)"
-         " cuts");
-      print("   --cuts            generate all cuts above (assumes --in"
-         "topt)");
+      xprintf("   --bfs             backtrack using breadth first searc"
+         "h\n");
+    xprintf("   --bestp           backtrack using the best projection h"
+         "euristic\n");
+    xprintf("   --bestb           backtrack using node with best local "
+         "bound\n");
+    xprintf("                     (default)\n");
+    xprintf("   --mipgap tol      set relative gap tolerance to tol\n");
+    xprintf("   --intopt          use advanced MIP solver\n");
+    xprintf("   --binarize        replace general integer variables by "
+         "binary ones\n");
+    xprintf("                     (assumes --intopt)\n");
+    xprintf("   --cover           generate mixed cover cuts\n");
+    xprintf("   --clique          generate clique cuts\n");
+      xprintf("   --gomory          generate Gomory's mixed integer cut"
+         "s\n");
+    xprintf("   --mir             generate MIR (mixed integer rounding)"
+         " cuts\n");
+    xprintf("   --cuts            generate all cuts above (assumes --in"
+         "topt)\n");
 #ifdef _GLP_USE_MIPOPT
       print("   --mipopt          use external MIP solver");
 #endif
-      print("");
-      print("For description of the MPS and CPLEX LP formats see Refere"
-         "nce Manual.");
-      print("For description of the modeling language see \"GLPK: Model"
-         "ing Language");
-      print("GNU MathProg\". Both documents are included in the GLPK di"
-         "stribution.");
-      print("");
-      print("See GLPK web page at <http://www.gnu.org/software/glpk/glp"
-         "k.html>.");
-      print("");
-      print("Please report bugs to <bug-glpk@gnu.org>.");
+    xprintf("\n");
+    xprintf("For description of the MPS and CPLEX LP formats see Refere"
+         "nce Manual.\n");
+    xprintf("For description of the modeling language see \"GLPK: Model"
+         "ing Language\n");
+    xprintf("GNU MathProg\". Both documents are included in the GLPK di"
+         "stribution.\n");
+    xprintf("\n");
+    xprintf("See GLPK web page at <http://www.gnu.org/software/glpk/glp"
+         "k.html>.\n");
+    xprintf("\n");
+    xprintf("Please report bugs to <bug-glpk@gnu.org>.\n");
       return;
 }
 
@@ -393,19 +396,19 @@ static void display_help(const char *my_name)
 -- by the GNU Coding Standards. */
 
 static void display_version(void)
-{     print("GLPSOL: GLPK LP/MIP Solver, Version %s", lib_version());
-      print("");
-      print("Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makh"
-         "orin,");
-      print("Department for Applied Informatics, Moscow Aviation Instit"
-         "ute,");
-      print("Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcn"
-         "et.ru>.");
-      print("");
-      print("This program is free software; you may redistribute it und"
-         "er the terms of");
-      print("the GNU General Public License. This program has absolutel"
-         "y no warranty.");
+{     xprintf("GLPSOL: GLPK LP/MIP Solver %s\n", glp_version());
+      xprintf("\n");
+      xprintf("Copyright (C) 2008 Andrew Makhorin, Department for Appli"
+         "ed Informatics,\n");
+      xprintf("Moscow Aviation Institute, Moscow, Russia. All rights re"
+         "served.\n");
+      xprintf("\n");
+      xprintf("This program has ABSOLUTELY NO WARRANTY.\n");
+      xprintf("\n");
+      xprintf("This program is free software; you may re-distribute it "
+         "under the terms\n");
+      xprintf("of the GNU General Public License version 3 or later.\n")
+         ;
       return;
 }
 
@@ -432,11 +435,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("-d") || p("--data"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No data input file specifed");
+            {  xprintf("No data input file specifed\n");
                return 1;
             }
             if (in_data != NULL)
-            {  print("Only one data input file allowed");
+            {  xprintf("Only one data input file allowed\n");
                return 1;
             }
             in_data = argv[k];
@@ -444,11 +447,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("-y") || p("--display"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No display output file specifed");
+            {  xprintf("No display output file specifed\n");
                return 1;
             }
             if (display != NULL)
-            {  print("Only one display output file allowed");
+            {  xprintf("Only one display output file allowed\n");
                return 1;
             }
             display = argv[k];
@@ -456,11 +459,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("-r") || p("--read"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No input solution file specifed");
+            {  xprintf("No input solution file specifed\n");
                return 1;
             }
             if (display != NULL)
-            {  print("Only one input solution file allowed");
+            {  xprintf("Only one input solution file allowed\n");
                return 1;
             }
             in_res = argv[k];
@@ -480,11 +483,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("-o") || p("--output"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No solution output file specified");
+            {  xprintf("No solution output file specified\n");
                return 1;
             }
             if (out_sol != NULL)
-            {  print("Only one solution output file allowed");
+            {  xprintf("Only one solution output file allowed\n");
                return 1;
             }
             out_sol = argv[k];
@@ -492,11 +495,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("-w") || p("--write"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No output solution file specifed");
+            {  xprintf("No output solution file specifed\n");
                return 1;
             }
             if (display != NULL)
-            {  print("Only one output solution file allowed");
+            {  xprintf("Only one output solution file allowed\n");
                return 1;
             }
             out_res = argv[k];
@@ -504,11 +507,12 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--bounds"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No sensitivity bounds output file specified");
+            {  xprintf("No sensitivity bounds output file specified\n");
                return 1;
             }
             if (out_bnds != NULL)
-            {  print("Only one sensitivity bounds output file allowed");
+            {  xprintf("Only one sensitivity bounds output file allowed"
+                  "\n");
                return 1;
             }
             out_bnds = argv[k];
@@ -516,22 +520,22 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--tmlim"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No time limit specified");
+            {  xprintf("No time limit specified\n");
                return 1;
             }
             if (str2int(argv[k], &tmlim) || tmlim < 0)
-            {  print("Invalid time limit `%s'", argv[k]);
+            {  xprintf("Invalid time limit `%s'\n", argv[k]);
                return 1;
             }
          }
          else if (p("--memlim"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No memory limit specified");
+            {  xprintf("No memory limit specified\n");
                return 1;
             }
             if (str2int(argv[k], &memlim) || memlim < 0)
-            {  print("Invalid memory limit `%s'", argv[k]);
+            {  xprintf("Invalid memory limit `%s'\n", argv[k]);
                return 1;
             }
          }
@@ -540,11 +544,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--name"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No problem name specified");
+            {  xprintf("No problem name specified\n");
                return 1;
             }
             if (newname != NULL)
-            {  print("Only one problem name allowed");
+            {  xprintf("Only one problem name allowed\n");
                return 1;
             }
             newname = argv[k];
@@ -556,11 +560,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--wmps"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No fixed MPS output file specified");
+            {  xprintf("No fixed MPS output file specified\n");
                return 1;
             }
             if (out_mps != NULL)
-            {  print("Only one fixed MPS output file allowed");
+            {  xprintf("Only one fixed MPS output file allowed\n");
                return 1;
             }
             out_mps = argv[k];
@@ -568,11 +572,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--wfreemps"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No free MPS output file specified");
+            {  xprintf("No free MPS output file specified\n");
                return 1;
             }
             if (out_mps != NULL)
-            {  print("Only one free MPS output file allowed");
+            {  xprintf("Only one free MPS output file allowed\n");
                return 1;
             }
             out_freemps = argv[k];
@@ -580,11 +584,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--wcpxlp") || p("--wlpt"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No CPLEX LP output file specified");
+            {  xprintf("No CPLEX LP output file specified\n");
                return 1;
             }
             if (out_cpxlp != NULL)
-            {  print("Only one CPLEX LP output file allowed");
+            {  xprintf("Only one CPLEX LP output file allowed\n");
                return 1;
             }
             out_cpxlp = argv[k];
@@ -592,11 +596,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--wtxt"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No problem output file specified");
+            {  xprintf("No problem output file specified\n");
                return 1;
             }
             if (out_txt != NULL)
-            {  print("Only one problem output file allowed");
+            {  xprintf("Only one problem output file allowed\n");
                return 1;
             }
             out_txt = argv[k];
@@ -604,11 +608,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--wpb"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No problem output file specified");
+            {  xprintf("No problem output file specified\n");
                return 1;
             }
             if (out_pb != NULL)
-            {  print("Only one OPB output file allowed");
+            {  xprintf("Only one OPB output file allowed\n");
                return 1;
             }
             out_pb = argv[k];
@@ -616,11 +620,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--wnpb"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No problem output file specified");
+            {  xprintf("No problem output file specified\n");
                return 1;
             }
             if (out_npb != NULL)
-            {  print("Only one normalized OPB output file allowed");
+            {  xprintf("Only one normalized OPB output file allowed\n");
                return 1;
             }
             out_npb = argv[k];
@@ -628,11 +632,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--log"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No log file specified");
+            {  xprintf("No log file specified\n");
                return 1;
             }
             if (log_file != NULL)
-            {  print("Only one log file allowed");
+            {  xprintf("Only one log file allowed\n");
                return 1;
             }
             log_file = argv[k];
@@ -640,11 +644,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--wglp"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No problem output file specified");
+            {  xprintf("No problem output file specified\n");
                return 1;
             }
             if (out_glp != NULL)
-            {  print("Only one problem output file allowed");
+            {  xprintf("Only one problem output file allowed\n");
                return 1;
             }
             out_glp = argv[k];
@@ -676,11 +680,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--bas"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No basis input file specifed");
+            {  xprintf("No basis input file specifed\n");
                return 1;
             }
             if (in_bas != NULL)
-            {  print("Only one basis input file allowed");
+            {  xprintf("Only one basis input file allowed\n");
                return 1;
             }
             in_bas = argv[k];
@@ -704,11 +708,11 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--wbas"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No basis output file specified");
+            {  xprintf("No basis output file specified\n");
                return 1;
             }
             if (out_bas != NULL)
-            {  print("Only one basis output file allowed");
+            {  xprintf("Only one basis output file allowed\n");
                return 1;
             }
             out_bas = argv[k];
@@ -734,11 +738,12 @@ static int parse_cmdline(int argc, const char *argv[])
          else if (p("--mipgap"))
          {  k++;
             if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
-            {  print("No relative gap tolerance specified");
+            {  xprintf("No relative gap tolerance specified\n");
                return 1;
             }
             if (str2num(argv[k], &mip_gap) || mip_gap < 0.0)
-            {  print("Invalid relative gap tolerance `%s'", argv[k]);
+            {  xprintf("Invalid relative gap tolerance `%s'\n",
+                  argv[k]);
                return 1;
             }
          }
@@ -762,13 +767,13 @@ static int parse_cmdline(int argc, const char *argv[])
 #endif
          else if (argv[k][0] == '-' ||
                  (argv[k][0] == '-' && argv[k][1] == '-'))
-         {  print("Invalid option `%s'; try %s --help",
+         {  xprintf("Invalid option `%s'; try %s --help\n",
                argv[k], argv[0]);
             return 1;
          }
          else
          {  if (in_file != NULL)
-            {  print("Only one input file allowed");
+            {  xprintf("Only one input file allowed\n");
                return 1;
             }
             in_file = argv[k];
@@ -787,7 +792,7 @@ int lpx_main(int argc, const char *argv[])
 {     LPX *lp = NULL;
       MPL *mpl = NULL;
       int ret;
-      glp_ulong start;
+      xlong_t start;
       /* parse command line parameters */
       ret = parse_cmdline(argc, argv);
       if (ret < 0)
@@ -815,14 +820,14 @@ int lpx_main(int argc, const char *argv[])
       /* open hardcopy file, if necessary */
       if (log_file != NULL)
       {  if (lib_open_log(log_file))
-         {  print("Unable to create log file");
+         {  xprintf("Unable to create log file\n");
             ret = EXIT_FAILURE;
             goto done;
          }
       }
       /* read problem data from the input file */
       if (in_file == NULL)
-      {  print("No input file specified; try %s --help", argv[0]);
+      {  xprintf("No input file specified; try %s --help\n", argv[0]);
          ret = EXIT_FAILURE;
          goto done;
       }
@@ -830,7 +835,7 @@ int lpx_main(int argc, const char *argv[])
       {  case 0:
             lp = lpx_read_mps(in_file);
             if (lp == NULL)
-            {  print("MPS file processing error");
+            {  xprintf("MPS file processing error\n");
                ret = EXIT_FAILURE;
                goto done;
             }
@@ -839,7 +844,7 @@ int lpx_main(int argc, const char *argv[])
          case 1:
             lp = lpx_read_cpxlp(in_file);
             if (lp == NULL)
-            {  print("CPLEX LP file processing error");
+            {  xprintf("CPLEX LP file processing error\n");
                ret = EXIT_FAILURE;
                goto done;
             }
@@ -850,7 +855,7 @@ int lpx_main(int argc, const char *argv[])
             /* read model section and optional data section */
             ret = mpl_read_model(mpl, (char *)in_file, in_data != NULL);
             if (ret == 4)
-err:        {  print("Model processing error");
+err:        {  xprintf("Model processing error\n");
                ret = EXIT_FAILURE;
                goto done;
             }
@@ -872,7 +877,7 @@ err:        {  print("Model processing error");
          case 3:
             lp = lpx_read_prob((char *)in_file);
             if (lp == NULL)
-            {  print("GNU LP file processing error");
+            {  xprintf("GNU LP file processing error\n");
                ret = EXIT_FAILURE;
                goto done;
             }
@@ -880,7 +885,7 @@ err:        {  print("Model processing error");
          case 4:
             lp = lpx_read_freemps(in_file);
             if (lp == NULL)
-            {  print("MPS file processing error");
+            {  xprintf("MPS file processing error\n");
                ret = EXIT_FAILURE;
                goto done;
             }
@@ -899,7 +904,7 @@ err:        {  print("Model processing error");
       {  lpx_set_int_parm(lp, LPX_K_MPSORIG, orig);
          ret = lpx_write_mps(lp, out_mps);
          if (ret != 0)
-         {  print("Unable to write problem in fixed MPS format");
+         {  xprintf("Unable to write problem in fixed MPS format\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -908,7 +913,7 @@ err:        {  print("Model processing error");
       if (out_freemps != NULL)
       {  ret = lpx_write_freemps(lp, out_freemps);
          if (ret != 0)
-         {  print("Unable to write problem in free MPS format");
+         {  xprintf("Unable to write problem in free MPS format\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -917,7 +922,7 @@ err:        {  print("Model processing error");
       if (out_cpxlp != NULL)
       {  ret = lpx_write_cpxlp(lp, out_cpxlp);
          if (ret != 0)
-         {  print("Unable to write problem in CPLEX LP format");
+         {  xprintf("Unable to write problem in CPLEX LP format\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -927,7 +932,7 @@ err:        {  print("Model processing error");
       {  lpx_set_int_parm(lp, LPX_K_LPTORIG, orig);
          ret = lpx_print_prob(lp, out_txt);
          if (ret != 0)
-         {  print("Unable to write problem in plain text format");
+         {  xprintf("Unable to write problem in plain text format\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -936,7 +941,7 @@ err:        {  print("Model processing error");
       if (out_glp != NULL)
       {  ret = lpx_write_prob(lp, (char *)out_glp);
          if (ret != 0)
-         {  print("Unable to write problem in GNU LP format");
+         {  xprintf("Unable to write problem in GNU LP format\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -945,7 +950,7 @@ err:        {  print("Model processing error");
       if (out_pb != NULL)
       {  ret = lpx_write_pb(lp, out_pb, 0);
          if (ret != 0)
-         {  print("Unable to write problem in OPB format");
+         {  xprintf("Unable to write problem in OPB format\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -954,7 +959,8 @@ err:        {  print("Model processing error");
       if (out_npb != NULL)
       {  ret = lpx_write_pb(lp, out_npb, 1);
          if (ret != 0)
-         {  print("Unable to write problem in normalized OPB format");
+         {  xprintf(
+               "Unable to write problem in normalized OPB format\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -979,7 +985,7 @@ err:        {  print("Model processing error");
                xassert(method != method);
          }
          if (ret != 0)
-         {  print("Unable to read problem solution");
+         {  xprintf("Unable to read problem solution\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -1008,21 +1014,21 @@ err:        {  print("Model processing error");
       /* or read initial basis from input text file in MPS format */
       if (in_bas != NULL)
       {  if (method != 0)
-         {  print("Initial LP basis is useless for interior-point solve"
-               "r and therefore ignored");
+         {  xprintf("Initial LP basis is useless for interior-point sol"
+               "ver and therefore ignored\n");
             goto nobs;
          }
          lpx_set_int_parm(lp, LPX_K_MPSORIG, orig);
          ret = lpx_read_bas(lp, in_bas);
          if (ret != 0)
-         {  print("Unable to read initial LP basis");
+         {  xprintf("Unable to read initial LP basis\n");
             ret = EXIT_FAILURE;
             goto done;
          }
          if (presol)
          {  presol = 0;
-            print("LP presolver disabled because initial LP basis has b"
-               "een provided");
+            xprintf("LP presolver disabled because initial LP basis has"
+               " been provided\n");
          }
 nobs:    ;
       }
@@ -1048,13 +1054,13 @@ nobs:    ;
                {  if (!presol || ret == LPX_E_OK)
                      lpx_exact(lp);
                   else
-                     print("If you need checking final basis for non-op"
-                        "timal solution, use --nopresol");
+                     xprintf("If you need checking final basis for non-"
+                        "optimal solution, use --nopresol\n");
                }
                if (presol && ret != LPX_E_OK && (out_bas != NULL ||
                   out_sol != NULL))
-                  print("If you need actual output for non-optimal solu"
-                     "tion, use --nopresol");
+                  xprintf("If you need actual output for non-optimal so"
+                     "lution, use --nopresol\n");
             }
             else
             {  method = 2;
@@ -1076,8 +1082,8 @@ nobs:    ;
             if (nomip || lpx_get_class(lp) == LPX_LP)
                lpx_interior(lp);
             else
-            {  print("Interior-point method is not able to solve MIP pr"
-                  "oblem; use --simplex");
+            {  xprintf("Interior-point method is not able to solve MIP "
+                  "problem; use --simplex\n");
                ret = EXIT_FAILURE;
                goto done;
             }
@@ -1086,13 +1092,12 @@ nobs:    ;
             xassert(method != method);
       }
       /* display statistics */
-      print("Time used:   %.1f secs", xdifftime(xtime(), start));
-      {  glp_ulong tpeak;
+      xprintf("Time used:   %.1f secs\n", xdifftime(xtime(), start));
+      {  xlong_t tpeak;
          char buf[50];
          lib_mem_usage(NULL, NULL, NULL, &tpeak);
-         print("Memory used: %.1f Mb (%s bytes)",
-            (4294967296.0 * tpeak.hi + tpeak.lo) / 1048576.0,
-            ultoa(tpeak, buf, 10));
+         xprintf("Memory used: %.1f Mb (%s bytes)\n",
+            xltod(tpeak) / 1048576.0, xltoa(tpeak, buf));
       }
 ssss: if (mpl != NULL && mpl_has_solve_stmt(mpl))
       {  int n, j, round;
@@ -1120,7 +1125,7 @@ ssss: if (mpl != NULL && mpl_has_solve_stmt(mpl))
          /* perform postsolving */
          ret = mpl_postsolve(mpl);
          if (ret == 4)
-         {  print("Model postsolving error");
+         {  xprintf("Model postsolving error\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -1131,7 +1136,7 @@ ssss: if (mpl != NULL && mpl_has_solve_stmt(mpl))
       {  lpx_set_int_parm(lp, LPX_K_MPSORIG, orig);
          ret = lpx_write_bas(lp, out_bas);
          if (ret != 0)
-         {  print("Unable to write final LP basis");
+         {  xprintf("Unable to write final LP basis\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -1152,7 +1157,7 @@ ssss: if (mpl != NULL && mpl_has_solve_stmt(mpl))
                xassert(method != method);
          }
          if (ret != 0)
-         {  print("Unable to write problem solution");
+         {  xprintf("Unable to write problem solution\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -1172,7 +1177,7 @@ ssss: if (mpl != NULL && mpl_has_solve_stmt(mpl))
                xassert(method != method);
          }
          if (ret != 0)
-         {  print("Unable to write problem solution");
+         {  xprintf("Unable to write problem solution\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -1180,14 +1185,14 @@ ssss: if (mpl != NULL && mpl_has_solve_stmt(mpl))
       /* write sensitivity bounds information (if required) */
       if (out_bnds != NULL)
       {  if (method != 0)
-         {  print("Cannot write sensitivity bounds information for inte"
-               "rior-point or MIP solution");
+         {  xprintf("Cannot write sensitivity bounds information for in"
+               "terior-point or MIP solution\n");
             ret = EXIT_FAILURE;
             goto done;
          }
          ret = lpx_print_sens_bnds(lp, out_bnds);
          if (ret != 0)
-         {  print("Unable to write sensitivity bounds information");
+         {  xprintf("Unable to write sensitivity bounds information\n");
             ret = EXIT_FAILURE;
             goto done;
          }
@@ -1204,7 +1209,7 @@ done: /* delete the problem object */
       if (log_file != NULL) lib_close_log();
       /* check that no memory blocks are still allocated */
       {  int count;
-         glp_ulong total;
+         xlong_t total;
          lib_mem_usage(&count, NULL, &total, NULL);
          xassert(count == 0);
          xassert(total.lo == 0 && total.hi == 0);

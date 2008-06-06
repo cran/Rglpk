@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -29,7 +29,11 @@
 #include "glprng.h"
 
 typedef struct MPL MPL;
+#if 0
 typedef struct STRING STRING;
+#else
+typedef char STRING;
+#endif
 typedef struct SYMBOL SYMBOL;
 typedef struct TUPLE TUPLE;
 typedef struct ARRAY ELEMSET;
@@ -53,6 +57,14 @@ typedef struct PARAMETER PARAMETER;
 typedef struct CONDITION CONDITION;
 typedef struct VARIABLE VARIABLE;
 typedef struct CONSTRAINT CONSTRAINT;
+#if 1 /* 11/II-2008 */
+typedef struct TABLE TABLE;
+typedef struct TABARG TABARG;
+typedef struct TABFLD TABFLD;
+typedef struct TABIN TABIN;
+typedef struct TABOUT TABOUT;
+typedef struct TABDCA TABDCA;
+#endif
 typedef union OPERANDS OPERANDS;
 typedef struct ARG_LIST ARG_LIST;
 typedef struct CODE CODE;
@@ -80,19 +92,22 @@ typedef struct TUPLE SLICE;
 #define A_FOR           109   /* for statement */
 #define A_FORMULA       110   /* formula */
 #define A_INDEX         111   /* dummy index */
-#define A_INTEGER       112   /* something integer */
-#define A_LOGICAL       113   /* something logical */
-#define A_MAXIMIZE      114   /* objective has to be maximized */
-#define A_MINIMIZE      115   /* objective has to be minimized */
-#define A_NONE          116   /* nothing */
-#define A_NUMERIC       117   /* something numeric */
-#define A_PARAMETER     118   /* model parameter */
-#define A_PRINTF        119   /* printf statement */
-#define A_SET           120   /* model set */
-#define A_SOLVE         121   /* solve statement */
-#define A_SYMBOLIC      122   /* something symbolic */
-#define A_TUPLE         123   /* n-tuple */
-#define A_VARIABLE      124   /* model variable */
+#define A_INPUT         112   /* input table */
+#define A_INTEGER       113   /* something integer */
+#define A_LOGICAL       114   /* something logical */
+#define A_MAXIMIZE      115   /* objective has to be maximized */
+#define A_MINIMIZE      116   /* objective has to be minimized */
+#define A_NONE          117   /* nothing */
+#define A_NUMERIC       118   /* something numeric */
+#define A_OUTPUT        119   /* output table */
+#define A_PARAMETER     120   /* model parameter */
+#define A_PRINTF        121   /* printf statement */
+#define A_SET           122   /* model set */
+#define A_SOLVE         123   /* solve statement */
+#define A_SYMBOLIC      124   /* something symbolic */
+#define A_TABLE         125   /* data table */
+#define A_TUPLE         126   /* n-tuple */
+#define A_VARIABLE      127   /* model variable */
 
 #define MAX_LENGTH 100
 /* maximal length of any symbolic value (this includes symbolic names,
@@ -168,6 +183,10 @@ struct MPL
 #define T_RBRACE        249   /* } */
 #if 1 /* 14/VII-2006 */
 #define T_APPEND        250   /* >> */
+#endif
+#if 1 /* 11/II-2008 */
+#define T_TILDE         251   /* ~ */
+#define T_INPUT         252   /* <- */
 #endif
       int imlen;
       /* length of the current token */
@@ -261,6 +280,11 @@ struct MPL
       /* if this flag is set, the postsolving phase is in effect */
       STATEMENT *stmt;
       /* model statement being currently executed */
+#if 1 /* 11/II-2008 */
+      TABDCA *dca;
+      /* pointer to table driver communication area for table statement
+         currently executed */
+#endif
       int m;
       /* number of rows in the problem, m >= 0 */
       int n;
@@ -311,73 +335,6 @@ struct MPL
       char *mpl_buf; /* char mpl_buf[255+1]; */
       /* working buffer used by some interface routines */
 };
-
-#define enter_context         _glp_mpl_enter_context
-#define print_context         _glp_mpl_print_context
-#define get_char              _glp_mpl_get_char
-#define append_char           _glp_mpl_append_char
-#define get_token             _glp_mpl_get_token
-#define unget_token           _glp_mpl_unget_token
-#define is_keyword            _glp_mpl_is_keyword
-#define is_reserved           _glp_mpl_is_reserved
-#define make_code             _glp_mpl_make_code
-#define make_unary            _glp_mpl_make_unary
-#define make_binary           _glp_mpl_make_binary
-#define make_ternary          _glp_mpl_make_ternary
-#define numeric_literal       _glp_mpl_numeric_literal
-#define string_literal        _glp_mpl_string_literal
-#define create_arg_list       _glp_mpl_create_arg_list
-#define expand_arg_list       _glp_mpl_expand_arg_list
-#define arg_list_len          _glp_mpl_arg_list_len
-#define subscript_list        _glp_mpl_subscript_list
-#define object_reference      _glp_mpl_object_reference
-#define numeric_argument      _glp_mpl_numeric_argument
-#define symbolic_argument     _glp_mpl_symbolic_argument
-#define elemset_argument      _glp_mpl_elemset_argument
-#define function_reference    _glp_mpl_function_reference
-#define create_domain         _glp_mpl_create_domain
-#define create_block          _glp_mpl_create_block
-#define append_block          _glp_mpl_append_block
-#define append_slot           _glp_mpl_append_slot
-#define expression_list       _glp_mpl_expression_list
-#define literal_set           _glp_mpl_literal_set
-#define indexing_expression   _glp_mpl_indexing_expression
-#define close_scope           _glp_mpl_close_scope
-#define iterated_expression   _glp_mpl_iterated_expression
-#define domain_arity          _glp_mpl_domain_arity
-#define set_expression        _glp_mpl_set_expression
-#define branched_expression   _glp_mpl_branched_expression
-#define primary_expression    _glp_mpl_primary_expression
-#define error_preceding       _glp_mpl_error_preceding
-#define error_following       _glp_mpl_error_following
-#define error_dimension       _glp_mpl_error_dimension
-#define expression_0          _glp_mpl_expression_0
-#define expression_1          _glp_mpl_expression_1
-#define expression_2          _glp_mpl_expression_2
-#define expression_3          _glp_mpl_expression_3
-#define expression_4          _glp_mpl_expression_4
-#define expression_5          _glp_mpl_expression_5
-#define expression_6          _glp_mpl_expression_6
-#define expression_7          _glp_mpl_expression_7
-#define expression_8          _glp_mpl_expression_8
-#define expression_9          _glp_mpl_expression_9
-#define expression_10         _glp_mpl_expression_10
-#define expression_11         _glp_mpl_expression_11
-#define expression_12         _glp_mpl_expression_12
-#define expression_13         _glp_mpl_expression_13
-#define set_statement         _glp_mpl_set_statement
-#define parameter_statement   _glp_mpl_parameter_statement
-#define variable_statement    _glp_mpl_variable_statement
-#define constraint_statement  _glp_mpl_constraint_statement
-#define objective_statement   _glp_mpl_objective_statement
-#define solve_statement       _glp_mpl_solve_statement
-#define check_statement       _glp_mpl_check_statement
-#define display_statement     _glp_mpl_display_statement
-#define printf_statement      _glp_mpl_printf_statement
-#define for_statement         _glp_mpl_for_statement
-#define end_statement         _glp_mpl_end_statement
-#define simple_statement      _glp_mpl_simple_statement
-#define model_section         _glp_mpl_model_section
 
 #define create_slice          _glp_mpl_create_slice
 #define expand_slice          _glp_mpl_expand_slice
@@ -562,203 +519,274 @@ struct MPL
 #define alloc(type) ((type *)dmp_get_atomv(mpl->pool, sizeof(type)))
 /* allocate atom of given type */
 
+#define enter_context _glp_mpl_enter_context
 void enter_context(MPL *mpl);
 /* enter current token into context queue */
 
+#define print_context _glp_mpl_print_context
 void print_context(MPL *mpl);
 /* print current content of context queue */
 
+#define get_char _glp_mpl_get_char
 void get_char(MPL *mpl);
 /* scan next character from input text file */
 
+#define append_char _glp_mpl_append_char
 void append_char(MPL *mpl);
 /* append character to current token */
 
+#define get_token _glp_mpl_get_token
 void get_token(MPL *mpl);
 /* scan next token from input text file */
 
+#define unget_token _glp_mpl_unget_token
 void unget_token(MPL *mpl);
 /* return current token back to input stream */
 
+#define is_keyword _glp_mpl_is_keyword
 int is_keyword(MPL *mpl, char *keyword);
 /* check if current token is given non-reserved keyword */
 
+#define is_reserved _glp_mpl_is_reserved
 int is_reserved(MPL *mpl);
 /* check if current token is reserved keyword */
 
+#define make_code _glp_mpl_make_code
 CODE *make_code(MPL *mpl, int op, OPERANDS *arg, int type, int dim);
 /* generate pseudo-code (basic routine) */
 
+#define make_unary _glp_mpl_make_unary
 CODE *make_unary(MPL *mpl, int op, CODE *x, int type, int dim);
 /* generate pseudo-code for unary operation */
 
+#define make_binary _glp_mpl_make_binary
 CODE *make_binary(MPL *mpl, int op, CODE *x, CODE *y, int type,
       int dim);
 /* generate pseudo-code for binary operation */
 
+#define make_ternary _glp_mpl_make_ternary
 CODE *make_ternary(MPL *mpl, int op, CODE *x, CODE *y, CODE *z,
       int type, int dim);
 /* generate pseudo-code for ternary operation */
 
+#define numeric_literal _glp_mpl_numeric_literal
 CODE *numeric_literal(MPL *mpl);
 /* parse reference to numeric literal */
 
+#define string_literal _glp_mpl_string_literal
 CODE *string_literal(MPL *mpl);
 /* parse reference to string literal */
 
+#define create_arg_list _glp_mpl_create_arg_list
 ARG_LIST *create_arg_list(MPL *mpl);
 /* create empty operands list */
 
+#define expand_arg_list _glp_mpl_expand_arg_list
 ARG_LIST *expand_arg_list(MPL *mpl, ARG_LIST *list, CODE *x);
 /* append operand to operands list */
 
+#define arg_list_len _glp_mpl_arg_list_len
 int arg_list_len(MPL *mpl, ARG_LIST *list);
 /* determine length of operands list */
 
+#define subscript_list _glp_mpl_subscript_list
 ARG_LIST *subscript_list(MPL *mpl);
 /* parse subscript list */
 
+#define object_reference _glp_mpl_object_reference
 CODE *object_reference(MPL *mpl);
 /* parse reference to named object */
 
+#define numeric_argument _glp_mpl_numeric_argument
 CODE *numeric_argument(MPL *mpl, char *func);
 /* parse argument passed to built-in function */
 
-#if 1 /* 21/VII-2006 */
+#define symbolic_argument _glp_mpl_symbolic_argument
 CODE *symbolic_argument(MPL *mpl, char *func);
-CODE *elemset_argument(MPL *mpl, char *func);
-#endif
 
+#define elemset_argument _glp_mpl_elemset_argument
+CODE *elemset_argument(MPL *mpl, char *func);
+
+#define function_reference _glp_mpl_function_reference
 CODE *function_reference(MPL *mpl);
 /* parse reference to built-in function */
 
+#define create_domain _glp_mpl_create_domain
 DOMAIN *create_domain(MPL *mpl);
 /* create empty domain */
 
+#define create_block _glp_mpl_create_block
 DOMAIN_BLOCK *create_block(MPL *mpl);
 /* create empty domain block */
 
+#define append_block _glp_mpl_append_block
 void append_block(MPL *mpl, DOMAIN *domain, DOMAIN_BLOCK *block);
 /* append domain block to specified domain */
 
+#define append_slot _glp_mpl_append_slot
 DOMAIN_SLOT *append_slot(MPL *mpl, DOMAIN_BLOCK *block, char *name,
       CODE *code);
 /* create and append new slot to domain block */
 
+#define expression_list _glp_mpl_expression_list
 CODE *expression_list(MPL *mpl);
 /* parse expression list */
 
+#define literal_set _glp_mpl_literal_set
 CODE *literal_set(MPL *mpl, CODE *code);
 /* parse literal set */
 
+#define indexing_expression _glp_mpl_indexing_expression
 DOMAIN *indexing_expression(MPL *mpl);
 /* parse indexing expression */
 
+#define close_scope _glp_mpl_close_scope
 void close_scope(MPL *mpl, DOMAIN *domain);
 /* close scope of indexing expression */
 
+#define iterated_expression _glp_mpl_iterated_expression
 CODE *iterated_expression(MPL *mpl);
 /* parse iterated expression */
 
+#define domain_arity _glp_mpl_domain_arity
 int domain_arity(MPL *mpl, DOMAIN *domain);
 /* determine arity of domain */
 
+#define set_expression _glp_mpl_set_expression
 CODE *set_expression(MPL *mpl);
 /* parse set expression */
 
+#define branched_expression _glp_mpl_branched_expression
 CODE *branched_expression(MPL *mpl);
 /* parse conditional expression */
 
+#define primary_expression _glp_mpl_primary_expression
 CODE *primary_expression(MPL *mpl);
 /* parse primary expression */
 
+#define error_preceding _glp_mpl_error_preceding
 void error_preceding(MPL *mpl, char *opstr);
 /* raise error if preceding operand has wrong type */
 
+#define error_following _glp_mpl_error_following
 void error_following(MPL *mpl, char *opstr);
 /* raise error if following operand has wrong type */
 
+#define error_dimension _glp_mpl_error_dimension
 void error_dimension(MPL *mpl, char *opstr, int dim1, int dim2);
 /* raise error if operands have different dimension */
 
+#define expression_0 _glp_mpl_expression_0
 CODE *expression_0(MPL *mpl);
 /* parse expression of level 0 */
 
+#define expression_1 _glp_mpl_expression_1
 CODE *expression_1(MPL *mpl);
 /* parse expression of level 1 */
 
+#define expression_2 _glp_mpl_expression_2
 CODE *expression_2(MPL *mpl);
 /* parse expression of level 2 */
 
+#define expression_3 _glp_mpl_expression_3
 CODE *expression_3(MPL *mpl);
 /* parse expression of level 3 */
 
+#define expression_4 _glp_mpl_expression_4
 CODE *expression_4(MPL *mpl);
 /* parse expression of level 4 */
 
+#define expression_5 _glp_mpl_expression_5
 CODE *expression_5(MPL *mpl);
 /* parse expression of level 5 */
 
+#define expression_6 _glp_mpl_expression_6
 CODE *expression_6(MPL *mpl);
 /* parse expression of level 6 */
 
+#define expression_7 _glp_mpl_expression_7
 CODE *expression_7(MPL *mpl);
 /* parse expression of level 7 */
 
+#define expression_8 _glp_mpl_expression_8
 CODE *expression_8(MPL *mpl);
 /* parse expression of level 8 */
 
+#define expression_9 _glp_mpl_expression_9
 CODE *expression_9(MPL *mpl);
 /* parse expression of level 9 */
 
+#define expression_10 _glp_mpl_expression_10
 CODE *expression_10(MPL *mpl);
 /* parse expression of level 10 */
 
+#define expression_11 _glp_mpl_expression_11
 CODE *expression_11(MPL *mpl);
 /* parse expression of level 11 */
 
+#define expression_12 _glp_mpl_expression_12
 CODE *expression_12(MPL *mpl);
 /* parse expression of level 12 */
 
+#define expression_13 _glp_mpl_expression_13
 CODE *expression_13(MPL *mpl);
 /* parse expression of level 13 */
 
+#define set_statement _glp_mpl_set_statement
 SET *set_statement(MPL *mpl);
 /* parse set statement */
 
+#define parameter_statement _glp_mpl_parameter_statement
 PARAMETER *parameter_statement(MPL *mpl);
 /* parse parameter statement */
 
+#define variable_statement _glp_mpl_variable_statement
 VARIABLE *variable_statement(MPL *mpl);
 /* parse variable statement */
 
+#define constraint_statement _glp_mpl_constraint_statement
 CONSTRAINT *constraint_statement(MPL *mpl);
 /* parse constraint statement */
 
+#define objective_statement _glp_mpl_objective_statement
 CONSTRAINT *objective_statement(MPL *mpl);
 /* parse objective statement */
 
+#if 1 /* 11/II-2008 */
+#define table_statement _glp_mpl_table_statement
+TABLE *table_statement(MPL *mpl);
+/* parse table statement */
+#endif
+
+#define solve_statement _glp_mpl_solve_statement
 void *solve_statement(MPL *mpl);
 /* parse solve statement */
 
+#define check_statement _glp_mpl_check_statement
 CHECK *check_statement(MPL *mpl);
 /* parse check statement */
 
+#define display_statement _glp_mpl_display_statement
 DISPLAY *display_statement(MPL *mpl);
 /* parse display statement */
 
+#define printf_statement _glp_mpl_printf_statement
 PRINTF *printf_statement(MPL *mpl);
 /* parse printf statement */
 
+#define for_statement _glp_mpl_for_statement
 FOR *for_statement(MPL *mpl);
 /* parse for statement */
 
+#define end_statement _glp_mpl_end_statement
 void end_statement(MPL *mpl);
 /* parse end statement */
 
+#define simple_statement _glp_mpl_simple_statement
 STATEMENT *simple_statement(MPL *mpl, int spec);
 /* parse simple statement */
 
+#define model_section _glp_mpl_model_section
 void model_section(MPL *mpl);
 /* parse model section */
 
@@ -982,6 +1010,7 @@ double fp_normal01(MPL *mpl);
 double fp_normal(MPL *mpl, double mu, double sigma);
 /* Gaussian random variate with specified mu and sigma */
 
+#if 0
 /**********************************************************************/
 /* * *                SEGMENTED CHARACTER STRINGS                 * * */
 /**********************************************************************/
@@ -999,6 +1028,11 @@ struct STRING
       STRING *next;
       /* the next segment of string */
 };
+#else
+/**********************************************************************/
+/* * *                     CHARACTER STRINGS                      * * */
+/**********************************************************************/
+#endif
 
 STRING *create_string
 (     MPL *mpl,
@@ -1857,6 +1891,142 @@ void eval_whole_con(MPL *mpl, CONSTRAINT *con);
 void clean_constraint(MPL *mpl, CONSTRAINT *con);
 /* clean model constraint */
 
+#if 1 /* 11/II-2008 */
+/**********************************************************************/
+/* * *                        DATA TABLES                         * * */
+/**********************************************************************/
+
+struct TABLE
+{     /* data table */
+      char *name;
+      /* symbolic name; cannot be NULL */
+      char *alias;
+      /* alias; NULL means alias is not specified */
+      int type;
+      /* table type:
+         A_INPUT  - input table
+         A_OUTPUT - output table */
+      TABARG *arg;
+      /* argument list; cannot be empty */
+      union
+      {  struct
+         {  SET *set;
+            /* input set; NULL means the set is not specified */
+            TABFLD *fld;
+            /* field list; cannot be empty */
+            TABIN *list;
+            /* input list; can be empty */
+         } in;
+         struct
+         {  DOMAIN *domain;
+            /* subscript domain; cannot be NULL */
+            TABOUT *list;
+            /* output list; cannot be empty */
+         } out;
+      } u;
+};
+
+struct TABARG
+{     /* table argument list entry */
+      CODE *code;
+      /* pseudo-code for computing the argument */
+      TABARG *next;
+      /* next entry for the same table */
+};
+
+struct TABFLD
+{     /* table field list entry */
+      char *name;
+      /* field name; cannot be NULL */
+      TABFLD *next;
+      /* next entry for the same table */
+};
+
+struct TABIN
+{     /* table input list entry */
+      PARAMETER *par;
+      /* parameter to be read; cannot be NULL */
+      char *name;
+      /* column name; cannot be NULL */
+      TABIN *next;
+      /* next entry for the same table */
+};
+
+struct TABOUT
+{     /* table output list entry */
+      CODE *code;
+      /* pseudo-code for computing the value to be written */
+      char *name;
+      /* column name; cannot be NULL */
+      TABOUT *next;
+      /* next entry for the same table */
+};
+
+struct TABDCA
+{     /* table driver communication area */
+      int id;
+      /* driver identifier (set by mpl_tab_drv_open) */
+      void *link;
+      /* driver link pointer (set by mpl_tab_drv_open) */
+      int na;
+      /* number of arguments */
+      char **arg; /* char *arg[1+ns]; */
+      /* arg[k], 1 <= k <= ns, is pointer to k-th argument */
+      int nf;
+      /* number of fields */
+      char **name; /* char *name[1+nc]; */
+      /* name[k], 1 <= k <= nc, is name of k-th field */
+      int *type; /* int type[1+nc]; */
+      /* type[k], 1 <= k <= nc, is type of k-th field:
+         '?' - value not assigned
+         'N' - number
+         'S' - character string */
+      double *num; /* double num[1+nc]; */
+      /* num[k], 1 <= k <= nc, is numeric value of k-th field */
+      char **str;
+      /* str[k], 1 <= k <= nc, is string value of k-th field */
+};
+
+#define mpl_tab_num_args _glp_mpl_tab_num_args
+int mpl_tab_num_args(TABDCA *dca);
+
+#define mpl_tab_get_arg _glp_mpl_tab_get_arg
+const char *mpl_tab_get_arg(TABDCA *dca, int k);
+
+#define mpl_tab_num_flds _glp_mpl_tab_num_flds
+int mpl_tab_num_flds(TABDCA *dca);
+
+#define mpl_tab_get_name _glp_mpl_tab_get_name
+const char *mpl_tab_get_name(TABDCA *dca, int k);
+
+#define mpl_tab_get_type _glp_mpl_tab_get_type
+int mpl_tab_get_type(TABDCA *dca, int k);
+
+#define mpl_tab_get_num _glp_mpl_tab_get_num
+double mpl_tab_get_num(TABDCA *dca, int k);
+
+#define mpl_tab_get_str _glp_mpl_tab_get_str
+const char *mpl_tab_get_str(TABDCA *dca, int k);
+
+#define mpl_tab_set_num _glp_mpl_tab_set_num
+void mpl_tab_set_num(TABDCA *dca, int k, double num);
+
+#define mpl_tab_set_str _glp_mpl_tab_set_str
+void mpl_tab_set_str(TABDCA *dca, int k, const char *str);
+
+#define mpl_tab_drv_open _glp_mpl_tab_drv_open
+void mpl_tab_drv_open(MPL *mpl, int mode);
+
+#define mpl_tab_drv_read _glp_mpl_tab_drv_read
+int mpl_tab_drv_read(MPL *mpl);
+
+#define mpl_tab_drv_write _glp_mpl_tab_drv_write
+void mpl_tab_drv_write(MPL *mpl);
+
+#define mpl_tab_drv_close _glp_mpl_tab_drv_close
+void mpl_tab_drv_close(MPL *mpl);
+#endif
+
 /**********************************************************************/
 /* * *                        PSEUDO-CODE                         * * */
 /**********************************************************************/
@@ -2188,6 +2358,7 @@ struct STATEMENT
          A_PARAMETER  - parameter statement
          A_VARIABLE   - variable statement
          A_CONSTRAINT - constraint/objective statement
+         A_TABLE      - table statement
          A_SOLVE      - solve statement
          A_CHECK      - check statement
          A_DISPLAY    - display statement
@@ -2198,6 +2369,9 @@ struct STATEMENT
          PARAMETER *par;
          VARIABLE *var;
          CONSTRAINT *con;
+#if 1 /* 11/II-2008 */
+         TABLE *tab;
+#endif
          void *slv; /* currently not used (set to NULL) */
          CHECK *chk;
          DISPLAY *dpy;
@@ -2209,6 +2383,20 @@ struct STATEMENT
       /* the next statement; in this list statements follow in the same
          order as they appear in the model section */
 };
+
+#if 1 /* 11/II-2008 */
+#define execute_table _glp_mpl_execute_table
+void execute_table(MPL *mpl, TABLE *tab);
+/* execute table statement */
+
+#define free_dca _glp_mpl_free_dca
+void free_dca(MPL *mpl);
+/* free table driver communucation area */
+
+#define clean_table _glp_mpl_clean_table
+void clean_table(MPL *mpl, TABLE *tab);
+/* clean table statement */
+#endif
 
 void execute_check(MPL *mpl, CHECK *chk);
 /* execute check statement */

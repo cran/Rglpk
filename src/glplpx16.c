@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,10 +21,10 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_ERRNO
+#define _GLPSTD_STDIO
 #include "glpapi.h"
-#include "glplib.h"
-#define print xprint1
-#define fault xfault1
+#define xfault xerror
 
 /*----------------------------------------------------------------------
 -- lpx_read_cpxlp - read problem data in CPLEX LP format.
@@ -107,7 +107,7 @@ static void fatal(struct dsa *dsa, char *fmt, ...)
       vsprintf(msg, fmt, arg);
       xassert(strlen(msg) <= 4095);
       va_end(arg);
-      print("%s:%d: %s", dsa->fname, dsa->count, msg);
+      xprintf("%s:%d: %s\n", dsa->fname, dsa->count, msg);
       longjmp(dsa->jump, 1);
       /* no return */
 }
@@ -126,8 +126,8 @@ static void read_char(struct dsa *dsa)
             c = EOF;
          }
          else
-         {  print("%s:%d: warning: missing final LF", dsa->fname,
-               dsa->count);
+         {  xprintf("%s:%d: warning: missing final LF\n",
+               dsa->fname, dsa->count);
             c = '\n';
          }
       }
@@ -554,7 +554,8 @@ loop: /* create new row (constraint) */
 static void set_lower_bound(struct dsa *dsa, int j, double lb)
 {     /* set upper bound of j-th variable */
       if (dsa->lb[j] != +DBL_MAX)
-         print("%s:%d: warning: lower bound of variable `%s' redefined",
+         xprintf(
+            "%s:%d: warning: lower bound of variable `%s' redefined\n",
             dsa->fname, dsa->count, lpx_get_col_name(dsa->lp, j));
       dsa->lb[j] = lb;
       return;
@@ -563,7 +564,8 @@ static void set_lower_bound(struct dsa *dsa, int j, double lb)
 static void set_upper_bound(struct dsa *dsa, int j, double ub)
 {     /* set upper bound of j-th variable */
       if (dsa->ub[j] != -DBL_MAX)
-         print("%s:%d: warning: upper bound of variable `%s' redefined",
+         xprintf(
+            "%s:%d: warning: upper bound of variable `%s' redefined\n",
             dsa->fname, dsa->count, lpx_get_col_name(dsa->lp, j));
       dsa->ub[j] = ub;
       return;
@@ -806,12 +808,12 @@ LPX *lpx_read_cpxlp(const char *fname)
       dsa->val = xcalloc(1+dsa->n_max, sizeof(double));
       dsa->lb = xcalloc(1+dsa->n_max, sizeof(double));
       dsa->ub = xcalloc(1+dsa->n_max, sizeof(double));
-      print("lpx_read_cpxlp: reading problem data from `%s'...",
+      xprintf("lpx_read_cpxlp: reading problem data from `%s'...\n",
          dsa->fname);
-      dsa->fp = xfopen(dsa->fname, "r");
+      dsa->fp = fopen(dsa->fname, "r");
       if (dsa->fp == NULL)
-      {  print("lpx_read_cpxlp: unable to open `%s' - %s", dsa->fname,
-            strerror(errno));
+      {  xprintf("lpx_read_cpxlp: unable to open `%s' - %s\n",
+            dsa->fname, strerror(errno));
          goto fail;
       }
       dsa->lp = lpx_create_prob();
@@ -840,8 +842,8 @@ LPX *lpx_read_cpxlp(const char *fname)
       if (dsa->token == T_END)
          scan_token(dsa);
       else if (dsa->token == T_EOF)
-         print("%s:%d: warning: keyword `end' missing", dsa->fname,
-            dsa->count);
+         xprintf("%s:%d: warning: keyword `end' missing\n",
+            dsa->fname, dsa->count);
       else
          fatal(dsa, "symbol `%s' in wrong position", dsa->image);
       /* nothing must follow the keyword 'end' (except comments) */
@@ -872,7 +874,8 @@ LPX *lpx_read_cpxlp(const char *fname)
       {  int m = lpx_get_num_rows(dsa->lp);
          int n = lpx_get_num_cols(dsa->lp);
          int nnz = lpx_get_num_nz(dsa->lp);
-         print("lpx_read_cpxlp: %d row%s, %d column%s, %d non-zero%s",
+         xprintf(
+            "lpx_read_cpxlp: %d row%s, %d column%s, %d non-zero%s\n",
             m, m == 1 ? "" : "s", n, n == 1 ? "" : "s", nnz, nnz == 1 ?
             "" : "s");
       }
@@ -890,11 +893,12 @@ LPX *lpx_read_cpxlp(const char *fname)
             strcpy(s, "all of");
          else
             sprintf(s, "%d of", nb);
-         print("lpx_read_cpxlp: %d integer column%s, %s which %s binary"
+         xprintf(
+            "lpx_read_cpxlp: %d integer column%s, %s which %s binary\n"
             , ni, ni == 1 ? "" : "s", s, nb == 1 ? "is" : "are");
       }
-      print("lpx_read_cpxlp: %d lines were read", dsa->count);
-      xfclose(dsa->fp);
+      xprintf("lpx_read_cpxlp: %d lines were read\n", dsa->count);
+      fclose(dsa->fp);
       xfree(dsa->map);
       xfree(dsa->ind);
       xfree(dsa->val);
@@ -904,7 +908,7 @@ LPX *lpx_read_cpxlp(const char *fname)
       lpx_order_matrix(dsa->lp);
       return dsa->lp;
 fail: if (dsa->lp != NULL) lpx_delete_prob(dsa->lp);
-      if (dsa->fp != NULL) xfclose(dsa->fp);
+      if (dsa->fp != NULL) fclose(dsa->fp);
       if (dsa->map != NULL) xfree(dsa->map);
       if (dsa->ind != NULL) xfree(dsa->ind);
       if (dsa->val != NULL) xfree(dsa->val);
@@ -996,12 +1000,13 @@ int lpx_write_cpxlp(LPX *lp, const char *fname)
       int nrows, ncols, i, j, t, len, typx, flag, kind, *ind;
       double lb, ub, temp, *val;
       char line[1023+1], term[1023+1], rname[255+1], cname[255+1];
-      print("lpx_write_cpxlp: writing problem data to `%s'...", fname);
+      xprintf("lpx_write_cpxlp: writing problem data to `%s'...\n",
+         fname);
       /* open the output text file */
-      fp = xfopen(fname, "w");
+      fp = fopen(fname, "w");
       if (fp == NULL)
-      {  print("lpx_write_cpxlp: unable to create `%s' - %s", fname,
-            strerror(errno));
+      {  xprintf("lpx_write_cpxlp: unable to create `%s' - %s\n",
+            fname, strerror(errno));
          goto fail;
       }
       /* determine the number of rows and columns */
@@ -1009,7 +1014,7 @@ int lpx_write_cpxlp(LPX *lp, const char *fname)
       ncols = lpx_get_num_cols(lp);
       /* the problem should contain at least one row and one column */
       if (!(nrows > 0 && ncols > 0))
-         fault("lpx_write_cpxlp: problem has no rows/columns");
+         xfault("lpx_write_cpxlp: problem has no rows/columns\n");
       /* write problem name */
       {  const char *name = lpx_get_prob_name(lp);
          if (name == NULL) name = "Unknown";
@@ -1165,15 +1170,15 @@ more:    if (!flag)
       /* close the output text file */
       fflush(fp);
       if (ferror(fp))
-      {  print("lpx_write_cpxlp: write error on `%s' - %s", fname,
-            strerror(errno));
+      {  xprintf("lpx_write_cpxlp: write error on `%s' - %s\n",
+            fname, strerror(errno));
          goto fail;
       }
-      xfclose(fp);
+      fclose(fp);
       /* return to the calling program */
       return 0;
 fail: /* the operation failed */
-      if (fp != NULL) xfclose(fp);
+      if (fp != NULL) fclose(fp);
       return 1;
 }
 

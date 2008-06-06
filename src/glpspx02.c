@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -24,7 +24,6 @@
 #include "glpapi.h"
 #include "glplib.h"
 #include "glpspx.h"
-#define print xprint1
 
 #if 0
 #define LPX_E_NOFEAS    209   /* no feasible solution */
@@ -114,7 +113,7 @@ static void prim_opt_dpy(SPX *spx)
       int i, def = 0;
       for (i = 1; i <= spx->m; i++)
          if (spx->type[spx->indx[i]] == GLP_FX) def++;
-      print("*%6d:   objval = %17.9e   infeas = %17.9e (%d)",
+      xprintf("*%6d:   objval = %17.9e   infeas = %17.9e (%d)\n",
          spx->it_cnt, spx_eval_obj(spx), spx_check_bbar(spx, 0.0), def);
       return;
 }
@@ -124,7 +123,7 @@ int spx_prim_opt(SPX *spx)
       int m = spx->m;
       int n = spx->n;
       int ret;
-      glp_ulong start = xtime();
+      xlong_t start = xtime();
       double spent = 0.0;
       /* the initial basis should be "warmed up" */
       xassert(spx->valid);
@@ -430,7 +429,7 @@ static void prim_feas_dpy(SPX *spx, double sum_0)
       int i, def = 0;
       for (i = 1; i <= spx->m; i++)
          if (spx->type[spx->indx[i]] == GLP_FX) def++;
-      print(" %6d:   objval = %17.9e   infeas = %17.9e (%d)",
+      xprintf(" %6d:   objval = %17.9e   infeas = %17.9e (%d)\n",
          spx->it_cnt, orig_objval(spx), orig_infsum(spx, 0.0) / sum_0,
          def);
       return;
@@ -442,7 +441,7 @@ int spx_prim_feas(SPX *spx)
       int n = spx->n;
       int i, k, ret;
       double sum_0;
-      glp_ulong start = xtime();
+      xlong_t start = xtime();
       double spent = 0.0;
       /* the initial basis should be "warmed up" */
       xassert(spx->valid);
@@ -828,7 +827,7 @@ static void dual_opt_dpy(SPX *spx)
       int i, def = 0;
       for (i = 1; i <= spx->m; i++)
          if (spx->type[spx->indx[i]] == GLP_FX) def++;
-      print("|%6d:   objval = %17.9e   infeas = %17.9e (%d)",
+      xprintf("|%6d:   objval = %17.9e   infeas = %17.9e (%d)\n",
          spx->it_cnt, spx_eval_obj(spx), spx_check_bbar(spx, 0.0), def);
       return;
 }
@@ -838,7 +837,7 @@ int spx_dual_opt(SPX *spx)
       int m = spx->m;
       int n = spx->n;
       int ret;
-      glp_ulong start = xtime();
+      xlong_t start = xtime();
       double spent = 0.0, obj;
       /* the initial basis should be "warmed up" */
       xassert(spx->valid);
@@ -1149,10 +1148,10 @@ int spx_simplex(SPX *spx)
          feasible), nothing to search for */
       if (spx->p_stat == GLP_FEAS && spx->d_stat == GLP_FEAS)
       {  if (spx->msg_lev >= 2 && spx->out_dly == 0.0)
-            print("!%6d:   objval = %17.9e   infeas = %17.9e",
+            xprintf("!%6d:   objval = %17.9e   infeas = %17.9e\n",
                spx->it_cnt, spx_eval_obj(spx), 0.0);
          if (spx->msg_lev >= 3)
-            print("OPTIMAL SOLUTION FOUND");
+            xprintf("OPTIMAL SOLUTION FOUND\n");
          ret = 0;
          goto done;
       }
@@ -1166,27 +1165,28 @@ feas: /* phase I: find a primal feasible basic solution */
             goto opt;
          case LPX_E_NOFEAS:
             if (spx->msg_lev >= 3)
-               print("PROBLEM HAS NO FEASIBLE SOLUTION");
+               xprintf("PROBLEM HAS NO FEASIBLE SOLUTION\n");
             ret = 0;
             goto done;
          case GLP_EITLIM:
             if (spx->msg_lev >= 3)
-               print("ITERATION LIMIT EXCEEDED; SEARCH TERMINATED");
+               xprintf("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED\n")
+                  ;
             goto done;
          case GLP_ETMLIM:
             if (spx->msg_lev >= 3)
-               print("TIME LIMIT EXCEEDED; SEARCH TERMINATED");
+               xprintf("TIME LIMIT EXCEEDED; SEARCH TERMINATED\n");
             goto done;
          case LPX_E_INSTAB:
             if (spx->msg_lev >= 2)
-               print(prefix "warning: numerical instability (primal sim"
-                  "plex, phase I)");
+               xprintf(prefix "warning: numerical instability (primal s"
+                  "implex, phase I)\n");
             goto feas;
          case GLP_EFAIL:
             if (spx->msg_lev >= 1)
-            {  print(prefix "numerical problems with basis matrix");
-               print(prefix "sorry, basis recovery procedure not implem"
-                  "ented yet");
+            {  xprintf(prefix "numerical problems with basis matrix\n");
+               xprintf(prefix "sorry, basis recovery procedure not impl"
+                  "emented yet\n");
             }
             goto done;
          default:
@@ -1197,31 +1197,32 @@ opt:  /* phase II: find an optimal basic solution (primal simplex) */
       switch (ret)
       {  case 0:
             if (spx->msg_lev >= 3)
-               print("OPTIMAL SOLUTION FOUND");
+               xprintf("OPTIMAL SOLUTION FOUND\n");
             goto done;
          case LPX_E_NOFEAS:
             if (spx->msg_lev >= 3)
-               print("PROBLEM HAS UNBOUNDED SOLUTION");
+               xprintf("PROBLEM HAS UNBOUNDED SOLUTION\n");
             ret = 0;
             goto done;
          case GLP_EITLIM:
             if (spx->msg_lev >= 3)
-               print("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED");
+               xprintf("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED\n")
+                  ;
             goto done;
          case GLP_ETMLIM:
             if (spx->msg_lev >= 3)
-               print("TIME LIMIT EXCEEDED; SEARCH TERMINATED");
+               xprintf("TIME LIMIT EXCEEDED; SEARCH TERMINATED\n");
             goto done;
          case LPX_E_INSTAB:
             if (spx->msg_lev >= 2)
-               print(prefix "warning: numerical instability (primal sim"
-                  "plex, phase II)");
+               xprintf(prefix "warning: numerical instability (primal s"
+                  "implex, phase II)\n");
             goto feas;
          case GLP_EFAIL:
             if (spx->msg_lev >= 1)
-            {  print(prefix "numerical problems with basis matrix");
-               print(prefix "sorry, basis recovery procedure not implem"
-                  "ented yet");
+            {  xprintf(prefix "numerical problems with basis matrix\n");
+               xprintf(prefix "sorry, basis recovery procedure not impl"
+                  "emented yet\n");
             }
             goto done;
          default:
@@ -1232,41 +1233,42 @@ dual: /* phase II: find an optimal basic solution (dual simplex) */
       switch (ret)
       {  case 0:
             if (spx->msg_lev >= 3)
-               print("OPTIMAL SOLUTION FOUND");
+               xprintf("OPTIMAL SOLUTION FOUND\n");
             goto done;
          case LPX_E_NOFEAS:
             if (spx->msg_lev >= 3)
-               print("PROBLEM HAS NO FEASIBLE SOLUTION");
+               xprintf("PROBLEM HAS NO FEASIBLE SOLUTION\n");
             ret = 0;
             goto done;
          case GLP_EOBJLL:
             if (spx->msg_lev >= 3)
-               print("OBJECTIVE LOWER LIMIT REACHED; SEARCH TERMINATED")
-                  ;
+               xprintf("OBJECTIVE LOWER LIMIT REACHED; SEARCH TERMINATE"
+                  "D\n");
             goto done;
          case GLP_EOBJUL:
             if (spx->msg_lev >= 3)
-               print("OBJECTIVE UPPER LIMIT REACHED; SEARCH TERMINATED")
-                  ;
+               xprintf("OBJECTIVE UPPER LIMIT REACHED; SEARCH TERMINATE"
+                  "D\n");
             goto done;
          case GLP_EITLIM:
             if (spx->msg_lev >= 3)
-               print("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED");
+               xprintf("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED\n")
+                  ;
             goto done;
          case GLP_ETMLIM:
             if (spx->msg_lev >= 3)
-               print("TIME LIMIT EXCEEDED; SEARCH TERMINATED");
+               xprintf("TIME LIMIT EXCEEDED; SEARCH TERMINATED\n");
             goto done;
          case LPX_E_INSTAB:
             if (spx->msg_lev >= 2)
-               print(prefix "warning: numerical instability (dual simpl"
-                  "ex)");
+               xprintf(prefix "warning: numerical instability (dual sim"
+                  "plex)\n");
             goto feas;
          case GLP_EFAIL:
             if (spx->msg_lev >= 1)
-            {  print(prefix "numerical problems with basis matrix");
-               print(prefix "sorry, basis recovery procedure not implem"
-                  "ented yet");
+            {  xprintf(prefix "numerical problems with basis matrix\n");
+               xprintf(prefix "sorry, basis recovery procedure not impl"
+                  "emented yet\n");
             }
             goto done;
          default:

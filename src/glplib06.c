@@ -1,9 +1,9 @@
-/* glplib06.c (memory allocation) */
+/* glplib06.c (64-bit arithmetic) */
 
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -26,191 +26,308 @@
 /***********************************************************************
 *  NAME
 *
-*  xmalloc - allocate memory block
+*  xlset - expand integer to long integer
 *
 *  SYNOPSIS
 *
 *  #include "glplib.h"
-*  void *xmalloc(int size);
-*
-*  DESCRIPTION
-*
-*  The routine xmalloc allocates a memory block of size bytes long.
-*
-*  Note that being allocated the memory block contains arbitrary data
-*  (not binary zeros).
+*  xlong_t xlset(int x);
 *
 *  RETURNS
 *
-*  The routine xmalloc returns a pointer to the allocated memory block.
-*  To free this block the routine xfree (not free!) should be used. */
+*  The routine xlset returns x expanded to long integer. */
 
-void *xmalloc(int size)
-{     LIBENV *env = lib_link_env();
-      LIBMEM *desc;
-      int size_of_desc = align_datasize(sizeof(LIBMEM));
-      if (size < 1 || size > INT_MAX - size_of_desc)
-         xfault("xmalloc: size = %d; invalid parameter\n", size);
-      size += size_of_desc;
-      if (ulcmp(ulset(0, size),
-          ulsub(env->mem_limit, env->mem_total)) > 0)
-         xfault("xmalloc: memory limit exceeded\n");
-      if (env->mem_count == INT_MAX)
-         xfault("xmalloc: too many memory blocks allocated\n");
-      desc = malloc(size);
-      if (desc == NULL)
-         xfault("xmalloc: no memory available\n");
-      memset(desc, '?', size);
-      desc->flag = LIB_MEM_FLAG;
-      desc->size = size;
-      desc->prev = NULL;
-      desc->next = env->mem_ptr;
-      if (desc->next != NULL) desc->next->prev = desc;
-      env->mem_ptr = desc;
-      env->mem_count++;
-      if (env->mem_cpeak < env->mem_count)
-         env->mem_cpeak = env->mem_count;
-      env->mem_total = uladd(env->mem_total, ulset(0, size));
-      if (ulcmp(env->mem_tpeak, env->mem_total) < 0)
-         env->mem_tpeak = env->mem_total;
-      return (void *)((char *)desc + size_of_desc);
+xlong_t xlset(int x)
+{     xlong_t t;
+      t.lo = x, t.hi = (x >= 0 ? 0 : -1);
+      return t;
 }
 
 /***********************************************************************
 *  NAME
 *
-*  xcalloc - allocate memory block
+*  xlneg - negate long integer
 *
 *  SYNOPSIS
 *
 *  #include "glplib.h"
-*  void *xcalloc(int n, int size);
-*
-*  DESCRIPTION
-*
-*  The routine xcalloc allocates a memory block of (n*size) bytes long.
-*
-*  Note that being allocated the memory block contains arbitrary data
-*  (not binary zeros).
+*  xlong_t xlneg(xlong_t x);
 *
 *  RETURNS
 *
-*  The routine xcalloc returns a pointer to the allocated memory block.
-*  To free this block the routine xfree (not free!) should be used. */
+*  The routine xlneg returns the difference  0 - x. */
 
-void *xcalloc(int n, int size)
-{     if (n < 1)
-         xfault("xcalloc: n = %d; invalid parameter\n", n);
-      if (size < 1)
-         xfault("xcalloc: size = %d; invalid parameter\n", size);
-      if (n > INT_MAX / size)
-         xfault("xcalloc: n = %d; size = %d; array too big\n", n, size);
-      return xmalloc(n * size);
-}
-
-/***********************************************************************
-*  NAME
-*
-*  xfree - free memory block
-*
-*  SYNOPSIS
-*
-*  #include "glplib.h"
-*  void xfree(void *ptr);
-*
-*  DESCRIPTION
-*
-*  The routine xfree frees a memory block pointed to by ptr, which was
-*  previuosly allocated by the routine xmalloc or xcalloc. */
-
-void xfree(void *ptr)
-{     LIBENV *env = lib_link_env();
-      LIBMEM *desc;
-      int size_of_desc = align_datasize(sizeof(LIBMEM));
-      if (ptr == NULL)
-         xfault("xfree: ptr = %p; null pointer\n", ptr);
-      desc = (void *)((char *)ptr - size_of_desc);
-      if (desc->flag != LIB_MEM_FLAG)
-         xfault("xfree: ptr = %p; invalid pointer\n", ptr);
-      if (env->mem_count == 0 ||
-          ulcmp(env->mem_total, ulset(0, desc->size)) < 0)
-         xfault("xfree: memory allocation error\n");
-      if (desc->prev == NULL)
-         env->mem_ptr = desc->next;
+xlong_t xlneg(xlong_t x)
+{     if (x.lo)
+         x.lo = - x.lo, x.hi = ~x.hi;
       else
-         desc->prev->next = desc->next;
-      if (desc->next == NULL)
-         ;
+         x.hi = - x.hi;
+      return x;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  xladd - add long integers
+*
+*  SYNOPSIS
+*
+*  #include "glplib.h"
+*  xlong_t xladd(xlong_t x, xlong_t y);
+*
+*  RETURNS
+*
+*  The routine xladd returns the sum x + y. */
+
+xlong_t xladd(xlong_t x, xlong_t y)
+{     if ((unsigned int)x.lo <= 0xFFFFFFFF - (unsigned int)y.lo)
+         x.lo += y.lo, x.hi += y.hi;
       else
-         desc->next->prev = desc->prev;
-      env->mem_count--;
-      env->mem_total = ulsub(env->mem_total, ulset(0, desc->size));
-      memset(desc, '?', size_of_desc);
-      free(desc);
-      return;
+         x.lo += y.lo, x.hi += y.hi + 1;
+      return x;
 }
 
 /***********************************************************************
 *  NAME
 *
-*  lib_mem_limit - set memory allocation limit
+*  xlsub - subtract long integers
 *
 *  SYNOPSIS
 *
 *  #include "glplib.h"
-*  void lib_mem_limit(glp_ulong limit);
+*  xlong_t xlsub(xlong_t x, xlong_t y);
 *
-*  DESCRIPTION
+*  RETURNS
 *
-*  The routine lib_mem_limit limits the amount of memory available for
-*  dynamic allocation (in GLPK routines) to limit bytes. */
+*  The routine xlsub returns the difference x - y. */
 
-void lib_mem_limit(glp_ulong limit)
-{     LIBENV *env = lib_link_env();
-      env->mem_limit = limit;
-      return;
+xlong_t xlsub(xlong_t x, xlong_t y)
+{     return
+         xladd(x, xlneg(y));
 }
 
 /***********************************************************************
 *  NAME
 *
-*  lib_mem_usage - get memory usage information
+*  xlcmp - compare long integers
 *
 *  SYNOPSIS
 *
 *  #include "glplib.h"
-*  void lib_mem_usage(int *count, int *cpeak, glp_ulong *total,
-*     glp_ulong *tpeak);
+*  int xlcmp(xlong_t x, xlong_t y);
 *
-*  DESCRIPTION
+*  RETURNS
 *
-*  The routine lib_mem_usage reports some information about utilization
-*  of the memory by GLPK routines. Information is stored to locations
-*  specified by corresponding parameters (see below). Any parameter can
-*  be specified as NULL, in which case corresponding information is not
-*  stored.
-*
-*  *count is the number of the memory blocks currently allocated by the
-*  routines xmalloc and xcalloc (one call to xmalloc or xcalloc results
-*  in allocating one memory block).
-*
-*  *cpeak is the peak value of *count reached since the initialization
-*  of the GLPK library environment.
-*
-*  *total is the total amount, in bytes, of the memory blocks currently
-*  allocated by the routines xmalloc and xcalloc.
-*
-*  *tpeak is the peak value of *total reached since the initialization
-*  of the GLPK library envirionment. */
+*  The routine xlcmp returns the sign of the difference x - y. */
 
-void lib_mem_usage(int *count, int *cpeak, glp_ulong *total,
-      glp_ulong *tpeak)
-{     LIBENV *env = lib_link_env();
-      if (count != NULL) *count = env->mem_count;
-      if (cpeak != NULL) *cpeak = env->mem_cpeak;
-      if (total != NULL) *total = env->mem_total;
-      if (tpeak != NULL) *tpeak = env->mem_tpeak;
-      return;
+int xlcmp(xlong_t x, xlong_t y)
+{     if (x.hi >= 0 && y.hi <  0) return +1;
+      if (x.hi <  0 && y.hi >= 0) return -1;
+      if ((unsigned int)x.hi < (unsigned int)y.hi) return -1;
+      if ((unsigned int)x.hi > (unsigned int)y.hi) return +1;
+      if ((unsigned int)x.lo < (unsigned int)y.lo) return -1;
+      if ((unsigned int)x.lo > (unsigned int)y.lo) return +1;
+      return 0;
 }
+
+/***********************************************************************
+*  NAME
+*
+*  xlmul - multiply long integers
+*
+*  SYNOPSIS
+*
+*  #include "glplib.h"
+*  xlong_t xlmul(xlong_t x, xlong_t y);
+*
+*  RETURNS
+*
+*  The routine xlmul returns the product x * y. */
+
+xlong_t xlmul(xlong_t x, xlong_t y)
+{     unsigned short xx[8], yy[4];
+      xx[4] = (unsigned short)x.lo;
+      xx[5] = (unsigned short)(x.lo >> 16);
+      xx[6] = (unsigned short)x.hi;
+      xx[7] = (unsigned short)(x.hi >> 16);
+      yy[0] = (unsigned short)y.lo;
+      yy[1] = (unsigned short)(y.lo >> 16);
+      yy[2] = (unsigned short)y.hi;
+      yy[3] = (unsigned short)(y.hi >> 16);
+      bigmul(4, 4, xx, yy);
+      x.lo = (unsigned int)xx[0] | ((unsigned int)xx[1] << 16);
+      x.hi = (unsigned int)xx[2] | ((unsigned int)xx[3] << 16);
+      return x;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  xldiv - divide long integers
+*
+*  SYNOPSIS
+*
+*  #include "glplib.h"
+*  xldiv_t xldiv(xlong_t x, xlong_t y);
+*
+*  RETURNS
+*
+*  The routine xldiv returns a structure of type xldiv_t containing
+*  members quot (the quotient) and rem (the remainder), both of type
+*  xlong_t. */
+
+xldiv_t xldiv(xlong_t x, xlong_t y)
+{     xldiv_t t;
+      int m, sx, sy;
+      unsigned short xx[8], yy[4];
+      /* sx := sign(x) */
+      sx = (x.hi < 0);
+      /* sy := sign(y) */
+      sy = (y.hi < 0);
+      /* x := |x| */
+      if (sx) x = xlneg(x);
+      /* y := |y| */
+      if (sy) y = xlneg(y);
+      /* compute x div y and x mod y */
+      xx[0] = (unsigned short)x.lo;
+      xx[1] = (unsigned short)(x.lo >> 16);
+      xx[2] = (unsigned short)x.hi;
+      xx[3] = (unsigned short)(x.hi >> 16);
+      yy[0] = (unsigned short)y.lo;
+      yy[1] = (unsigned short)(y.lo >> 16);
+      yy[2] = (unsigned short)y.hi;
+      yy[3] = (unsigned short)(y.hi >> 16);
+      if (yy[3])
+         m = 4;
+      else if (yy[2])
+         m = 3;
+      else if (yy[1])
+         m = 2;
+      else if (yy[0])
+         m = 1;
+      else
+         xerror("xldiv: divide by zero\n");
+      bigdiv(4 - m, m, xx, yy);
+      /* remainder in x[0], x[1], ..., x[m-1] */
+      t.rem.lo = (unsigned int)xx[0], t.rem.hi = 0;
+      if (m >= 2) t.rem.lo |= (unsigned int)xx[1] << 16;
+      if (m >= 3) t.rem.hi = (unsigned int)xx[2];
+      if (m >= 4) t.rem.hi |= (unsigned int)xx[3] << 16;
+      if (sx) t.rem = xlneg(t.rem);
+      /* quotient in x[m], x[m+1], ..., x[4] */
+      t.quot.lo = (unsigned int)xx[m], t.quot.hi = 0;
+      if (m <= 3) t.quot.lo |= (unsigned int)xx[m+1] << 16;
+      if (m <= 2) t.quot.hi = (unsigned int)xx[m+2];
+      if (m <= 1) t.quot.hi |= (unsigned int)xx[m+3] << 16;
+      if (sx ^ sy) t.quot = xlneg(t.quot);
+      return t;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  xltod - convert long integer to double
+*
+*  SYNOPSIS
+*
+*  #include "glplib.h"
+*  double xltod(xlong_t x);
+*
+*  RETURNS
+*
+*  The routine xltod returns x converted to double. */
+
+double xltod(xlong_t x)
+{     double s, z;
+      if (x.hi >= 0)
+         s = +1.0;
+      else
+         s = -1.0, x = xlneg(x);
+      if (x.hi >= 0)
+         z = 4294967296.0 * (double)x.hi + (double)(unsigned int)x.lo;
+      else
+      {  xassert(x.hi == 0x80000000 && x.lo == 0x00000000);
+         z = 9223372036854775808.0; /* 2^63 */
+      }
+      return s * z;
+}
+
+char *xltoa(xlong_t x, char *s)
+{     /* convert long integer to character string */
+      static const char *d = "0123456789";
+      xldiv_t t;
+      int neg, len;
+      if (x.hi >= 0)
+         neg = 0;
+      else
+         neg = 1, x = xlneg(x);
+      if (x.hi >= 0)
+      {  len = 0;
+         while (!(x.hi == 0 && x.lo == 0))
+         {  t = xldiv(x, xlset(10));
+            xassert(0 <= t.rem.lo && t.rem.lo <= 9);
+            s[len++] = d[t.rem.lo];
+            x = t.quot;
+         }
+         if (len == 0) s[len++] = d[0];
+         if (neg) s[len++] = '-';
+         s[len] = '\0';
+         strrev(s);
+      }
+      else
+         strcpy(s, "-9223372036854775808"); /* -2^63 */
+      return s;
+}
+
+/**********************************************************************/
+
+#if 0
+#include "glprng.h"
+
+#define N_TEST 1000000
+/* number of tests */
+
+static xlong_t myrand(RNG *rand)
+{     xlong_t x;
+      int k;
+      k = rng_unif_rand(rand, 4);
+      xassert(0 <= k && k <= 3);
+      x.lo = rng_unif_rand(rand, 65536);
+      if (k == 1 || k == 3)
+      {  x.lo <<= 16;
+         x.lo += rng_unif_rand(rand, 65536);
+      }
+      if (k <= 1)
+         x.hi = 0;
+      else
+         x.hi = rng_unif_rand(rand, 65536);
+      if (k == 3)
+      {  x.hi <<= 16;
+         x.hi += rng_unif_rand(rand, 65536);
+      }
+      if (rng_unif_rand(rand, 2)) x = xlneg(x);
+      return x;
+}
+
+int main(void)
+{     RNG *rand;
+      xlong_t x, y;
+      xldiv_t z;
+      int test;
+      rand = rng_create_rand();
+      for (test = 1; test <= N_TEST; test++)
+      {  x = myrand(rand);
+         y = myrand(rand);
+         if (y.lo == 0 && y.hi == 0) y.lo = 1;
+         /* z.quot := x div y, z.rem := x mod y */
+         z = xldiv(x, y);
+         /* x must be equal to y * z.quot + z.rem */
+         xassert(xlcmp(x, xladd(xlmul(y, z.quot), z.rem)) == 0);
+      }
+      xprintf("%d tests successfully passed\n", N_TEST);
+      rng_delete_rand(rand);
+      return 0;
+}
+#endif
 
 /* eof */

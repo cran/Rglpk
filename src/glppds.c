@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,13 +21,16 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_ERRNO
+#define _GLPSTD_STDIO
 #include "glppds.h"
+#define xfault xerror
 
 PDS *pds_open_file(const char *fname)
 {     /* open plain data stream */
       PDS *pds = NULL;
       FILE *fp;
-      fp = xfopen(fname, "r");
+      fp = fopen(fname, "r");
       if (fp == NULL) goto done;
       pds = xmalloc(sizeof(PDS));
       pds->fname = xmalloc(strlen(fname)+1);
@@ -77,13 +80,14 @@ void pds_warning(PDS *pds, const char *fmt, ...)
 
 static void scan_char(PDS *pds)
 {     /* scan character from plain data stream */
+      FILE *fp = pds->fp;
       int c;
       if (pds->c == EOF) goto done;
       if (pds->c == '\n') pds->count++;
-      c = fgetc(pds->fp);
-      if (ferror(pds->fp))
+      c = fgetc(fp);
+      if (ferror(fp))
          pds_error(pds, "read error - %s\n", strerror(errno));
-      if (feof(pds->fp))
+      if (feof(fp))
       {  if (pds->c == '\n')
          {  pds->count--;
             c = EOF;
@@ -221,7 +225,7 @@ double pds_scan_num(PDS *pds)
 
 void pds_close_file(PDS *pds)
 {     /* close plain data stream */
-      xfclose(pds->fp);
+      fclose(pds->fp);
       xfree(pds->fname);
       xfree(pds);
       return;

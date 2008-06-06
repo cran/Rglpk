@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -26,72 +26,23 @@
 
 #include "glpstd.h"
 
-#define bigmul _glp_lib_bigmul
-void bigmul(int n, int m, unsigned short x[], unsigned short y[]);
-/* multiply unsigned integer numbers of arbitrary precision */
+typedef struct { int lo, hi; } xlong_t;
+/* long integer data type */
 
-#define bigdiv _glp_lib_bigdiv
-void bigdiv(int n, int m, unsigned short x[], unsigned short y[]);
-/* divide unsigned integer numbers of arbitrary precision */
-
-#ifndef _GLP_ULONG
-#define _GLP_ULONG
-typedef struct { unsigned int lo, hi; } glp_ulong;
-/* 64-bit unsigned integer data type */
-#endif
-
-typedef struct { glp_ulong quot, rem; } glp_uldiv;
-/* result of 64-bit unsigned integer division */
-
-#define ulset _glp_lib_ulset
-glp_ulong ulset(unsigned int hi, unsigned int lo);
-/* construct an unsigned long integer */
-
-#define uladd _glp_lib_uladd
-glp_ulong uladd(glp_ulong x, glp_ulong y);
-/* add unsigned long integers */
-
-#define ulsub _glp_lib_ulsub
-glp_ulong ulsub(glp_ulong x, glp_ulong y);
-/* subtract unsigned long integers */
-
-#define ulcmp _glp_lib_ulcmp
-int ulcmp(glp_ulong x, glp_ulong y);
-/* compare unsigned long integers */
-
-#define ulmul _glp_lib_ulmul
-glp_ulong ulmul(glp_ulong x, glp_ulong y);
-/* multiply unsigned long integers */
-
-#define uldiv _glp_lib_uldiv
-glp_uldiv uldiv(glp_ulong x, glp_ulong y);
-/* divide unsigned long integers */
-
-#define ultoa _glp_lib_ultoa
-char *ultoa(glp_ulong x, char *s, int radix);
-/* convert unsigned long integer to character string */
-
-#define lib_set_ptr _glp_lib_set_ptr
-void lib_set_ptr(void *ptr);
-/* store global pointer in TLS */
-
-#define lib_get_ptr _glp_lib_get_ptr
-void *lib_get_ptr(void);
-/* retrieve global pointer from TLS */
+typedef struct { xlong_t quot, rem; } xldiv_t;
+/* result of long integer division */
 
 typedef struct LIBENV LIBENV;
 typedef struct LIBMEM LIBMEM;
-
-#define LIB_MAX_OPEN 20
-/* maximal number of simultaneously open streams */
+typedef struct XFILE XFILE;
 
 struct LIBENV
-{     /* library environmental block */
+{     /* library environment block */
       char version[7+1];
       /* version string returned by the routine glp_version */
       /*--------------------------------------------------------------*/
       /* memory allocation */
-      glp_ulong mem_limit;
+      xlong_t mem_limit;
       /* maximal amount of memory (in bytes) available for dynamic
          allocation */
       LIBMEM *mem_ptr;
@@ -100,10 +51,10 @@ struct LIBENV
       /* total number of currently allocated memory blocks */
       int mem_cpeak;
       /* peak value of mem_count */
-      glp_ulong mem_total;
+      xlong_t mem_total;
       /* total amount of currently allocated memory (in bytes; is the
          sum of the size field over all memory block descriptors) */
-      glp_ulong mem_tpeak;
+      xlong_t mem_tpeak;
       /* peak value of mem_total */
       /*--------------------------------------------------------------*/
       /* terminal output */
@@ -115,12 +66,22 @@ struct LIBENV
       /* transit pointer passed to the routine term_hook */
       /*--------------------------------------------------------------*/
       /* input/output streams */
-      FILE *file_slot[LIB_MAX_OPEN];
-      /* file_slot[k], 0 <= k <= LIB_MAX_OPEN-1, is a pointer to k-th
-         stream; file_slot[k] = NULL means that k-th slot is free */
-      FILE *log_file;
+      char err_msg[1000+1];
+      XFILE *file_ptr;
+      /* pointer to the linked list of active stream descriptors */
+      void *log_file; /* FILE *log_file; */
       /* output stream used to hardcopy all terminal output; NULL means
          no hardcopying */
+      const char *err_file;
+      int err_line;
+      /*--------------------------------------------------------------*/
+      /* standard time */
+      xlong_t t_init, t_last;
+      char c_init[sizeof(double)]; /* clock_t c_init; */
+      /*--------------------------------------------------------------*/
+      /* shared libraries */
+      void *h_odbc;  /* handle to ODBC shared library */
+      void *h_mysql; /* handle to MySQL shared library */
 };
 
 #define LIB_MEM_FLAG 0x20101960
@@ -138,13 +99,81 @@ struct LIBMEM
       /* pointer to next memory block descriptor */
 };
 
+struct XFILE
+{     /* input/output stream descriptor */
+      int type;
+      /* stream handle type: */
+#define FH_FILE   0x11  /* FILE   */
+#define FH_ZLIB   0x22  /* gzFile */
+      void *fh;
+      /* pointer to stream handle */
+      XFILE *prev;
+      /* pointer to previous stream descriptor */
+      XFILE *next;
+      /* pointer to next stream descriptor */
+};
+
+#define XEOF (-1)
+
+#define bigmul _glp_lib_bigmul
+void bigmul(int n, int m, unsigned short x[], unsigned short y[]);
+/* multiply unsigned integer numbers of arbitrary precision */
+
+#define bigdiv _glp_lib_bigdiv
+void bigdiv(int n, int m, unsigned short x[], unsigned short y[]);
+/* divide unsigned integer numbers of arbitrary precision */
+
+#define xlset _glp_lib_xlset
+xlong_t xlset(int x);
+/* expand integer to long integer */
+
+#define xlneg _glp_lib_xlneg
+xlong_t xlneg(xlong_t x);
+/* negate long integer */
+
+#define xladd _glp_lib_xladd
+xlong_t xladd(xlong_t x, xlong_t y);
+/* add long integers */
+
+#define xlsub _glp_lib_xlsub
+xlong_t xlsub(xlong_t x, xlong_t y);
+/* subtract long integers */
+
+#define xlcmp _glp_lib_xlcmp
+int xlcmp(xlong_t x, xlong_t y);
+/* compare long integers */
+
+#define xlmul _glp_lib_xlmul
+xlong_t xlmul(xlong_t x, xlong_t y);
+/* multiply long integers */
+
+#define xldiv _glp_lib_xldiv
+xldiv_t xldiv(xlong_t x, xlong_t y);
+/* divide long integers */
+
+#define xltod _glp_lib_xltod
+double xltod(xlong_t x);
+/* convert long integer to double */
+
+#define xltoa _glp_lib_xltoa
+char *xltoa(xlong_t x, char *s);
+/* convert long integer to character string */
+
+#define lib_set_ptr _glp_lib_set_ptr
+void lib_set_ptr(void *ptr);
+/* store global pointer in TLS */
+
+#define lib_get_ptr _glp_lib_get_ptr
+void *lib_get_ptr(void);
+/* retrieve global pointer from TLS */
+
 #define lib_init_env _glp_lib_init_env
 int lib_init_env(void);
 /* initialize library environment */
 
 #define lib_link_env _glp_lib_link_env
 LIBENV *lib_link_env(void);
-/* retrieve pointer to library environmental block */
+/* retrieve pointer to library environment block */
 
 #define lib_version _glp_lib_version
 const char *lib_version(void);
@@ -154,17 +183,21 @@ const char *lib_version(void);
 int lib_free_env(void);
 /* free library environment */
 
-#define xputs _glp_lib_xputs
-void xputs(const char *s);
-/* write character string to the terminal */
+#define xgetc _glp_lib_xgetc
+int xgetc(void);
+/* read character from the terminal */
+
+#define xputc _glp_lib_xputc
+void xputc(int c);
+/* write character to the terminal */
 
 #define xprintf _glp_lib_xprintf
 void xprintf(const char *fmt, ...);
 /* write formatted output to the terminal */
 
-#define xprint1 _glp_lib_xprint1
-void xprint1(const char *fmt, ...);
-/* (obsolete) */
+#define xvprintf _glp_lib_xvprintf
+void xvprintf(const char *fmt, va_list arg);
+/* write formatted output to the terminal */
 
 #define lib_term_hook _glp_lib_term_hook
 void lib_term_hook(int (*func)(void *info, const char *s), void *info);
@@ -174,22 +207,31 @@ void lib_term_hook(int (*func)(void *info, const char *s), void *info);
 void lib_print_hook(int (*func)(void *info, char *buf), void *info);
 /* (obsolete) */
 
-#define xfault _glp_lib_xfault
-void xfault(const char *fmt, ...);
+#if 0
+#define xerror _glp_lib_xerror
+void xerror(const char *fmt, ...);
 /* display error message and terminate execution */
+#else
+#define xerror lib_xerror1(__FILE__, __LINE__)
 
-#define xfault1 _glp_lib_xfault1
-void xfault1(const char *fmt, ...);
-/* (obsolete) */
+typedef void (*xerror_t)(const char *fmt, ...);
+
+#define lib_xerror1 _glp_lib_xerror1
+xerror_t lib_xerror1(const char *file, int line);
+
+#define lib_xerror2 _glp_lib_xerror2
+void lib_xerror2(const char *fmt, ...);
+#endif
 
 #define lib_fault_hook _glp_lib_fault_hook
 void lib_fault_hook(int (*func)(void *info, char *buf), void *info);
 /* (obsolete) */
 
 #define xassert(expr) \
-      ((void)((expr) || (_xassert(#expr, __FILE__, __LINE__), 1)))
-#define _xassert _glp_lib_xassert
-void _xassert(const char *expr, const char *file, int line);
+      ((void)((expr) || (lib_xassert(#expr, __FILE__, __LINE__), 1)))
+
+#define lib_xassert _glp_lib_xassert
+void lib_xassert(const char *expr, const char *file, int line);
 /* check for logical condition */
 
 /* some processors need data to be properly aligned; the macro
@@ -215,21 +257,48 @@ void xfree(void *ptr);
 /* free memory block */
 
 #define lib_mem_limit _glp_lib_mem_limit
-void lib_mem_limit(glp_ulong limit);
+void lib_mem_limit(xlong_t limit);
 /* set memory allocation limit */
 
 #define lib_mem_usage _glp_lib_mem_usage
-void lib_mem_usage(int *count, int *cpeak, glp_ulong *total,
-      glp_ulong *tpeak);
+void lib_mem_usage(int *count, int *cpeak, xlong_t *total,
+      xlong_t *tpeak);
 /* get memory usage information */
 
+#define lib_err_msg _glp_lib_err_msg
+void lib_err_msg(const char *msg);
+
+#define xerrmsg _glp_lib_xerrmsg
+const char *xerrmsg(void);
+
 #define xfopen _glp_lib_xfopen
-FILE *xfopen(const char *fname, const char *mode);
-/* open file */
+XFILE *xfopen(const char *fname, const char *mode);
+
+#define xferror _glp_lib_xferror
+int xferror(XFILE *file);
+
+#define xfeof _glp_lib_xfeof
+int xfeof(XFILE *file);
+
+#define xfgetc _glp_lib_xfgetc
+int xfgetc(XFILE *file);
+
+#define xfputc _glp_lib_xfputc
+int xfputc(int c, XFILE *file);
+
+#define xfflush _glp_lib_xfflush
+int xfflush(XFILE *fp);
 
 #define xfclose _glp_lib_xfclose
-void xfclose(FILE *fp);
-/* close file */
+int xfclose(XFILE *file);
+
+#define lib_doprnt _glp_lib_doprnt
+int lib_doprnt(int (*func)(void *info, int c), void *info, const char
+      *fmt, va_list arg);
+/* perform formatted output (basic routine) */
+
+#define xfprintf _glp_lib_xfprintf
+int xfprintf(XFILE *file, const char *fmt, ...);
 
 #define lib_open_log _glp_lib_open_log
 int lib_open_log(const char *fname);
@@ -239,13 +308,24 @@ int lib_open_log(const char *fname);
 int lib_close_log(void);
 /* close hardcopy file */
 
+#if 0
+#define xtime1 _glp_lib_xtime1
+glp_ulong xtime1(void);
+/* determine the current universal time */
+#endif
+
+#if 0
+#define xdifftime1 _glp_lib_xdifftime1
+double xdifftime1(glp_ulong t1, glp_ulong t0);
+/* compute the difference between two time values */
+#endif
+
 #define xtime _glp_lib_xtime
-glp_ulong xtime(void);
+xlong_t xtime(void);
 /* determine the current universal time */
 
 #define xdifftime _glp_lib_xdifftime
-double xdifftime(glp_ulong t1, glp_ulong t0);
-/* compute the difference between two time values */
+double xdifftime(xlong_t t1, xlong_t t0);
 
 #define str2int _glp_lib_str2int
 int str2int(const char *str, int *val);
@@ -270,6 +350,23 @@ char *strrev(char *s);
 #define fp2rat _glp_lib_fp2rat
 int fp2rat(double x, double eps, double *p, double *q);
 /* convert floating-point number to rational number */
+
+#define jday _glp_lib_jday
+int jday(int d, int m, int y);
+/* convert calendar date to Julian day number */
+
+#define jdate _glp_lib_jdate
+void jdate(int j, int *d, int *m, int *y);
+/* convert Julian day number to calendar date */
+
+#define xdlopen _glp_xdlopen
+void *xdlopen(const char *module);
+
+#define xdlsym _glp_xdlsym
+void *xdlsym(void *h, const char *symbol);
+
+#define xdlclose _glp_xdlclose
+void xdlclose(void *h);
 
 #endif
 

@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,9 +21,10 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_ERRNO
+#define _GLPSTD_STDIO
 #include "glplib.h"
 #include "glpmpl.h"
-#define print xprint1
 
 /**********************************************************************/
 /* * *                   FLOATING-POINT NUMBERS                   * * */
@@ -403,6 +404,7 @@ STRING *create_string
 (     MPL *mpl,
       char buf[MAX_LENGTH+1]  /* not changed */
 )
+#if 0
 {     STRING *head, *tail;
       int i, j;
       xassert(buf != NULL);
@@ -416,6 +418,14 @@ tail = (tail->next = dmp_get_atom(mpl->strings, sizeof(STRING))), j = 0;
       tail->next = NULL;
       return head;
 }
+#else
+{     STRING *str;
+      xassert(strlen(buf) <= MAX_LENGTH);
+      str = dmp_get_atom(mpl->strings, strlen(buf)+1);
+      strcpy(str, buf);
+      return str;
+}
+#endif
 
 /*----------------------------------------------------------------------
 -- copy_string - make copy of character string.
@@ -426,6 +436,7 @@ STRING *copy_string
 (     MPL *mpl,
       STRING *str             /* not changed */
 )
+#if 0
 {     STRING *head, *tail;
       xassert(str != NULL);
       head = tail = dmp_get_atom(mpl->strings, sizeof(STRING));
@@ -437,6 +448,11 @@ tail = (tail->next = dmp_get_atom(mpl->strings, sizeof(STRING)));
       tail->next = NULL;
       return head;
 }
+#else
+{     xassert(mpl == mpl);
+      return create_string(mpl, str);
+}
+#endif
 
 /*----------------------------------------------------------------------
 -- compare_strings - compare one character string with another.
@@ -453,6 +469,7 @@ int compare_strings
       STRING *str1,           /* not changed */
       STRING *str2            /* not changed */
 )
+#if 0
 {     int j, c1, c2;
       xassert(mpl == mpl);
       for (;; str1 = str1->next, str2 = str2->next)
@@ -468,6 +485,11 @@ int compare_strings
       }
 done: return 0;
 }
+#else
+{     xassert(mpl == mpl);
+      return strcmp(str1, str2);
+}
+#endif
 
 /*----------------------------------------------------------------------
 -- fetch_string - extract content of character string.
@@ -480,6 +502,7 @@ char *fetch_string
       STRING *str,            /* not changed */
       char buf[MAX_LENGTH+1]  /* modified */
 )
+#if 0
 {     int i, j;
       xassert(mpl == mpl);
       xassert(buf != NULL);
@@ -491,6 +514,11 @@ char *fetch_string
 done: xassert(strlen(buf) <= MAX_LENGTH);
       return buf;
 }
+#else
+{     xassert(mpl == mpl);
+      return strcpy(buf, str);
+}
+#endif
 
 /*----------------------------------------------------------------------
 -- delete_string - delete character string.
@@ -501,6 +529,7 @@ void delete_string
 (     MPL *mpl,
       STRING *str             /* destroyed */
 )
+#if 0
 {     STRING *temp;
       xassert(str != NULL);
       while (str != NULL)
@@ -510,6 +539,11 @@ void delete_string
       }
       return;
 }
+#else
+{     dmp_free_atom(mpl->strings, str, strlen(str)+1);
+      return;
+}
+#endif
 
 /**********************************************************************/
 /* * *                          SYMBOLS                           * * */
@@ -4627,6 +4661,376 @@ void clean_code(MPL *mpl, CODE *code)
 done: return;
 }
 
+#if 1 /* 11/II-2008 */
+/**********************************************************************/
+/* * *                        DATA TABLES                         * * */
+/**********************************************************************/
+
+int mpl_tab_num_args(TABDCA *dca)
+{     /* returns the number of arguments */
+      return dca->na;
+}
+
+const char *mpl_tab_get_arg(TABDCA *dca, int k)
+{     /* returns pointer to k-th argument */
+      xassert(1 <= k && k <= dca->na);
+      return dca->arg[k];
+}
+
+int mpl_tab_num_flds(TABDCA *dca)
+{     /* returns the number of fields */
+      return dca->nf;
+}
+
+const char *mpl_tab_get_name(TABDCA *dca, int k)
+{     /* returns pointer to name of k-th field */
+      xassert(1 <= k && k <= dca->nf);
+      return dca->name[k];
+}
+
+int mpl_tab_get_type(TABDCA *dca, int k)
+{     /* returns type of k-th field */
+      xassert(1 <= k && k <= dca->nf);
+      return dca->type[k];
+}
+
+double mpl_tab_get_num(TABDCA *dca, int k)
+{     /* returns numeric value of k-th field */
+      xassert(1 <= k && k <= dca->nf);
+      xassert(dca->type[k] == 'N');
+      return dca->num[k];
+}
+
+const char *mpl_tab_get_str(TABDCA *dca, int k)
+{     /* returns pointer to string value of k-th field */
+      xassert(1 <= k && k <= dca->nf);
+      xassert(dca->type[k] == 'S');
+      xassert(dca->str[k] != NULL);
+      return dca->str[k];
+}
+
+void mpl_tab_set_num(TABDCA *dca, int k, double num)
+{     /* assign numeric value to k-th field */
+      xassert(1 <= k && k <= dca->nf);
+      xassert(dca->type[k] == '?');
+      dca->type[k] = 'N';
+      dca->num[k] = num;
+      return;
+}
+
+void mpl_tab_set_str(TABDCA *dca, int k, const char *str)
+{     /* assign string value to k-th field */
+      xassert(1 <= k && k <= dca->nf);
+      xassert(dca->type[k] == '?');
+      xassert(strlen(str) <= MAX_LENGTH);
+      xassert(dca->str[k] != NULL);
+      dca->type[k] = 'S';
+      strcpy(dca->str[k], str);
+      return;
+}
+
+static int write_func(MPL *mpl, void *info)
+{     /* this is auxiliary routine to work within domain scope */
+      TABLE *tab = info;
+      TABDCA *dca = mpl->dca;
+      TABOUT *out;
+      SYMBOL *sym;
+      int k;
+      char buf[MAX_LENGTH+1];
+      /* evaluate field values */
+      k = 0;
+      for (out = tab->u.out.list; out != NULL; out = out->next)
+      {  k++;
+         switch (out->code->type)
+         {  case A_NUMERIC:
+               dca->type[k] = 'N';
+               dca->num[k] = eval_numeric(mpl, out->code);
+               dca->str[k][0] = '\0';
+               break;
+            case A_SYMBOLIC:
+               sym = eval_symbolic(mpl, out->code);
+               if (sym->str == NULL)
+               {  dca->type[k] = 'N';
+                  dca->num[k] = sym->num;
+                  dca->str[k][0] = '\0';
+               }
+               else
+               {  dca->type[k] = 'S';
+                  dca->num[k] = 0.0;
+                  fetch_string(mpl, sym->str, buf);
+                  strcpy(dca->str[k], buf);
+               }
+               delete_symbol(mpl, sym);
+               break;
+            default:
+               xassert(out != out);
+         }
+      }
+      /* write record to output table */
+      mpl_tab_drv_write(mpl);
+      return 0;
+}
+
+void execute_table(MPL *mpl, TABLE *tab)
+{     /* execute table statement */
+      TABARG *arg;
+      TABFLD *fld;
+      TABIN *in;
+      TABOUT *out;
+      TABDCA *dca;
+      SET *set;
+      int k;
+      char buf[MAX_LENGTH+1];
+      /* allocate table driver communication area */
+      xassert(mpl->dca == NULL);
+      mpl->dca = dca = xmalloc(sizeof(TABDCA));
+      dca->id = 0;
+      dca->link = NULL;
+      dca->na = 0;
+      dca->arg = NULL;
+      dca->nf = 0;
+      dca->name = NULL;
+      dca->type = NULL;
+      dca->num = NULL;
+      dca->str = NULL;
+      /* allocate arguments */
+      xassert(dca->na == 0);
+      for (arg = tab->arg; arg != NULL; arg = arg->next)
+         dca->na++;
+      dca->arg = xcalloc(1+dca->na, sizeof(char *));
+      /* evaluate argument values */
+      k = 0;
+      for (arg = tab->arg; arg != NULL; arg = arg->next)
+      {  SYMBOL *sym;
+         k++;
+         xassert(arg->code->type == A_SYMBOLIC);
+         sym = eval_symbolic(mpl, arg->code);
+         if (sym->str == NULL)
+            sprintf(buf, "%.*g", DBL_DIG, sym->num);
+         else
+            fetch_string(mpl, sym->str, buf);
+         delete_symbol(mpl, sym);
+         dca->arg[k] = xmalloc(strlen(buf)+1);
+         strcpy(dca->arg[k], buf);
+      }
+      /* perform table input/output */
+      switch (tab->type)
+      {  case A_INPUT:  goto read_table;
+         case A_OUTPUT: goto write_table;
+         default:       xassert(tab != tab);
+      }
+read_table:
+      /* read data from input table */
+      /* add the only member to the control set and assign it empty
+         elemental set */
+      set = tab->u.in.set;
+      if (set != NULL)
+      {  if (set->data)
+            error(mpl, "%s already provided with data", set->name);
+         xassert(set->array->head == NULL);
+         add_member(mpl, set->array, NULL)->value.set =
+            create_elemset(mpl, set->dimen);
+         set->data = 1;
+      }
+      /* check parameters specified in the input list */
+      for (in = tab->u.in.list; in != NULL; in = in->next)
+      {  if (in->par->data)
+            error(mpl, "%s already provided with data", in->par->name);
+         in->par->data = 1;
+      }
+      /* allocate and initialize fields */
+      xassert(dca->nf == 0);
+      for (fld = tab->u.in.fld; fld != NULL; fld = fld->next)
+         dca->nf++;
+      for (in = tab->u.in.list; in != NULL; in = in->next)
+         dca->nf++;
+      dca->name = xcalloc(1+dca->nf, sizeof(char *));
+      dca->type = xcalloc(1+dca->nf, sizeof(int));
+      dca->num = xcalloc(1+dca->nf, sizeof(double));
+      dca->str = xcalloc(1+dca->nf, sizeof(char *));
+      k = 0;
+      for (fld = tab->u.in.fld; fld != NULL; fld = fld->next)
+      {  k++;
+         dca->name[k] = fld->name;
+         dca->type[k] = '?';
+         dca->num[k] = 0.0;
+         dca->str[k] = xmalloc(MAX_LENGTH+1);
+         dca->str[k][0] = '\0';
+      }
+      for (in = tab->u.in.list; in != NULL; in = in->next)
+      {  k++;
+         dca->name[k] = in->name;
+         dca->type[k] = '?';
+         dca->num[k] = 0.0;
+         dca->str[k] = xmalloc(MAX_LENGTH+1);
+         dca->str[k][0] = '\0';
+      }
+      /* open input table */
+      mpl_tab_drv_open(mpl, 'R');
+      /* read and process records */
+      for (;;)
+      {  TUPLE *tup;
+         /* reset field types */
+         for (k = 1; k <= dca->nf; k++)
+            dca->type[k] = '?';
+         /* read next record */
+         if (mpl_tab_drv_read(mpl)) break;
+         /* all fields must be set by the driver */
+         for (k = 1; k <= dca->nf; k++)
+         {  if (dca->type[k] == '?')
+               error(mpl, "field %s missing in input table",
+                  dca->name[k]);
+         }
+         /* construct n-tuple */
+         tup = create_tuple(mpl);
+         k = 0;
+         for (fld = tab->u.in.fld; fld != NULL; fld = fld->next)
+         {  k++;
+            xassert(k <= dca->nf);
+            switch (dca->type[k])
+            {  case 'N':
+                  tup = expand_tuple(mpl, tup, create_symbol_num(mpl,
+                     dca->num[k]));
+                  break;
+               case 'S':
+                  xassert(strlen(dca->str[k]) <= MAX_LENGTH);
+                  tup = expand_tuple(mpl, tup, create_symbol_str(mpl,
+                     create_string(mpl, dca->str[k])));
+                  break;
+               default:
+                  xassert(dca != dca);
+            }
+         }
+         /* add n-tuple just read to the control set */
+         if (tab->u.in.set != NULL)
+            check_then_add(mpl, tab->u.in.set->array->head->value.set,
+               copy_tuple(mpl, tup));
+         /* assign values to the parameters in the input list */
+         for (in = tab->u.in.list; in != NULL; in = in->next)
+         {  MEMBER *memb;
+            k++;
+            xassert(k <= dca->nf);
+            /* there must be no member with the same n-tuple */
+            if (find_member(mpl, in->par->array, tup) != NULL)
+               error(mpl, "%s%s already defined", in->par->name,
+               format_tuple(mpl, '[', tup));
+            /* create new parameter member with given n-tuple */
+            memb = add_member(mpl, in->par->array, copy_tuple(mpl, tup))
+               ;
+            /* assign value to the parameter member */
+            switch (in->par->type)
+            {  case A_NUMERIC:
+               case A_INTEGER:
+               case A_BINARY:
+                  if (dca->type[k] != 'N')
+                     error(mpl, "%s requires numeric data",
+                        in->par->name);
+                  memb->value.num = dca->num[k];
+                  break;
+               case A_SYMBOLIC:
+                  switch (dca->type[k])
+                  {  case 'N':
+                        memb->value.sym = create_symbol_num(mpl,
+                           dca->num[k]);
+                        break;
+                     case 'S':
+                        xassert(strlen(dca->str[k]) <= MAX_LENGTH);
+                        memb->value.sym = create_symbol_str(mpl,
+                           create_string(mpl,dca->str[k]));
+                        break;
+                     default:
+                        xassert(dca != dca);
+                  }
+                  break;
+               default:
+                  xassert(in != in);
+            }
+         }
+         /* n-tuple is no more needed */
+         delete_tuple(mpl, tup);
+      }
+      /* close input table */
+      mpl_tab_drv_close(mpl);
+      goto done;
+write_table:
+      /* write data to output table */
+      /* allocate and initialize fields */
+      xassert(dca->nf == 0);
+      for (out = tab->u.out.list; out != NULL; out = out->next)
+         dca->nf++;
+      dca->name = xcalloc(1+dca->nf, sizeof(char *));
+      dca->type = xcalloc(1+dca->nf, sizeof(int));
+      dca->num = xcalloc(1+dca->nf, sizeof(double));
+      dca->str = xcalloc(1+dca->nf, sizeof(char *));
+      k = 0;
+      for (out = tab->u.out.list; out != NULL; out = out->next)
+      {  k++;
+         dca->name[k] = out->name;
+         dca->type[k] = '?';
+         dca->num[k] = 0.0;
+         dca->str[k] = xmalloc(MAX_LENGTH+1);
+         dca->str[k][0] = '\0';
+      }
+      /* open output table */
+      mpl_tab_drv_open(mpl, 'W');
+      /* evaluate fields and write records */
+      loop_within_domain(mpl, tab->u.out.domain, tab, write_func);
+      /* close output table */
+      mpl_tab_drv_close(mpl);
+done: /* free table driver communication area */
+      free_dca(mpl);
+      return;
+}
+
+void free_dca(MPL *mpl)
+{     /* free table driver communucation area */
+      TABDCA *dca = mpl->dca;
+      int k;
+      if (dca != NULL)
+      {  if (dca->link != NULL)
+            mpl_tab_drv_close(mpl);
+         if (dca->arg != NULL)
+         {  for (k = 1; k <= dca->na; k++)
+               xfree(dca->arg[k]);
+            xfree(dca->arg);
+         }
+         if (dca->name != NULL) xfree(dca->name);
+         if (dca->type != NULL) xfree(dca->type);
+         if (dca->num != NULL) xfree(dca->num);
+         if (dca->str != NULL)
+         {  for (k = 1; k <= dca->nf; k++)
+               xfree(dca->str[k]);
+            xfree(dca->str);
+         }
+         xfree(dca), mpl->dca = NULL;
+      }
+      return;
+}
+
+void clean_table(MPL *mpl, TABLE *tab)
+{     /* clean table statement */
+      TABARG *arg;
+      TABOUT *out;
+      /* clean string list */
+      for (arg = tab->arg; arg != NULL; arg = arg->next)
+         clean_code(mpl, arg->code);
+      switch (tab->type)
+      {  case A_INPUT:
+            break;
+         case A_OUTPUT:
+            /* clean subscript domain */
+            clean_domain(mpl, tab->u.out.domain);
+            /* clean output list */
+            for (out = tab->u.out.list; out != NULL; out = out->next)
+               clean_code(mpl, out->code);
+            break;
+         default:
+            xassert(tab != tab);
+      }
+      return;
+}
+#endif
+
 /**********************************************************************/
 /* * *                      MODEL STATEMENTS                      * * */
 /**********************************************************************/
@@ -5174,7 +5578,7 @@ void execute_printf(MPL *mpl, PRINTF *prt)
 {     if (prt->fname == NULL)
       {  /* switch to the standard output */
          if (mpl->prt_fp != NULL)
-         {  xfclose(mpl->prt_fp), mpl->prt_fp = NULL;
+         {  fclose(mpl->prt_fp), mpl->prt_fp = NULL;
             xfree(mpl->prt_file), mpl->prt_file = NULL;
          }
       }
@@ -5191,12 +5595,12 @@ void execute_printf(MPL *mpl, PRINTF *prt)
          /* close the current print file, if necessary */
          if (mpl->prt_fp != NULL &&
             (!prt->app || strcmp(mpl->prt_file, fname) != 0))
-         {  xfclose(mpl->prt_fp), mpl->prt_fp = NULL;
+         {  fclose(mpl->prt_fp), mpl->prt_fp = NULL;
             xfree(mpl->prt_file), mpl->prt_file = NULL;
          }
          /* open the specified print file, if necessary */
          if (mpl->prt_fp == NULL)
-         {  mpl->prt_fp = xfopen(fname, prt->app ? "a" : "w");
+         {  mpl->prt_fp = fopen(fname, prt->app ? "a" : "w");
             if (mpl->prt_fp == NULL)
                error(mpl, "unable to open `%s' for writing - %s",
                   fname, strerror(errno));
@@ -5289,9 +5693,24 @@ void execute_statement(MPL *mpl, STATEMENT *stmt)
          case A_VARIABLE:
             break;
          case A_CONSTRAINT:
-            print("Generating %s...", stmt->u.con->name);
+            xprintf("Generating %s...\n", stmt->u.con->name);
             eval_whole_con(mpl, stmt->u.con);
             break;
+#if 1 /* 11/II-2008 */
+         case A_TABLE:
+            switch (stmt->u.tab->type)
+            {  case A_INPUT:
+                  xprintf("Reading %s...\n", stmt->u.tab->name);
+                  break;
+               case A_OUTPUT:
+                  xprintf("Writing %s...\n", stmt->u.tab->name);
+                  break;
+               default:
+                  xassert(stmt != stmt);
+            }
+            execute_table(mpl, stmt->u.tab);
+            break;
+#endif
          case A_SOLVE:
             break;
          case A_CHECK:
@@ -5330,6 +5749,10 @@ void clean_statement(MPL *mpl, STATEMENT *stmt)
             clean_variable(mpl, stmt->u.var); break;
          case A_CONSTRAINT:
             clean_constraint(mpl, stmt->u.con); break;
+#if 1 /* 11/II-2008 */
+         case A_TABLE:
+            clean_table(mpl, stmt->u.tab); break;
+#endif
          case A_SOLVE:
             break;
          case A_CHECK:

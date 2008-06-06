@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -22,7 +22,7 @@
 ***********************************************************************/
 
 #include "glpapi.h"
-#include "glplib.h"
+#define xfault xerror
 
 /***********************************************************************
 *  NAME
@@ -189,8 +189,8 @@ void glp_free(void *ptr)
 *
 *  SYNOPSIS
 *
-*  void glp_mem_usage(int *count, int *cpeak, glp_ulong *total,
-*     glp_ulong *tpeak);
+*  void glp_mem_usage(int *count, int *cpeak, glp_long *total,
+*     glp_long *tpeak);
 *
 *  DESCRIPTION
 *
@@ -213,9 +213,12 @@ void glp_free(void *ptr)
 *  *tpeak is the peak value of *total reached since the initialization
 *  of the GLPK library envirionment. */
 
-void glp_mem_usage(int *count, int *cpeak, glp_ulong *total,
-      glp_ulong *tpeak)
-{     lib_mem_usage(count, cpeak, total, tpeak);
+void glp_mem_usage(int *count, int *cpeak, glp_long *total,
+      glp_long *tpeak)
+{     xlong_t total1, tpeak1;
+      lib_mem_usage(count, cpeak, &total1, &tpeak1);
+      if (total != NULL) total->lo = total1.lo, total->hi = total1.hi;
+      if (tpeak != NULL) tpeak->lo = tpeak1.lo, tpeak->hi = tpeak1.hi;
       return;
 }
 
@@ -237,10 +240,11 @@ void glp_mem_limit(int limit)
 {     if (limit < 0)
          xfault("glp_mem_limit: limit = %d; invalid parameter\n",
             limit);
-      lib_mem_limit(ulmul(ulset(0, 1 << 20), ulset(0, limit)));
+      lib_mem_limit(xlmul(xlset(limit), xlset(1 << 20)));
       return;
 }
 
+#if 0
 /***********************************************************************
 *  NAME
 *
@@ -286,6 +290,7 @@ void glp_fclose(FILE *fp)
 {     xfclose(fp);
       return;
 }
+#endif
 
 /***********************************************************************
 *  NAME

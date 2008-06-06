@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -24,7 +24,6 @@
 #include "glpipm.h"
 #include "glplib.h"
 #include "glpmat.h"
-#define print xprint1
 
 /*----------------------------------------------------------------------
 -- ipm_main - solve LP with primal-dual interior-point method.
@@ -234,7 +233,7 @@ static void initialize(struct dsa *dsa, int m, int n, int A_ptr[],
       dsa->A_ptr = A_ptr;
       dsa->A_ind = A_ind;
       dsa->A_val = A_val;
-      print("lpx_interior: A has %d non-zeros", A_ptr[m+1]-1);
+      xprintf("lpx_interior: A has %d non-zeros\n", A_ptr[m+1]-1);
       dsa->b = b;
       dsa->c = c;
       dsa->x = x;
@@ -248,10 +247,10 @@ static void initialize(struct dsa *dsa, int m, int n, int A_ptr[],
       dsa->S_ptr = xcalloc(1+m+1, sizeof(int));
       dsa->S_ind = adat_symbolic(m, n, dsa->P, dsa->A_ptr, dsa->A_ind,
          dsa->S_ptr);
-      print("lpx_interior: S has %d non-zeros (upper triangle)",
+      xprintf("lpx_interior: S has %d non-zeros (upper triangle)\n",
          dsa->S_ptr[m+1]-1 + m);
       /* determine P using minimal degree algorithm */
-      print("lpx_interior: minimal degree ordering...");
+      xprintf("lpx_interior: minimal degree ordering...\n");
       min_degree(m, dsa->S_ptr, dsa->S_ind, dsa->P);
       /* S = P*A*A'*P', symbolically */
       xfree(dsa->S_ind);
@@ -260,10 +259,11 @@ static void initialize(struct dsa *dsa, int m, int n, int A_ptr[],
       dsa->S_val = xcalloc(dsa->S_ptr[m+1], sizeof(double));
       dsa->S_diag = xcalloc(1+m, sizeof(double));
       /* compute Cholesky factorization S = U'*U, symbolically */
-      print("lpx_interior: computing Cholesky factorization...");
+      xprintf("lpx_interior: computing Cholesky factorization...\n");
       dsa->U_ptr = xcalloc(1+m+1, sizeof(int));
       dsa->U_ind = chol_symbolic(m, dsa->S_ptr, dsa->S_ind, dsa->U_ptr);
-      print("lpx_interior: U has %d non-zeros", dsa->U_ptr[m+1]-1 + m);
+      xprintf("lpx_interior: U has %d non-zeros\n",
+         dsa->U_ptr[m+1]-1 + m);
       dsa->U_val = xcalloc(dsa->U_ptr[m+1], sizeof(double));
       dsa->U_diag = xcalloc(1+m, sizeof(double));
       dsa->iter = 0;
@@ -900,10 +900,10 @@ int ipm_main(int m, int n, int A_ptr[], int A_ind[], double A_val[],
       xassert(n > 0);
       initialize(dsa, m, n, A_ptr, A_ind, A_val, b, c, x, y, z);
       /* choose initial point using Mehrotra's heuristic */
-      print("lpx_interior: guessing initial point...");
+      xprintf("lpx_interior: guessing initial point...\n");
       initial_point(dsa);
       /* main loop starts here */
-      print("Optimization begins...");
+      xprintf("Optimization begins...\n");
       for (;;)
       {  /* perform basic computations at the current point */
          basic_info(dsa);
@@ -922,11 +922,11 @@ int ipm_main(int m, int n, int A_ptr[], int A_ind[], double A_val[],
          else
             dsa->phi_min[dsa->iter] = dsa->phi_min[dsa->iter-1];
          /* display information at the current point */
-         print("%3d: obj = %17.9e; rpi = %8.1e; rdi = %8.1e; gap = %8.1"
-            "e", dsa->iter, dsa->obj, dsa->rpi, dsa->rdi, dsa->gap);
+         xprintf("%3d: obj = %17.9e; rpi = %8.1e; rdi = %8.1e; gap = %8"
+            ".1e\n", dsa->iter, dsa->obj, dsa->rpi, dsa->rdi, dsa->gap);
          /* check if the current point is optimal */
          if (dsa->rpi < 1e-8 && dsa->rdi < 1e-8 && dsa->gap < 1e-8)
-         {  print("OPTIMAL SOLUTION FOUND");
+         {  xprintf("OPTIMAL SOLUTION FOUND\n");
             status = 0;
             break;
          }
@@ -934,7 +934,7 @@ int ipm_main(int m, int n, int A_ptr[], int A_ind[], double A_val[],
          temp = 1e5 * dsa->phi_min[dsa->iter];
          if (temp < 1e-8) temp = 1e-8;
          if (dsa->phi >= temp)
-         {  print("PROBLEM HAS NO FEASIBLE PRIMAL OR DUAL SOLUTION");
+         {  xprintf("PROBLEM HAS NO FEASIBLE PRIMAL/DUAL SOLUTION\n");
             status = 1;
             break;
          }
@@ -943,13 +943,13 @@ int ipm_main(int m, int n, int A_ptr[], int A_ind[], double A_val[],
                dsa->rmu0 >= 1e6) ||
                (dsa->iter >= 30 && dsa->phi_min[dsa->iter] >= 0.5 *
                dsa->phi_min[dsa->iter - 30]))
-         {  print("NO CONVERGENCE; SEARCH TERMINATED");
+         {  xprintf("NO CONVERGENCE; SEARCH TERMINATED\n");
             status = 2;
             break;
          }
          /* check for maximal number of iterations */
          if (dsa->iter == ITER_MAX)
-         {  print("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED");
+         {  xprintf("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED\n");
             status = 3;
             break;
          }
@@ -961,7 +961,7 @@ int ipm_main(int m, int n, int A_ptr[], int A_ind[], double A_val[],
          /* compute the next point using Mehrotra's predictor-corrector
             technique */
          if (make_step(dsa))
-         {  print("NUMERIC INSTABILITY; SEARCH TERMINATED");
+         {  xprintf("NUMERIC INSTABILITY; SEARCH TERMINATED\n");
             status = 4;
             break;
          }
@@ -971,7 +971,7 @@ int ipm_main(int m, int n, int A_ptr[], int A_ind[], double A_val[],
       {  for (j = 1; j <= n; j++) dsa->x[j] = dsa->best_x[j];
          for (i = 1; i <= m; i++) dsa->y[i] = dsa->best_y[i];
          for (j = 1; j <= n; j++) dsa->z[j] = dsa->best_z[j];
-         print("The best point %17.9e was reached on iteration %d",
+         xprintf("The best point %17.9e was reached on iteration %d\n",
             dsa->best_obj, dsa->best_iter);
       }
       /* deallocate working area */

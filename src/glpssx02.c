@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -23,7 +23,6 @@
 
 #include "glplib.h"
 #include "glpssx.h"
-#define print xprint1
 
 static void show_progress(SSX *ssx, int phase)
 {     /* this auxiliary routine displays information about progress of
@@ -31,7 +30,7 @@ static void show_progress(SSX *ssx, int phase)
       int i, def = 0;
       for (i = 1; i <= ssx->m; i++)
          if (ssx->type[ssx->Q_col[i]] == SSX_FX) def++;
-      print("%s%6d:   %s = %22.15g   (%d)", phase == 1 ? " " : "*",
+      xprintf("%s%6d:   %s = %22.15g   (%d)\n", phase == 1 ? " " : "*",
          ssx->it_cnt, phase == 1 ? "infsum" : "objval",
          mpq_get_d(ssx->bbar[0]), def);
 #if 0
@@ -381,7 +380,7 @@ int ssx_driver(SSX *ssx)
       ssx->tm_beg = xtime();
       /* factorize the initial basis matrix */
       if (ssx_factorize(ssx))
-      {  print("Initial basis matrix is singular");
+      {  xprintf("Initial basis matrix is singular\n");
          ret = 7;
          goto done;
       }
@@ -419,15 +418,15 @@ int ssx_driver(SSX *ssx)
             ret = 0;
             break;
          case 1:
-            print("PROBLEM HAS NO FEASIBLE SOLUTION");
+            xprintf("PROBLEM HAS NO FEASIBLE SOLUTION\n");
             ret = 1;
             break;
          case 2:
-            print("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED");
+            xprintf("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED\n");
             ret = 3;
             break;
          case 3:
-            print("TIME LIMIT EXCEEDED; SEARCH TERMINATED");
+            xprintf("TIME LIMIT EXCEEDED; SEARCH TERMINATED\n");
             ret = 5;
             break;
          default:
@@ -446,19 +445,19 @@ skip: /* compute simplex multipliers */
       ret = ssx_phase_II(ssx);
       switch (ret)
       {  case 0:
-            print("OPTIMAL SOLUTION FOUND");
+            xprintf("OPTIMAL SOLUTION FOUND\n");
             ret = 0;
             break;
          case 1:
-            print("PROBLEM HAS UNBOUNDED SOLUTION");
+            xprintf("PROBLEM HAS UNBOUNDED SOLUTION\n");
             ret = 2;
             break;
          case 2:
-            print("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED");
+            xprintf("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED\n");
             ret = 4;
             break;
          case 3:
-            print("TIME LIMIT EXCEEDED; SEARCH TERMINATED");
+            xprintf("TIME LIMIT EXCEEDED; SEARCH TERMINATED\n");
             ret = 6;
             break;
          default:

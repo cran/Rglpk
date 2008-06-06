@@ -5,7 +5,7 @@
 *
 *  Author: Brady Hunsaker <bkh@member.fsf.org>.
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -23,9 +23,10 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_ERRNO
+#define _GLPSTD_STDIO
 #include "glpapi.h"
 #include "glplib.h"
-#define print xprint1
 
 /*----------------------------------------------------------------------
 -- lpx_print_sens_bnds - write bounds sensitivity information.
@@ -57,8 +58,8 @@
 int lpx_print_sens_bnds(LPX *lp, const char *fname)
 {     FILE *fp = NULL;
       int what, round;
-      print("lpx_print_sens_bnds: writing LP problem solution bounds to"
-         " `%s'...", fname);
+      xprintf("lpx_print_sens_bnds: writing LP problem solution bounds "
+         "to `%s'...\n", fname);
 #if 1
       /* added by mao */
       /* this routine needs factorization of the current basis matrix
@@ -73,14 +74,14 @@ int lpx_print_sens_bnds(LPX *lp, const char *fname)
 #else
       if (!lpx_is_b_avail(lp))
 #endif
-      {  print("lpx_print_sens_bnds: basis information not available (m"
-            "ay be a presolve issue)");
+      {  xprintf("lpx_print_sens_bnds: basis information not available "
+            "(may be a presolve issue)\n");
          goto fail;
       }
-      fp = xfopen(fname, "w");
+      fp = fopen(fname, "w");
       if (fp == NULL)
-      {  print("lpx_print_sens_bnds: can't create `%s' - %s", fname,
-            strerror(errno));
+      {  xprintf("lpx_print_sens_bnds: can't create `%s' - %s\n",
+            fname, strerror(errno));
          goto fail;
       }
       /* problem name */
@@ -567,13 +568,13 @@ int lpx_print_sens_bnds(LPX *lp, const char *fname)
       fprintf(fp, "End of output\n");
       fflush(fp);
       if (ferror(fp))
-      {  print("lpx_print_sens_bnds: can't write to `%s' - %s", fname,
-            strerror(errno));
+      {  xprintf("lpx_print_sens_bnds: can't write to `%s' - %s\n",
+            fname, strerror(errno));
          goto fail;
       }
-      xfclose(fp);
+      fclose(fp);
       return 0;
-fail: if (fp != NULL) xfclose(fp);
+fail: if (fp != NULL) fclose(fp);
       return 1;
 }
 

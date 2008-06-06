@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -22,8 +22,7 @@
 ***********************************************************************/
 
 #include "glpapi.h"
-#include "glplib.h"
-#define fault xfault1
+#define xfault xerror
 
 /*----------------------------------------------------------------------
 -- lpx_remove_tiny - remove zero and tiny elements.
@@ -62,10 +61,10 @@ int lpx_remove_tiny(int ne, int ia[], int ja[], double ar[],
 {     int k, newne;
       double big;
       if (ne < 0)
-         fault("lpx_remove_tiny: ne = %d; invalid number of elements",
-            ne);
+         xfault("lpx_remove_tiny: ne = %d; invalid number of elements\n"
+            , ne);
       if (eps < 0.0)
-         fault("lpx_remove_tiny: eps = %g; invalid threshold", eps);
+         xfault("lpx_remove_tiny: eps = %g; invalid threshold\n", eps);
       /* big := max(1, |ar[1]|, ..., |ar[ne]|) */
       big = 1.0;
       for (k = 1; k <= ne; k++)
@@ -140,8 +139,8 @@ int lpx_reduce_form(LPX *lp, int len, int ind[], double val[],
       for (t = 1; t <= len; t++)
       {  k = ind[t];
          if (!(1 <= k && k <= m+n))
-            fault("lpx_reduce_form: ind[%d] = %d; ordinal number out of"
-               " range", t, k);
+            xfault("lpx_reduce_form: ind[%d] = %d; ordinal number out o"
+               "f range\n", t, k);
          work[k] += val[t];
       }
       /* perform substitution */
@@ -202,11 +201,11 @@ double lpx_eval_row(LPX *lp, int len, int ind[], double val[])
       int j, k;
       double sum = 0.0;
       if (len < 0)
-         fault("lpx_eval_row: len = %d; invalid row length", len);
+         xfault("lpx_eval_row: len = %d; invalid row length\n", len);
       for (k = 1; k <= len; k++)
       {  j = ind[k];
          if (!(1 <= j && j <= n))
-            fault("lpx_eval_row: j = %d; column number out of range",
+            xfault("lpx_eval_row: j = %d; column number out of range\n",
                j);
          sum += val[k] * lpx_get_col_prim(lp, j);
       }
@@ -274,17 +273,17 @@ double lpx_eval_degrad(LPX *lp, int len, int ind[], double val[],
       int q, k;
       double y, delta;
       if (lpx_get_dual_stat(lp) != LPX_D_FEAS)
-         fault("lpx_eval_degrad: LP basis is not dual feasible");
+         xfault("lpx_eval_degrad: LP basis is not dual feasible\n");
       if (!(0 <= len && len <= n))
-         fault("lpx_eval_degrad: len = %d; invalid row length", len);
+         xfault("lpx_eval_degrad: len = %d; invalid row length\n", len);
       if (!(type == LPX_LO || type == LPX_UP))
-         fault("lpx_eval_degrad: type = %d; invalid row type", type);
+         xfault("lpx_eval_degrad: type = %d; invalid row type\n", type);
       /* compute value of the row auxiliary variable */
       y = lpx_eval_row(lp, len, ind, val);
       /* the inequalitiy constraint is assumed to be violated */
       if (!(type == LPX_LO && y < rhs || type == LPX_UP && y > rhs))
-         fault("lpx_eval_degrad: y = %g, rhs = %g; constraint is not vi"
-            "olated", y, rhs);
+         xfault("lpx_eval_degrad: y = %g, rhs = %g; constraint is not v"
+            "iolated\n", y, rhs);
       /* transform the row in order to express y through only non-basic
          variables: y = alfa[1] * xN[1] + ... + alfa[n] * xN[n] */
       len = lpx_transform_row(lp, len, ind, val);
@@ -427,8 +426,8 @@ int lpx_gomory_cut(LPX *lp, int len, int ind[], double val[],
       {  /* get index of some non-basic variable x[k] = xN[j] */
          k = ind[t];
          if (!(1 <= k && k <= m+n))
-            fault("lpx_gomory_cut: ind[%d] = %d; variable number out of"
-               " range", t, k);
+            xfault("lpx_gomory_cut: ind[%d] = %d; variable number out o"
+               "f range\n", t, k);
          /* get the original influence coefficient alfa[j] */
          alfa_j = alfa[t];
          /* obtain status and bounds of x[k] = xN[j] */
@@ -444,8 +443,8 @@ int lpx_gomory_cut(LPX *lp, int len, int ind[], double val[],
          }
          /* perform conversion */
          if (stat == LPX_BS)
-            fault("lpx_gomory_cut: ind[%d] = %d; variable must be non-b"
-               "asic", t, k);
+            xfault("lpx_gomory_cut: ind[%d] = %d; variable must be non-"
+               "basic\n", t, k);
          switch (stat)
          {  case LPX_NL:
                /* xN[j] is on its lower bound */

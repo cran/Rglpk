@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -22,8 +22,6 @@
 ***********************************************************************/
 
 #include "glpipp.h"
-#define print xprint1
-#define dmp_get_atomv dmp_get_atom
 
 /*----------------------------------------------------------------------
 -- FREE ROW
@@ -656,7 +654,7 @@ int ipp_basic_tech(IPP *ipp)
       }
       for (row = ipp->row_ptr; row != NULL; row = row->next) nrows--;
       for (col = ipp->col_ptr; col != NULL; col = col->next) ncols--;
-      print("ipp_basic_tech:  %d row(s) and %d column(s) removed",
+      xprintf("ipp_basic_tech:  %d row(s) and %d column(s) removed\n",
          nrows, ncols);
       return 0;
 }
@@ -877,7 +875,8 @@ loop: /* start a next pass for all active rows */
       }
       total += count;
       if (count > 0) goto loop;
-      print("ipp_reduce_bnds: %d pass(es) made, %d bound(s) reduced",
+      xprintf(
+         "ipp_reduce_bnds: %d pass(es) made, %d bound(s) reduced\n",
          pass, total);
       return 0;
 }
@@ -1024,7 +1023,7 @@ int ipp_nonbin_col(IPP *ipp, IPPCOL *col)
       /* create binary columns z[0], z[1], ..., z[t-1] */
       for (k = 0, two_k = 1; k < t; k++, two_k += two_k)
       {  bin = ipp_add_col(ipp, 1, 0.0, 1.0, 0.0);
-         lfe = dmp_get_atomv(ipp->tqe_pool, sizeof(IPPLFE));
+         lfe = dmp_get_atom(ipp->tqe_pool, sizeof(IPPLFE));
          lfe->ref = bin->j;
          lfe->val = (double)two_k;
          lfe->next = info->ptr;
@@ -1205,8 +1204,8 @@ loop: /* start a next pass for all active rows */
       }
       total += count;
       if (count > 0) goto loop;
-      print("ipp_reduce_coef: %d pass(es) made, %d coefficient(s) reduc"
-         "ed", pass, total);
+      xprintf("ipp_reduce_coef: %d pass(es) made, %d coefficient(s) red"
+         "uced\n", pass, total);
       return;
 }
 
@@ -1239,7 +1238,7 @@ void ipp_binarize(IPP *ipp)
          xassert(col->ub != +DBL_MAX);
          if (col->lb == -DBL_MAX || col->ub == +DBL_MAX ||
              col->ub - col->lb > 32767.0)
-         {  print("WARNING: BINARIZATION IMPOSSIBLE");
+         {  xprintf("WARNING: BINARIZATION IMPOSSIBLE\n");
             goto done;
          }
          ipp_enque_col(ipp, col);
@@ -1260,11 +1259,11 @@ void ipp_binarize(IPP *ipp)
          nbins += ipp_nonbin_col(ipp, col);
       }
       if (ncols == 0)
-         print("ipp_binarize:    no general integer variables detected")
-            ;
+         xprintf(
+            "ipp_binarize: no general integer variables detected\n");
       else
-         print("ipp_binarize:    %d integer variable(s) replaced by %d "
-            "binary ones", ncols, nbins);
+         xprintf("ipp_binarize: %d integer variable(s) replaced by %d b"
+            "inary ones\n", ncols, nbins);
 done: return;
 }
 
@@ -1320,8 +1319,8 @@ void ipp_reduction(IPP *ipp)
             ipp_add_aij(ipp, dup, aij->col, aij->val);
       }
       if (nrows > 0)
-         print("ipp_reduction:   %d row(s) splitted into single inequal"
-            "ities", nrows);
+         xprintf("ipp_reduction: %d row(s) splitted into single inequal"
+            "ities\n", nrows);
       /* replace all '>=' inequalities by '<=' ones */
       for (row = ipp->row_ptr; row != NULL; row = row->next)
       {  if (row->lb != -DBL_MAX && row->ub == +DBL_MAX)

@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,8 +21,8 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_STDIO
 #include "glpmpl.h"
-#define print xprint1
 #define dmp_get_atomv dmp_get_atom
 
 /**********************************************************************/
@@ -65,7 +65,7 @@ void print_context(MPL *mpl)
          memmove(mpl->context, mpl->context+1, CONTEXT_SIZE-1);
          mpl->context[CONTEXT_SIZE-1] = (char)c;
       }
-      print("Context: %s%.*s", mpl->context[0] == ' ' ? "" : "...",
+      xprintf("Context: %s%.*s\n", mpl->context[0] == ' ' ? "" : "...",
          CONTEXT_SIZE, mpl->context);
       return;
 }
@@ -321,6 +321,10 @@ err:     {  enter_context(mpl);
             mpl->token = T_LE, append_char(mpl);
          else if (mpl->c == '>')
             mpl->token = T_NE, append_char(mpl);
+#if 1 /* 11/II-2008 */
+         else if (mpl->c == '-')
+            mpl->token = T_INPUT, append_char(mpl);
+#endif
       }
       else if (mpl->c == '=')
       {  mpl->token = T_EQ, append_char(mpl);
@@ -389,6 +393,10 @@ err:     {  enter_context(mpl);
          mpl->token = T_LBRACE, append_char(mpl);
       else if (mpl->c == '}')
          mpl->token = T_RBRACE, append_char(mpl);
+#if 1 /* 11/II-2008 */
+      else if (mpl->c == '~')
+         mpl->token = T_TILDE, append_char(mpl);
+#endif
       else if (isalnum(mpl->c) || strchr("+-._", mpl->c) != NULL)
       {  /* symbol */
          xassert(mpl->flag_d);
@@ -3680,6 +3688,319 @@ CONSTRAINT *objective_statement(MPL *mpl)
       return obj;
 }
 
+#if 1 /* 11/II-2008 */
+/***********************************************************************
+*  table_statement - parse table statement
+*
+*  This routine parses table statement using the syntax:
+*
+*  <table statement> ::= <input table statement>
+*  <table statement> ::= <output table statement>
+*
+*  <input table statement> ::=
+*        table <table name> <alias> IN <argument list> :
+*        <input set> [ <field list> ] , <input list> ;
+*  <alias> ::= <empty>
+*  <alias> ::= <string literal>
+*  <argument list> ::= <expression 5>
+*  <argument list> ::= <argument list> <expression 5>
+*  <argument list> ::= <argument list> , <expression 5>
+*  <input set> ::= <empty>
+*  <input set> ::= <set name> <-
+*  <field list> ::= <field name>
+*  <field list> ::= <field list> , <field name>
+*  <input list> ::= <input item>
+*  <input list> ::= <input list> , <input item>
+*  <input item> ::= <parameter name>
+*  <input item> ::= <parameter name> ~ <field name>
+*
+*  <output table statement> ::=
+*        table <table name> <alias> <domain> OUT <argument list> :
+*        <output list> ;
+*  <domain> ::= <indexing expression>
+*  <output list> ::= <output item>
+*  <output list> ::= <output list> , <output item>
+*  <output item> ::= <expression 5>
+*  <output item> ::= <expression 5> ~ <field name> */
+
+TABLE *table_statement(MPL *mpl)
+{     TABLE *tab;
+      TABARG *last_arg, *arg;
+      TABFLD *last_fld, *fld;
+      TABIN *last_in, *in;
+      TABOUT *last_out, *out;
+      AVLNODE *node;
+      int nflds;
+      char name[MAX_LENGTH+1];
+      xassert(is_keyword(mpl, "table"));
+      get_token(mpl /* solve */);
+      /* symbolic name must follow the keyword table */
+      if (mpl->token == T_NAME)
+         ;
+      else if (is_reserved(mpl))
+         error(mpl, "invalid use of reserved keyword %s", mpl->image);
+      else
+         error(mpl, "symbolic name missing where expected");
+      /* there must be no other object with the same name */
+      if (avl_find_node(mpl->tree, mpl->image) != NULL)
+         error(mpl, "%s multiply declared", mpl->image);
+      /* create data table */
+      tab = alloc(TABLE);
+      tab->name = dmp_get_atomv(mpl->pool, strlen(mpl->image)+1);
+      strcpy(tab->name, mpl->image);
+      get_token(mpl /* <symbolic name> */);
+      /* parse optional alias */
+      if (mpl->token == T_STRING)
+      {  tab->alias = dmp_get_atomv(mpl->pool, strlen(mpl->image)+1);
+         strcpy(tab->alias, mpl->image);
+         get_token(mpl /* <string literal> */);
+      }
+      else
+         tab->alias = NULL;
+      /* parse optional indexing expression */
+      if (mpl->token == T_LBRACE)
+      {  /* this is output table */
+         tab->type = A_OUTPUT;
+         tab->u.out.domain = indexing_expression(mpl);
+         if (!is_keyword(mpl, "OUT"))
+            error(mpl, "keyword OUT missing where expected");
+         get_token(mpl /* OUT */);
+      }
+      else
+      {  /* this is input table */
+         tab->type = A_INPUT;
+         if (!is_keyword(mpl, "IN"))
+            error(mpl, "keyword IN missing where expected");
+         get_token(mpl /* IN */);
+      }
+      /* parse argument list */
+      tab->arg = last_arg = NULL;
+      for (;;)
+      {  /* create argument list entry */
+         arg = alloc(TABARG);
+         /* parse argument expression */
+         if (mpl->token == T_COMMA || mpl->token == T_COLON ||
+             mpl->token == T_SEMICOLON)
+            error(mpl, "argument expression missing where expected");
+         arg->code = expression_5(mpl);
+         /* convert the result to symbolic type, if necessary */
+         if (arg->code->type == A_NUMERIC)
+            arg->code =
+               make_unary(mpl, O_CVTSYM, arg->code, A_SYMBOLIC, 0);
+         /* check that now the result is of symbolic type */
+         if (arg->code->type != A_SYMBOLIC)
+            error(mpl, "argument expression has invalid type");
+         /* add the entry to the end of the list */
+         arg->next = NULL;
+         if (last_arg == NULL)
+            tab->arg = arg;
+         else
+            last_arg->next = arg;
+         last_arg = arg;
+         /* argument expression has been parsed */
+         if (mpl->token == T_COMMA)
+            get_token(mpl /* , */);
+         else if (mpl->token == T_COLON || mpl->token == T_SEMICOLON)
+            break;
+      }
+      xassert(tab->arg != NULL);
+      /* argument list must end with colon */
+      if (mpl->token == T_COLON)
+         get_token(mpl /* : */);
+      else
+         error(mpl, "colon missing where expected");
+      /* parse specific part of the table statement */
+      switch (tab->type)
+      {  case A_INPUT:  goto input_table;
+         case A_OUTPUT: goto output_table;
+         default:       xassert(tab != tab);
+      }
+input_table:
+      /* parse optional set name */
+      if (mpl->token == T_NAME)
+      {  node = avl_find_node(mpl->tree, mpl->image);
+         if (node == NULL)
+            error(mpl, "%s not defined", mpl->image);
+         if (avl_get_node_type(node) != A_SET)
+            error(mpl, "%s not a set", mpl->image);
+         tab->u.in.set = (SET *)avl_get_node_link(node);
+         if (tab->u.in.set->assign != NULL)
+            error(mpl, "%s needs no data", mpl->image);
+         if (tab->u.in.set->dim != 0)
+            error(mpl, "%s must be a simple set", mpl->image);
+         get_token(mpl /* <symbolic name> */);
+         if (mpl->token == T_INPUT)
+            get_token(mpl /* <- */);
+         else
+            error(mpl, "delimiter <- missing where expected");
+      }
+      else if (is_reserved(mpl))
+         error(mpl, "invalid use of reserved keyword %s", mpl->image);
+      else
+         tab->u.in.set = NULL;
+      /* parse field list */
+      tab->u.in.fld = last_fld = NULL;
+      nflds = 0;
+      if (mpl->token == T_LBRACKET)
+         get_token(mpl /* [ */);
+      else
+         error(mpl, "field list missing where expected");
+      for (;;)
+      {  /* create field list entry */
+         fld = alloc(TABFLD);
+         /* parse field name */
+         if (mpl->token == T_NAME)
+            ;
+         else if (is_reserved(mpl))
+            error(mpl,
+               "invalid use of reserved keyword %s", mpl->image);
+         else
+            error(mpl, "field name missing where expected");
+         fld->name = dmp_get_atomv(mpl->pool, strlen(mpl->image)+1);
+         strcpy(fld->name, mpl->image);
+         get_token(mpl /* <symbolic name> */);
+         /* add the entry to the end of the list */
+         fld->next = NULL;
+         if (last_fld == NULL)
+            tab->u.in.fld = fld;
+         else
+            last_fld->next = fld;
+         last_fld = fld;
+         nflds++;
+         /* field name has been parsed */
+         if (mpl->token == T_COMMA)
+            get_token(mpl /* , */);
+         else if (mpl->token == T_RBRACKET)
+            break;
+         else
+            error(mpl, "syntax error in field list");
+      }
+      /* check that the set dimen is equal to the number of fields */
+      if (tab->u.in.set != NULL && tab->u.in.set->dimen != nflds)
+         error(mpl, "there must be %d field%s rather than %d",
+            tab->u.in.set->dimen, tab->u.in.set->dimen == 1 ? "" : "s",
+            nflds);
+      get_token(mpl /* ] */);
+      /* parse optional input list */
+      tab->u.in.list = last_in = NULL;
+      while (mpl->token == T_COMMA)
+      {  get_token(mpl /* , */);
+         /* create input list entry */
+         in = alloc(TABIN);
+         /* parse parameter name */
+         if (mpl->token == T_NAME)
+            ;
+         else if (is_reserved(mpl))
+            error(mpl,
+               "invalid use of reserved keyword %s", mpl->image);
+         else
+            error(mpl, "parameter name missing where expected");
+         node = avl_find_node(mpl->tree, mpl->image);
+         if (node == NULL)
+            error(mpl, "%s not defined", mpl->image);
+         if (avl_get_node_type(node) != A_PARAMETER)
+            error(mpl, "%s not a parameter", mpl->image);
+         in->par = (PARAMETER *)avl_get_node_link(node);
+         if (in->par->dim != nflds)
+            error(mpl, "%s must have %d subscript%s rather than %d",
+               mpl->image, nflds, nflds == 1 ? "" : "s", in->par->dim);
+         if (in->par->assign != NULL)
+            error(mpl, "%s needs no data", mpl->image);
+         get_token(mpl /* <symbolic name> */);
+         /* parse optional field name */
+         if (mpl->token == T_TILDE)
+         {  get_token(mpl /* ~ */);
+            /* parse field name */
+            if (mpl->token == T_NAME)
+               ;
+            else if (is_reserved(mpl))
+               error(mpl,
+                  "invalid use of reserved keyword %s", mpl->image);
+            else
+               error(mpl, "field name missing where expected");
+            xassert(strlen(mpl->image) < sizeof(name));
+            strcpy(name, mpl->image);
+            get_token(mpl /* <symbolic name> */);
+         }
+         else
+         {  /* field name is the same as the parameter name */
+            xassert(strlen(in->par->name) < sizeof(name));
+            strcpy(name, in->par->name);
+         }
+         /* assign field name */
+         in->name = dmp_get_atomv(mpl->pool, strlen(name)+1);
+         strcpy(in->name, name);
+         /* add the entry to the end of the list */
+         in->next = NULL;
+         if (last_in == NULL)
+            tab->u.in.list = in;
+         else
+            last_in->next = in;
+         last_in = in;
+      }
+      goto end_of_table;
+output_table:
+      /* parse output list */
+      tab->u.out.list = last_out = NULL;
+      for (;;)
+      {  /* create output list entry */
+         out = alloc(TABOUT);
+         /* parse expression */
+         if (mpl->token == T_COMMA || mpl->token == T_SEMICOLON)
+            error(mpl, "expression missing where expected");
+         if (mpl->token == T_NAME)
+         {  xassert(strlen(mpl->image) < sizeof(name));
+            strcpy(name, mpl->image);
+         }
+         else
+            name[0] = '\0';
+         out->code = expression_5(mpl);
+         /* parse optional field name */
+         if (mpl->token == T_TILDE)
+         {  get_token(mpl /* ~ */);
+            /* parse field name */
+            if (mpl->token == T_NAME)
+               ;
+            else if (is_reserved(mpl))
+               error(mpl,
+                  "invalid use of reserved keyword %s", mpl->image);
+            else
+               error(mpl, "field name missing where expected");
+            xassert(strlen(mpl->image) < sizeof(name));
+            strcpy(name, mpl->image);
+            get_token(mpl /* <symbolic name> */);
+         }
+         /* assign field name */
+         if (name[0] == '\0')
+            error(mpl, "field name required");
+         out->name = dmp_get_atomv(mpl->pool, strlen(name)+1);
+         strcpy(out->name, name);
+         /* add the entry to the end of the list */
+         out->next = NULL;
+         if (last_out == NULL)
+            tab->u.out.list = out;
+         else
+            last_out->next = out;
+         last_out = out;
+         /* output item has been parsed */
+         if (mpl->token == T_COMMA)
+            get_token(mpl /* , */);
+         else if (mpl->token == T_SEMICOLON)
+            break;
+         else
+            error(mpl, "syntax error in output list");
+      }
+      /* close the domain scope */
+      close_scope(mpl,tab->u.out.domain);
+end_of_table:
+      /* the table statement must end with semicolon */
+      if (mpl->token != T_SEMICOLON)
+         error(mpl, "syntax error in table statement");
+      get_token(mpl /* ; */);
+      return tab;
+}
+#endif
+
 /*----------------------------------------------------------------------
 -- solve_statement - parse solve statement.
 --
@@ -4111,6 +4432,14 @@ STATEMENT *simple_statement(MPL *mpl, int spec)
          stmt->type = A_CONSTRAINT;
          stmt->u.con = objective_statement(mpl);
       }
+#if 1 /* 11/II-2008 */
+      else if (is_keyword(mpl, "table"))
+      {  if (spec)
+            error(mpl, "table statement not allowed here");
+         stmt->type = A_TABLE;
+         stmt->u.tab = table_statement(mpl);
+      }
+#endif
       else if (is_keyword(mpl, "solve"))
       {  if (spec)
             error(mpl, "solve statement not allowed here");

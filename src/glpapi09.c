@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,6 +21,8 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_ERRNO
+#define _GLPSTD_STDIO
 #include "glpapi.h"
 #include "glppds.h"
 
@@ -166,7 +168,7 @@ int glp_write_sol(glp_prob *lp, const char *fname)
       int i, j, ret = 0;
       xprintf("glp_write_sol: writing basic solution to `%s'...\n",
          fname);
-      fp = xfopen(fname, "w");
+      fp = fopen(fname, "w");
       if (fp == NULL)
       {  xprintf("glp_write_sol: unable to create `%s' - %s\n", fname,
             strerror(errno));
@@ -201,7 +203,7 @@ int glp_write_sol(glp_prob *lp, const char *fname)
       }
       xprintf("glp_write_sol: %d lines were written\n", 2 + lp->m +
          lp->n);
-done: if (fp != NULL) xfclose(fp);
+done: if (fp != NULL) fclose(fp);
       return ret;
 }
 
@@ -325,7 +327,7 @@ int glp_write_ipt(glp_prob *lp, const char *fname)
       int i, j, ret = 0;
       xprintf("glp_write_ipt: writing interior-point solution to `%s'.."
          ".\n", fname);
-      fp = xfopen(fname, "w");
+      fp = fopen(fname, "w");
       if (fp == NULL)
       {  xprintf("glp_write_ipt: unable to create `%s' - %s\n", fname,
             strerror(errno));
@@ -359,7 +361,7 @@ int glp_write_ipt(glp_prob *lp, const char *fname)
       }
       xprintf("glp_write_ipt: %d lines were written\n", 2 + lp->m +
          lp->n);
-done: if (fp != NULL) xfclose(fp);
+done: if (fp != NULL) fclose(fp);
       return ret;
 }
 
@@ -480,7 +482,7 @@ int glp_write_mip(glp_prob *mip, const char *fname)
       int i, j, ret = 0;
       xprintf("glp_write_mip: writing MIP solution to `%s'...\n",
          fname);
-      fp = xfopen(fname, "w");
+      fp = fopen(fname, "w");
       if (fp == NULL)
       {  xprintf("glp_write_mip: unable to create `%s' - %s\n", fname,
             strerror(errno));
@@ -506,7 +508,7 @@ int glp_write_mip(glp_prob *mip, const char *fname)
       }
       xprintf("glp_write_mip: %d lines were written\n", 2 + mip->m +
          mip->n);
-done: if (fp != NULL) xfclose(fp);
+done: if (fp != NULL) fclose(fp);
       return ret;
 }
 

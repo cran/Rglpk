@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -22,6 +22,7 @@
 ***********************************************************************/
 
 #include "glpios.h"
+#define xfault xerror
 
 /* CAUTION: DO NOT CHANGE THE LIMITS BELOW */
 
@@ -243,7 +244,11 @@ int glp_add_rows(glp_prob *lp, int nrs)
          row->ptr = NULL;
          row->rii = 1.0;
          row->stat = GLP_BS;
+#if 0
          row->bind = -1;
+#else
+         row->bind = 0;
+#endif
          row->prim = row->dual = 0.0;
          row->pval = row->dval = 0.0;
          row->mipx = 0.0;
@@ -318,7 +323,11 @@ int glp_add_cols(glp_prob *lp, int ncs)
          col->ptr = NULL;
          col->sjj = 1.0;
          col->stat = GLP_NS;
+#if 0
          col->bind = -1;
+#else
+         col->bind = 0; /* the basis may remain valid */
+#endif
          col->prim = col->dual = 0.0;
          col->pval = col->dval = 0.0;
          col->mipx = 0.0;

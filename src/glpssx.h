@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -322,10 +322,10 @@ struct SSX
       /* output frequency, in seconds; this parameter specifies how
          frequently the solver sends information about the progress of
          the search to the standard output */
-      glp_ulong tm_beg;
+      xlong_t tm_beg;
       /* starting time of the search, in seconds; the total time of the
-         search is the difference between utime() and tm_beg */
-      glp_ulong tm_lag;
+         search is the difference between xtime() and tm_beg */
+      xlong_t tm_lag;
       /* the most recent time, in seconds, at which the progress of the
          the search was displayed */
 };

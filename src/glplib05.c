@@ -1,9 +1,9 @@
-/* glplib05.c (terminal output and error handling) */
+/* glplib05.c (bignum arithmetic) */
 
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,213 +21,265 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
 #include "glplib.h"
 
 /***********************************************************************
-*  NAME
-*
-*  xputs - write character string to the terminal
-*
-*  SYNOPSIS
-*
-*  #include "glplib.h"
-*  void xputs(const char *s);
-*
-*  DESCRIPTION
-*
-*  The routine xputs writes the character string s to the terminal.
-*  It does not write the terminating '\0' character and does not append
-*  the '\n' character.
-*
-*  The routine xputs is a base low-level routine used by all other glpk
-*  routines to perform terminal output. */
-
-void xputs(const char *s)
-{     LIBENV *env = lib_link_env();
-      /* pass the string to the user-defined routine */
-      if (env->term_hook != NULL)
-         if (env->term_hook(env->term_info, s) != 0) goto skip;
-      /* write the string to the terminal */
-      if (env->term_out) fputs(s, stdout);
-      /* write the string to the hardcopy file */
-      if (env->log_file != NULL) fputs(s, env->log_file);
-skip: return;
-}
+*  Two routines below are intended to multiply and divide unsigned
+*  integer numbers of arbitrary precision.
+* 
+*  The routines assume that an unsigned integer number is represented in
+*  the positional numeral system with the base 2^16 = 65536, i.e. each
+*  "digit" of the number is in the range [0, 65535] and represented as
+*  a 16-bit value of the unsigned short type. In other words, a number x
+*  has the following representation:
+* 
+*         n-1
+*     x = sum d[j] * 65536^j,
+*         j=0
+* 
+*  where n is the number of places (positions), and d[j] is j-th "digit"
+*  of x, 0 <= d[j] <= 65535.
+***********************************************************************/
 
 /***********************************************************************
 *  NAME
 *
-*  xprintf - write formatted output to the terminal
-*
+*  bigmul - multiply unsigned integer numbers of arbitrary precision
+* 
 *  SYNOPSIS
-*
+* 
 *  #include "glplib.h"
-*  void xprintf(const char *fmt, ...);
-*
+*  void bigmul(int n, int m, unsigned short x[], unsigned short y[]);
+* 
 *  DESCRIPTION
-*
-*  The routine xprintf uses the format control string fmt and optional
-*  parameter list to perform fomatting in the same way as the standard
-*  function printf does and then writes the formatted output to the
-*  terminal using the routine xputs. The number of characters written at
-*  once must not exceed 4,000. */
+* 
+*  The routine bigmul multiplies unsigned integer numbers of arbitrary
+*  precision.
+* 
+*  n is the number of digits of multiplicand, n >= 1;
+* 
+*  m is the number of digits of multiplier, m >= 1;
+* 
+*  x is an array containing digits of the multiplicand in elements
+*  x[m], x[m+1], ..., x[n+m-1]. Contents of x[0], x[1], ..., x[m-1] are
+*  ignored on entry.
+* 
+*  y is an array containing digits of the multiplier in elements y[0],
+*  y[1], ..., y[m-1].
+* 
+*  On exit digits of the product are stored in elements x[0], x[1], ...,
+*  x[n+m-1]. The array y is not changed. */
 
-static void xvprintf(const char *fmt, va_list arg)
-{     char buf[4000+1];
-#ifdef HAVE_VSNPRINTF
-      vsnprintf(buf, sizeof(buf), fmt, arg);
-#else
-      vsprintf(buf, fmt, arg);
-      xassert(strlen(buf) < sizeof(buf));
-#endif
-      xputs(buf);
-      return;
-}
-
-void xprintf(const char *fmt, ...)
-{     va_list arg;
-      va_start(arg, fmt);
-      xvprintf(fmt, arg);
-      va_end(arg);
-      return;
-}
-
-void xprint1(const char *fmt, ...)
-{     /* (obsolete) */
-      va_list arg;
-      va_start(arg, fmt);
-      xvprintf(fmt, arg), xputs("\n");
-      va_end(arg);
-      return;
-}
-
-/***********************************************************************
-*  NAME
-*
-*  lib_term_hook - install hook to intercept terminal output
-*
-*  SYNOPSIS
-*
-*  #include "glplib.h"
-*  void lib_term_hook(int (*func)(void *info, const char *s),
-*     void *info);
-*
-*  DESCRIPTION
-*
-*  The routine lib_term_hook installs the user-defined hook routine to
-*  intercept all terminal output performed by glpk routines.
-*
-*  This feature can be used to redirect the terminal output to other
-*  destination, for example to a file or a text window.
-*
-*  The parameter func specifies the user-defined hook routine. It is
-*  called from an internal printing routine, which passes to it two
-*  parameters: info and s. The parameter info is a transit pointer,
-*  specified in the corresponding call to the routine lib_term_hook;
-*  it may be used to pass some information to the hook routine. The
-*  parameter s is a pointer to the null terminated character string,
-*  which is intended to be written to the terminal. If the hook routine
-*  returns zero, the printing routine writes the string s to the
-*  terminal in a usual way; otherwise, if the hook routine returns
-*  non-zero, no terminal output is performed.
-*
-*  To uninstall the hook routine the parameters func and info should be
-*  specified as NULL. */
-
-void lib_term_hook(int (*func)(void *info, const char *s), void *info)
-{     LIBENV *env = lib_link_env();
-      if (func == NULL)
-      {  env->term_hook = NULL;
-         env->term_info = NULL;
+void bigmul(int n, int m, unsigned short x[], unsigned short y[])
+{     int i, j;
+      unsigned int t;
+      xassert(n >= 1);
+      xassert(m >= 1);
+      for (j = 0; j < m; j++) x[j] = 0;
+      for (i = 0; i < n; i++)
+      {  if (x[i+m])
+         {  t = 0;
+            for (j = 0; j < m; j++)
+            {  t += (unsigned int)x[i+m] * (unsigned int)y[j] +
+                    (unsigned int)x[i+j];
+               x[i+j] = (unsigned short)t;
+               t >>= 16;
+            }
+            x[i+m] = (unsigned short)t;
+         }
       }
+      return;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  bigdiv - divide unsigned integer numbers of arbitrary precision
+* 
+*  SYNOPSIS
+* 
+*  #include "glplib.h"
+*  void bigdiv(int n, int m, unsigned short x[], unsigned short y[]);
+* 
+*  DESCRIPTION
+* 
+*  The routine bigdiv divides one unsigned integer number of arbitrary
+*  precision by another with the algorithm described in [1].
+* 
+*  n is the difference between the number of digits of dividend and the
+*  number of digits of divisor, n >= 0.
+* 
+*  m is the number of digits of divisor, m >= 1.
+* 
+*  x is an array containing digits of the dividend in elements x[0],
+*  x[1], ..., x[n+m-1].
+* 
+*  y is an array containing digits of the divisor in elements y[0],
+*  y[1], ..., y[m-1]. The highest digit y[m-1] must be non-zero.
+* 
+*  On exit n+1 digits of the quotient are stored in elements x[m],
+*  x[m+1], ..., x[n+m], and m digits of the remainder are stored in
+*  elements x[0], x[1], ..., x[m-1]. The array y is changed but then
+*  restored.
+*
+*  REFERENCES
+*
+*  1. D. Knuth. The Art of Computer Programming. Vol. 2: Seminumerical
+*  Algorithms. Stanford University, 1969. */
+
+void bigdiv(int n, int m, unsigned short x[], unsigned short y[])
+{     int i, j;
+      unsigned int t;
+      unsigned short d, q, r;
+      xassert(n >= 0);
+      xassert(m >= 1);
+      xassert(y[m-1] != 0);
+      /* special case when divisor has the only digit */
+      if (m == 1)
+      {  d = 0;
+         for (i = n; i >= 0; i--)
+         {  t = ((unsigned int)d << 16) + (unsigned int)x[i];
+            x[i+1] = (unsigned short)(t / y[0]);
+            d = (unsigned short)(t % y[0]);
+         }
+         x[0] = d;
+         goto done;
+      }
+      /* multiply dividend and divisor by a normalizing coefficient in
+         order to provide the condition y[m-1] >= base / 2 */
+      d = (unsigned short)(0x10000 / ((unsigned int)y[m-1] + 1));
+      if (d == 1)
+         x[n+m] = 0;
       else
-      {  env->term_hook = func;
-         env->term_info = info;
+      {  t = 0;
+         for (i = 0; i < n+m; i++)
+         {  t += (unsigned int)x[i] * (unsigned int)d;
+            x[i] = (unsigned short)t;
+            t >>= 16;
+         }
+         x[n+m] = (unsigned short)t;
+         t = 0;
+         for (j = 0; j < m; j++)
+         {  t += (unsigned int)y[j] * (unsigned int)d;
+            y[j] = (unsigned short)t;
+            t >>= 16;
+         }
       }
-      return;
+      /* main loop */
+      for (i = n; i >= 0; i--)
+      {  /* estimate and correct the current digit of quotient */
+         if (x[i+m] < y[m-1])
+         {  t = ((unsigned int)x[i+m] << 16) + (unsigned int)x[i+m-1];
+            q = (unsigned short)(t / (unsigned int)y[m-1]);
+            r = (unsigned short)(t % (unsigned int)y[m-1]);
+            if (q == 0) goto putq; else goto test;
+         }
+         q = 0;
+         r = x[i+m-1];
+decr:    q--; /* if q = 0 then q-- = 0xFFFF */
+         t = (unsigned int)r + (unsigned int)y[m-1];
+         r = (unsigned short)t;
+         if (t > 0xFFFF) goto msub;
+test:    t = (unsigned int)y[m-2] * (unsigned int)q;
+         if ((unsigned short)(t >> 16) > r) goto decr;
+         if ((unsigned short)(t >> 16) < r) goto msub;
+         if ((unsigned short)t > x[i+m-2]) goto decr;
+msub:    /* now subtract divisor multiplied by the current digit of
+            quotient from the current dividend */
+         if (q == 0) goto putq;
+         t = 0;
+         for (j = 0; j < m; j++)
+         {  t += (unsigned int)y[j] * (unsigned int)q;
+            if (x[i+j] < (unsigned short)t) t += 0x10000;
+            x[i+j] -= (unsigned short)t;
+            t >>= 16;
+         }
+         if (x[i+m] >= (unsigned short)t) goto putq;
+         /* perform correcting addition, because the current digit of
+            quotient is greater by one than its correct value */
+         q--;
+         t = 0;
+         for (j = 0; j < m; j++)
+         {  t += (unsigned int)x[i+j] + (unsigned int)y[j];
+            x[i+j] = (unsigned short)t;
+            t >>= 16;
+         }
+putq:    /* store the current digit of quotient */
+         x[i+m] = q;
+      }
+      /* divide divisor and remainder by the normalizing coefficient in
+         order to restore their original values */
+      if (d > 1)
+      {  t = 0;
+         for (i = m-1; i >= 0; i--)
+         {  t = (t << 16) + (unsigned int)x[i];
+            x[i] = (unsigned short)(t / (unsigned int)d);
+            t %= (unsigned int)d;
+         }
+         t = 0;
+         for (j = m-1; j >= 0; j--)
+         {  t = (t << 16) + (unsigned int)y[j];
+            y[j] = (unsigned short)(t / (unsigned int)d);
+            t %= (unsigned int)d;
+         }
+      }
+done: return;
 }
 
-void lib_print_hook(int (*func)(void *info, char *buf), void *info)
-{     /* (obsolete) */
-#if 0 /* iso c complains */
-      int (*hook)(void *, const char *) = (void *)func;
-#else
-      int (*hook)(void *, const char *) = (int(*)(void *, const char *))
-         (func);
+/**********************************************************************/
+
+#if 0
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "glprng.h"
+
+#define N_MAX 7
+/* maximal number of digits in multiplicand */
+
+#define M_MAX 5
+/* maximal number of digits in multiplier */
+
+#define N_TEST 1000000
+/* number of tests */
+
+int main(void)
+{     RNG *rand;
+      int d, j, n, m, test;
+      unsigned short x[N_MAX], y[M_MAX], z[N_MAX+M_MAX];
+      rand = rng_create_rand();
+      for (test = 1; test <= N_TEST; test++)
+      {  /* x[0,...,n-1] := multiplicand */
+         n = 1 + rng_unif_rand(rand, N_MAX-1);
+         assert(1 <= n && n <= N_MAX);
+         for (j = 0; j < n; j++)
+         {  d = rng_unif_rand(rand, 65536);
+            assert(0 <= d && d <= 65535);
+            x[j] = (unsigned short)d;
+         }
+         /* y[0,...,m-1] := multiplier */
+         m = 1 + rng_unif_rand(rand, M_MAX-1);
+         assert(1 <= m && m <= M_MAX);
+         for (j = 0; j < m; j++)
+         {  d = rng_unif_rand(rand, 65536);
+            assert(0 <= d && d <= 65535);
+            y[j] = (unsigned short)d;
+         }
+         if (y[m-1] == 0) y[m-1] = 1;
+         /* z[0,...,n+m-1] := x * y */
+         for (j = 0; j < n; j++) z[m+j] = x[j];
+         bigmul(n, m, z, y);
+         /* z[0,...,m-1] := z mod y, z[m,...,n+m-1] := z div y */
+         bigdiv(n, m, z, y);
+         /* z mod y must be 0 */
+         for (j = 0; j < m; j++) assert(z[j] == 0);
+         /* z div y must be x */
+         for (j = 0; j < n; j++) assert(z[m+j] == x[j]);
+      }
+      fprintf(stderr, "%d tests successfully passed\n", N_TEST);
+      rng_delete_rand(rand);
+      return 0;
+}
 #endif
-      lib_term_hook(hook, info);
-      return;
-}
-
-/***********************************************************************
-*  NAME
-*
-*  xfault - display error message and terminate execution
-*
-*  SYNOPSIS
-*
-*  #include "glplib.h"
-*  void xfault(const char *fmt, ...);
-*
-*  DESCRIPTION
-*
-*  The routine xfault uses the format control string fmt and optional
-*  parameter list to perform formatting in the same way as the standard
-*  function printf does, writes the formatted error message to the
-*  terminal using the routine xputs, and then abnormally terminates the
-*  program. The message length must not exceed 4,000 characters. */
-
-void xfault(const char *fmt, ...)
-{     va_list arg;
-      va_start(arg, fmt);
-      xvprintf(fmt, arg);
-      va_end(arg);
-      abort();
-      /* no return */
-}
-
-void xfault1(const char *fmt, ...)
-{     /* (obsolete) */
-      va_list arg;
-      va_start(arg, fmt);
-      xvprintf(fmt, arg), xputs("\n");
-      va_end(arg);
-      abort();
-      /* no return */
-}
-
-void lib_fault_hook(int (*func)(void *info, char *buf), void *info)
-{     /* (obsolete) */
-      xassert(func == func);
-      xassert(info == info);
-      return;
-}
-
-/***********************************************************************
-*  NAME
-*
-*  xassert - check for logical condition
-*
-*  SYNOPSIS
-*
-*  #include "glplib.h"
-*  void xassert(int expr);
-*
-*  DESCRIPTION
-*
-*  The routine xassert (implemented as a macro) checks for a logical
-*  condition specified by the parameter expr. If the condition is false
-*  (i.e. the value of expr is zero), the routine displays an error
-*  message and abnormally terminates the program. */
-
-void _xassert(const char *expr, const char *file, int line)
-{     xfault("GLPK internal error: %s; file %s, line %d\n",
-         expr, file, line);
-      /* no return */
-}
 
 /* eof */

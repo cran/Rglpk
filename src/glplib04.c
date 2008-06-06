@@ -1,9 +1,9 @@
-/* glplib04.c (library environment) */
+/* glplib04.c (terminal input/output) */
 
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,172 +21,184 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
-#include "glpapi.h"
+#define _GLPSTD_STDIO
 #include "glplib.h"
+
+int xgetc(void)
+{     /* read character from the terminal */
+      int c;
+      c = fgetc(stdin);
+      if (c == EOF)
+         c = XEOF;
+      else
+         xassert(0x00 <= c && c <= 0xFF);
+      return c;
+}
 
 /***********************************************************************
 *  NAME
 *
-*  lib_init_env - initialize library environment
+*  xputc - write character to the terminal
 *
 *  SYNOPSIS
 *
 *  #include "glplib.h"
-*  int lib_init_env(void);
+*  void xputc(int c);
 *
 *  DESCRIPTION
 *
-*  The routine lib_init_env initializes the library environment block
-*  used by other low-level library routines.
-*
-*  This routine is called automatically on the first call any library
-*  routine, so it is not needed to be called explicitly.
-*
-*  RETURNS
-*
-*  The routine lib_init_env returns one of the following codes:
-*
-*  0 - initialization successful;
-*  1 - the library environment has been already initialized;
-*  2 - initialization failed (insufficient memory);
-*  3 - initialization failed (unsupported programming model). */
+*  The routine xputc writes the character c to the terminal. */
 
-int lib_init_env(void)
-{     LIBENV *env;
-      int ok, k;
-      /* check if the programming model is supported */
-      ok = (CHAR_BIT == 8 && sizeof(char) == 1 &&
-         sizeof(short) == 2 && sizeof(int) == 4 &&
-         (sizeof(void *) == 4 || sizeof(void *) == 8));
-      if (!ok) return 3;
-      /* check if the environment has been already initialized */
-      if (lib_get_ptr() != NULL) return 1;
-      /* allocate the environmental block */
-      env = malloc(sizeof(LIBENV));
-      if (env == NULL) return 2;
-      /* initialize the environmental block */
-      sprintf(env->version, "%d.%d",
-         GLP_MAJOR_VERSION, GLP_MINOR_VERSION);
-      env->mem_limit = ulset(0xFFFFFFFF, 0xFFFFFFFF);
-      env->mem_ptr = NULL;
-      env->mem_count = env->mem_cpeak = 0;
-      env->mem_total = env->mem_tpeak = ulset(0, 0);
-      env->term_out = GLP_ON;
-      env->term_hook = NULL;
-      env->term_info = NULL;
-      for (k = 0; k < LIB_MAX_OPEN; k++)
-         env->file_slot[k] = NULL;
-      env->log_file = NULL;
-      /* keep a pointer to the environmental block */
-      lib_set_ptr(env);
-      /* initialization successful */
+void xputc(int c)
+{     LIBENV *env = lib_link_env();
+      /* if terminal output is disabled, do nothing */
+      if (!env->term_out) goto skip;
+      /* pass the character to the user-defined routine */
+      if (env->term_hook != NULL)
+      {  char s[1+1];
+         s[0] = (char)c, s[1] = '\0';
+         if (env->term_hook(env->term_info, s) != 0) goto skip;
+      }
+      /* write the character to the terminal */
+      fputc(c, stdout);
+      /* write the character to the log file */
+      if (env->log_file != NULL) fputc(c, env->log_file);
+skip: return;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  xprintf - write formatted output to the terminal
+*
+*  SYNOPSIS
+*
+*  #include "glplib.h"
+*  void xprintf(const char *fmt, ...);
+*
+*  DESCRIPTION
+*
+*  The routine xprintf formats its parameters under the format control
+*  string fmt and writes the formatted output to the terminal. */
+
+void xprintf(const char *fmt, ...)
+{     va_list arg;
+      va_start(arg, fmt);
+      xvprintf(fmt, arg);
+      va_end(arg);
+      return;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  xvprintf - write formatted output to the terminal
+*
+*  SYNOPSIS
+*
+*  #include "glplib.h"
+*  void xvprintf(const char *fmt, va_list arg);
+*
+*  The routine xprintf formats its parameters under the format control
+*  string fmt and writes the formatted output to the terminal. */
+
+static int func(void *info, int c)
+{     xassert(info == NULL);
+      xassert(0x00 <= c && c <= 0xFF);
+      xputc(c);
+      return c;
+}
+
+void xvprintf(const char *fmt, va_list arg)
+{     lib_doprnt(func, NULL, fmt, arg);
+      return;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  lib_term_hook - install hook to intercept terminal output
+*
+*  SYNOPSIS
+*
+*  #include "glplib.h"
+*  void lib_term_hook(int (*func)(void *info, const char *s),
+*     void *info);
+*
+*  DESCRIPTION
+*
+*  The routine lib_term_hook installs the user-defined hook routine to
+*  intercept all terminal output performed by glpk routines.
+*
+*  This feature can be used to redirect the terminal output to other
+*  destination, for example to a file or a text window.
+*
+*  The parameter func specifies the user-defined hook routine. It is
+*  called from an internal printing routine, which passes to it two
+*  parameters: info and s. The parameter info is a transit pointer,
+*  specified in the corresponding call to the routine lib_term_hook;
+*  it may be used to pass some information to the hook routine. The
+*  parameter s is a pointer to the null terminated character string,
+*  which is intended to be written to the terminal. If the hook routine
+*  returns zero, the printing routine writes the string s to the
+*  terminal as usual; otherwise, if the hook routine returns non-zero,
+*  no terminal output is performed.
+*
+*  To uninstall the hook routine the parameters func and info should be
+*  specified as NULL. */
+
+void lib_term_hook(int (*func)(void *info, const char *s), void *info)
+{     LIBENV *env = lib_link_env();
+      if (func == NULL)
+      {  env->term_hook = NULL;
+         env->term_info = NULL;
+      }
+      else
+      {  env->term_hook = func;
+         env->term_info = info;
+      }
+      return;
+}
+
+void lib_print_hook(int (*func)(void *info, char *buf), void *info)
+{     /* (obsolete) */
+#if 0 /* iso c complains */
+      int (*hook)(void *, const char *) = (void *)func;
+#else
+      int (*hook)(void *, const char *) = (int(*)(void *, const char *))
+         (func);
+#endif
+      lib_term_hook(hook, info);
+      return;
+}
+
+/**********************************************************************/
+
+int lib_open_log(const char *fname)
+{     /* open hardcopy file */
+      LIBENV *env = lib_link_env();
+      if (env->log_file != NULL)
+      {  /* hardcopy file is already open */
+         return 1;
+      }
+      env->log_file = fopen(fname, "w");
+      if (env->log_file == NULL)
+      {  /* cannot create hardcopy file */
+         return 2;
+      }
+      setvbuf(env->log_file, NULL, _IOLBF, BUFSIZ);
       return 0;
 }
 
-/***********************************************************************
-*  NAME
-*
-*  lib_link_env - retrieve pointer to library environmental block
-*
-*  SYNOPSIS
-*
-*  #include "glplib.h"
-*  LIBENV *lib_link_env(void);
-*
-*  DESCRIPTION
-*
-*  The routine lib_link_env retrieves and returns a pointer to the
-*  library environmental block.
-*
-*  If the library environment has not been initialized yet, the routine
-*  performs initialization. If initialization fails, the routine prints
-*  an error message to stderr and terminates the program.
-*
-*  RETURNS
-*
-*  The routine returns a pointer to the library environmental block. */
-
-LIBENV *lib_link_env(void)
-{     LIBENV *env = lib_get_ptr();
-      /* check if the environment has been initialized */
-      if (env == NULL)
-      {  /* not initialized yet; perform initialization */
-         if (lib_init_env() != 0)
-         {  /* initialization failed; display an error message */
-            fprintf(stderr, "GLPK library initialization failed.\n");
-            fflush(stderr);
-            /* and abnormally terminate the program */
-            abort();
-         }
-         /* initialization successful; obtain the pointer */
-         env = lib_get_ptr();
+int lib_close_log(void)
+{     /* close hardcopy file */
+      LIBENV *env = lib_link_env();
+      if (env->log_file == NULL)
+      {  /* hardcopy file is already closed */
+         return 1;
       }
-      return env;
-}
-
-/***********************************************************************
-*  NAME
-*
-*  lib_version - determine library version
-*
-*  SYNOPSIS
-*
-*  #include "glplib.h"
-*  const char *lib_version(void);
-*
-*  RETURNS
-*
-*  The routine lib_version returns a pointer to a null-terminated
-*  character string, which specifies the version of the GLPK library in
-*  the form "X.Y", where X is the major version number, and Y is the
-*  minor version number, for example, "4.16". */
-
-const char *lib_version(void)
-{     LIBENV *env = lib_link_env();
-      return env->version;
-}
-
-/***********************************************************************
-*  NAME
-*
-*  lib_free_env - free library environment
-*
-*  SYNOPSIS
-*
-*  #include "glplib.h"
-*  int lib_free_env(void);
-*
-*  DESCRIPTION
-*
-*  The routine lib_free_env frees all resources (memory blocks, etc.),
-*  which was required by the library routines and which are currently
-*  still in use.
-*
-*  RETURNS
-*
-*  0 - deinitialization successful;
-*  1 - the library environment is inactive (not initialized). */
-
-int lib_free_env(void)
-{     LIBENV *env = lib_get_ptr();
-      LIBMEM *desc;
-      int k;
-      /* check if the library environment is inactive */
-      if (env == NULL) return 1;
-      /* free memory blocks which are still allocated */
-      while (env->mem_ptr != NULL)
-      {  desc = env->mem_ptr;
-         env->mem_ptr = desc->next;
-         free(desc);
-      }
-      /* close streams which are still open */
-      for (k = 0; k < LIB_MAX_OPEN; k++)
-         if (env->file_slot[k] != NULL) fclose(env->file_slot[k]);
-      /* free memory allocated to the environmental block */
-      free(env);
-      /* reset a pointer to the environmental block */
-      lib_set_ptr(NULL);
-      /* deinitialization successful */
+      fclose(env->log_file);
+      env->log_file = NULL;
       return 0;
 }
 

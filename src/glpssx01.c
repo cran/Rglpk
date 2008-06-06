@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -23,7 +23,7 @@
 
 #include "glplib.h"
 #include "glpssx.h"
-#define fault xfault1
+#define xfault xerror
 
 /*----------------------------------------------------------------------
 // ssx_create - create simplex solver workspace.
@@ -41,12 +41,12 @@ SSX *ssx_create(int m, int n, int nnz)
 {     SSX *ssx;
       int i, j, k;
       if (m < 1)
-         fault("ssx_create: m = %d; invalid number of rows", m);
+         xfault("ssx_create: m = %d; invalid number of rows\n", m);
       if (n < 1)
-         fault("ssx_create: n = %d; invalid number of columns", n);
+         xfault("ssx_create: n = %d; invalid number of columns\n", n);
       if (nnz < 0)
-         fault("ssx_create: nnz = %d; invalid number of non-zero constr"
-            "aint coefficients", nnz);
+         xfault("ssx_create: nnz = %d; invalid number of non-zero const"
+            "raint coefficients\n", nnz);
       ssx = xmalloc(sizeof(SSX));
       ssx->m = m;
       ssx->n = n;

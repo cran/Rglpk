@@ -10,9 +10,9 @@ void R_glp_solve (int *lp_direction, int *lp_number_of_constraints,
 		  int *lp_direction_of_constraints, double *lp_right_hand_side,
 		  int *lp_number_of_objective_vars,
 		  double *lp_objective_coefficients,
-		  int *lp_objective_var_is_integer, int *lp_is_integer, //should
-									//be
-									//boolean
+		  int *lp_objective_var_is_integer, 
+		  int *lp_objective_var_is_binary,
+		  int *lp_is_integer,                     //should be boolean
 		  int *lp_number_of_values_in_constraint_matrix,
 		  int *lp_constraint_matrix_i, int *lp_constraint_matrix_j,
 		  double *lp_constraint_matrix_values,
@@ -73,6 +73,8 @@ void R_glp_solve (int *lp_direction, int *lp_number_of_constraints,
     glp_set_obj_coef(lp, i+1, lp_objective_coefficients[i]);
     if (lp_objective_var_is_integer[i])
       glp_set_col_kind(lp, i+1, GLP_IV);
+    if (lp_objective_var_is_binary[i])
+      glp_set_col_kind(lp, i+1, GLP_BV);
   }
   // load the matrix
   // IMPORTANT: as glp_load_matrix requires triplets as vectors of the

@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -22,7 +22,7 @@
 ***********************************************************************/
 
 #include "glpapi.h"
-#define fault xfault1
+#define xfault xerror
 
 /*----------------------------------------------------------------------
 -- lpx_order_matrix - order rows and columns of the constraint matrix.
@@ -266,26 +266,26 @@ void lpx_put_lp_basis(glp_prob *lp, int valid, int basis[], BFD *b_inv)
          for (i = 1; i <= lp->m; i++)
          {  k = lp->bhead[i];
             if (!(1 <= k && k <= lp->m+lp->n))
-               fault("lpx_put_lp_basis: basis[%d] = %d; invalid referen"
-                  "ce to basic variable", i, k);
+               xfault("lpx_put_lp_basis: basis[%d] = %d; invalid refere"
+                  "nce to basic variable\n", i, k);
             if (k <= lp->m)
             {  row = lp->row[k];
                if (row->stat != GLP_BS)
-                  fault("lpx_put_lp_basis: basis[%d] = %d; invalid refe"
-                     "rence to non-basic row", i, k);
+                  xfault("lpx_put_lp_basis: basis[%d] = %d; invalid ref"
+                     "erence to non-basic row\n", i, k);
                if (row->bind != 0)
-                  fault("lpx_put_lp_basis: basis[%d] = %d; duplicate re"
-                     "ference to basic row", i, k);
+                  xfault("lpx_put_lp_basis: basis[%d] = %d; duplicate r"
+                     "eference to basic row\n", i, k);
                row->bind = i;
             }
             else
             {  col = lp->col[k-lp->m];
                if (col->stat != GLP_BS)
-                  fault("lpx_put_lp_basis: basis[%d] = %d; invalid refe"
-                     "rence to non-basic column", i, k);
+                  xfault("lpx_put_lp_basis: basis[%d] = %d; invalid ref"
+                     "erence to non-basic column\n", i, k);
                if (col->bind != 0)
-                  fault("lpx_put_lp_basis: basis[%d] = %d; duplicate re"
-                     "ference to basic column", i, k);
+                  xfault("lpx_put_lp_basis: basis[%d] = %d; duplicate r"
+                     "eference to basic column\n", i, k);
                col->bind = i;
             }
          }
@@ -310,8 +310,8 @@ void lpx_put_lp_basis(glp_prob *lp, int valid, int basis[], BFD *b_inv)
 
 void lpx_put_ray_info(glp_prob *lp, int k)
 {     if (!(0 <= k && k <= lp->m+lp->n))
-         fault("lpx_put_ray_info: ray = %d; row/column number out of ra"
-            "nge", k);
+         xfault("lpx_put_ray_info: ray = %d; row/column number out of r"
+            "ange\n", k);
       lp->some = k;
       return;
 }
@@ -340,8 +340,8 @@ void lpx_put_ipt_soln(glp_prob *lp, int t_stat, double row_pval[],
       int i, j;
       /* store interior-point status */
       if (!(t_stat == LPX_T_UNDEF || t_stat == LPX_T_OPT))
-         fault("lpx_put_ipm_soln: t_stat = %d; invalid interior-point s"
-            "tatus", t_stat);
+         xfault("lpx_put_ipm_soln: t_stat = %d; invalid interior-point "
+            "status\n", t_stat);
       lp->ipt_stat = (t_stat == LPX_T_UNDEF ? GLP_UNDEF : GLP_OPT);
       /* store row solution components */
       for (i = 1; i <= lp->m; i++)
@@ -405,8 +405,8 @@ void lpx_put_mip_soln(glp_prob *lp, int i_stat, double row_mipx[],
          case LPX_I_NOFEAS:
             lp->mip_stat = GLP_NOFEAS; break;
          default:
-            fault("lpx_put_mip_soln: i_stat = %d; invalid mixed integer"
-               " status", i_stat);
+            xfault("lpx_put_mip_soln: i_stat = %d; invalid mixed intege"
+               "r status\n", i_stat);
       }
 #endif
       /* store row solution components */
@@ -428,8 +428,8 @@ void lpx_put_mip_soln(glp_prob *lp, int i_stat, double row_mipx[],
       {  for (j = 1; j <= lp->n; j++)
          {  col = lp->col[j];
             if (col->kind == GLP_IV && col->mipx != floor(col->mipx))
-               fault("lpx_put_mip_soln: col_mipx[%d] = %.*g; must be in"
-                  "tegral", j, DBL_DIG, col->mipx);
+               xfault("lpx_put_mip_soln: col_mipx[%d] = %.*g; must be i"
+                  "ntegral\n", j, DBL_DIG, col->mipx);
          }
       }
       /* compute the objective function value */

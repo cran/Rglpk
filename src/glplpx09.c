@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07 Andrew Makhorin,
+*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -21,10 +21,10 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPSTD_STDIO
 #include "glpapi.h"
 #include "glpipp.h"
 #include "glplib.h"
-#define print xprint1
 
 /*----------------------------------------------------------------------
 -- show_status - display current status of the problem.
@@ -58,7 +58,7 @@ static void show_status(LPX *prob, int prob_m, int prob_nz)
          if (fabs(x - floor(x + 0.5)) <= tol_int) continue;
          count++;
       }
-      print("&%6d: obj = %17.9e   frac = %5d   cuts = %5d (%d)",
+      xprintf("&%6d: obj = %17.9e   frac = %5d   cuts = %5d (%d)\n",
          lpx_get_int_parm(prob, LPX_K_ITCNT),
          lpx_get_obj_val(prob), count,
          lpx_get_num_rows(prob) - prob_m,
@@ -320,10 +320,10 @@ static int generate_cuts(LPX *prob, int use_cuts)
       int prob_m, prob_nz, msg_lev, dual, nrows, it_cnt, ret,
          cover = 0, clique = 0, gomory = 0;
       double out_dly, tm_lim;
-      glp_ulong tm_lag = ulset(0, 0), tm_beg = xtime();
+      xlong_t tm_lag = xlset(0), tm_beg = xtime();
       /* generating clique cuts needs the conflict graph */
       if (use_cuts & LPX_C_CLIQUE) cog = lpx_create_cog(prob);
-      print("Generating cutting planes...");
+      xprintf("Generating cutting planes...\n");
       /* determine the number of rows, columns, and non-zeros on entry
          to the routine */
       prob_m = lpx_get_num_rows(prob);
@@ -429,27 +429,27 @@ loop: /* main loop starts here */
 done: /* display final status of the problem */
       show_status(prob, prob_m, prob_nz);
       if (cover)
-         print("%d mixed cover cut(s) added", cover);
+         xprintf("%d mixed cover cut(s) added\n", cover);
       if (clique)
-         print("%d clique cut(s) added", clique);
+         xprintf("%d clique cut(s) added\n", clique);
       if (gomory)
-         print("%d Gomory's mixed integer cut(s) added", gomory);
+         xprintf("%d Gomory's mixed integer cut(s) added\n", gomory);
       /* the conflict graph is no longer needed, so delete it */
       if (cog != NULL) lpx_delete_cog(cog);
       switch (ret)
       {  case LPX_E_OK:
             break;
          case LPX_E_NOPFS:
-            print("PROBLEM HAS NO INTEGER FEASIBLE SOLUTION");
+            xprintf("PROBLEM HAS NO INTEGER FEASIBLE SOLUTION\n");
             break;
          case LPX_E_ITLIM:
-            print("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED");
+            xprintf("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED\n");
             break;
          case LPX_E_TMLIM:
-            print("TIME LIMIT EXCEEDED; SEARCH TERMINATED");
+            xprintf("TIME LIMIT EXCEEDED; SEARCH TERMINATED\n");
             break;
          case LPX_E_SING:
-            print("lpx_intopt: cannot re-optimize LP relaxation");
+            xprintf("lpx_intopt: cannot re-optimize LP relaxation\n");
             break;
          default:
             xassert(ret != ret);
@@ -528,7 +528,7 @@ int lpx_intopt(LPX *_mip)
       orig_m = lpx_get_num_rows(orig);
       orig_n = lpx_get_num_cols(orig);
       if (!(orig_m > 0 && orig_n > 0))
-      {  print("lpx_intopt: problem has no rows/columns");
+      {  xprintf("lpx_intopt: problem has no rows/columns\n");
          ret = LPX_E_FAULT;
          goto done;
       }
@@ -536,7 +536,7 @@ int lpx_intopt(LPX *_mip)
       for (i = 1; i <= orig_m; i++)
       {  if (lpx_get_row_type(orig, i) == LPX_DB)
          {  if (lpx_get_row_lb(orig, i) >= lpx_get_row_ub(orig, i))
-            {  print("lpx_intopt: row %d has incorrect bounds", i);
+            {  xprintf("lpx_intopt: row %d has incorrect bounds\n", i);
                ret = LPX_E_FAULT;
                goto done;
             }
@@ -545,7 +545,8 @@ int lpx_intopt(LPX *_mip)
       for (j = 1; j <= orig_n; j++)
       {  if (lpx_get_col_type(orig, j) == LPX_DB)
          {  if (lpx_get_col_lb(orig, j) >= lpx_get_col_ub(orig, j))
-            {  print("lpx_intopt: column %d has incorrect bounds", j);
+            {  xprintf("lpx_intopt: column %d has incorrect bounds\n",
+                  j);
                ret = LPX_E_FAULT;
                goto done;
             }
@@ -560,8 +561,8 @@ int lpx_intopt(LPX *_mip)
          if (type == LPX_LO || type == LPX_DB || type == LPX_FX)
          {  lb = lpx_get_col_lb(orig, j);
             if (lb != floor(lb))
-            {  print("lpx_intopt: integer column %d has non-integer low"
-                  "er bound or fixed value %g", j, lb);
+            {  xprintf("lpx_intopt: integer column %d has non-integer l"
+                  "ower bound or fixed value %g\n", j, lb);
                ret = LPX_E_FAULT;
                goto done;
             }
@@ -569,8 +570,8 @@ int lpx_intopt(LPX *_mip)
          if (type == LPX_UP || type == LPX_DB)
          {  ub = lpx_get_col_ub(orig, j);
             if (ub != floor(ub))
-            {  print("lpx_intopt: integer column %d has non-integer upp"
-                  "er bound %g", j, ub);
+            {  xprintf("lpx_intopt: integer column %d has non-integer u"
+                  "pper bound %g\n", j, ub);
                ret = LPX_E_FAULT;
                goto done;
             }
@@ -589,12 +590,12 @@ int lpx_intopt(LPX *_mip)
             break;
          case 1:
 nopfs:      /* primal infeasibility is detected */
-            print("PROBLEM HAS NO PRIMAL FEASIBLE SOLUTION");
+            xprintf("PROBLEM HAS NO PRIMAL FEASIBLE SOLUTION\n");
             ret = LPX_E_NOPFS;
             goto done;
          case 2:
             /* dual infeasibility is detected */
-nodfs:      print("LP RELAXATION HAS NO DUAL FEASIBLE SOLUTION");
+nodfs:      xprintf("LP RELAXATION HAS NO DUAL FEASIBLE SOLUTION\n");
             ret = LPX_E_NODFS;
             goto done;
          default:
@@ -624,9 +625,9 @@ nodfs:      print("LP RELAXATION HAS NO DUAL FEASIBLE SOLUTION");
       if (ipp->row_ptr == NULL || ipp->col_ptr == NULL)
       {  xassert(ipp->row_ptr == NULL);
          xassert(ipp->col_ptr == NULL);
-         print("Objective value = %.10g",
+         xprintf("Objective value = %.10g\n",
             ipp->orig_dir == LPX_MIN ? +ipp->c0 : -ipp->c0);
-         print("INTEGER OPTIMAL SOLUTION FOUND BY MIP PRESOLVER");
+         xprintf("INTEGER OPTIMAL SOLUTION FOUND BY MIP PRESOLVER\n");
          /* allocate recovered solution segment */
          ipp->col_stat = xcalloc(1+ipp->ncols, sizeof(int));
          ipp->col_mipx = xcalloc(1+ipp->ncols, sizeof(double));
@@ -648,8 +649,9 @@ nodfs:      print("LP RELAXATION HAS NO DUAL FEASIBLE SOLUTION");
          int ni = lpx_get_num_int(prob);
          int nb = lpx_get_num_bin(prob);
          char s[50];
-         print("lpx_intopt: presolved MIP has %d row%s, %d column%s, %d"
-            " non-zero%s", m, m == 1 ? "" : "s", n, n == 1 ? "" : "s",
+         xprintf("lpx_intopt: presolved MIP has %d row%s, %d column%s, "
+            "%d non-zero%s\n",
+            m, m == 1 ? "" : "s", n, n == 1 ? "" : "s",
             nnz, nnz == 1 ? "" : "s");
          if (nb == 0)
             strcpy(s, "none of");
@@ -661,7 +663,8 @@ nodfs:      print("LP RELAXATION HAS NO DUAL FEASIBLE SOLUTION");
             strcpy(s, "all of");
          else
             sprintf(s, "%d of", nb);
-         print("lpx_intopt: %d integer column%s, %s which %s binary",
+         xprintf(
+            "lpx_intopt: %d integer column%s, %s which %s binary\n",
             ni, ni == 1 ? "" : "s", s, nb == 1 ? "is" : "are");
       }
       /* inherit some control parameters and statistics */
@@ -698,7 +701,7 @@ nodfs:      print("LP RELAXATION HAS NO DUAL FEASIBLE SOLUTION");
       /* build an advanced initial basis */
       lpx_adv_basis(prob);
       /* solve LP relaxation */
-      print("Solving LP relaxation...");
+      xprintf("Solving LP relaxation...\n");
       switch (lpx_simplex(prob))
       {  case LPX_E_OK:
             break;
@@ -709,7 +712,7 @@ nodfs:      print("LP RELAXATION HAS NO DUAL FEASIBLE SOLUTION");
             ret = LPX_E_TMLIM;
             goto done;
          default:
-            print("lpx_intopt: cannot solve LP relaxation");
+            xprintf("lpx_intopt: cannot solve LP relaxation\n");
             ret = LPX_E_SING;
             goto done;
       }
