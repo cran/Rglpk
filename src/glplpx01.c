@@ -320,9 +320,11 @@ int lpx_simplex(LPX *lp)
       if (lpx_get_real_parm(lp, LPX_K_TMLIM) < 0.0)
          parm.tm_lim = INT_MAX;
       else
-         parm.tm_lim  = 1000.0 * lpx_get_real_parm(lp, LPX_K_TMLIM);
+         parm.tm_lim =
+            (int)(1000.0 * lpx_get_real_parm(lp, LPX_K_TMLIM));
       parm.out_frq = lpx_get_int_parm(lp, LPX_K_OUTFRQ);
-      parm.out_dly = 1000.0 * lpx_get_real_parm(lp, LPX_K_OUTDLY);
+      parm.out_dly =
+            (int)(1000.0 * lpx_get_real_parm(lp, LPX_K_OUTDLY));
       switch (lpx_get_int_parm(lp, LPX_K_PRESOL))
       {  case 0:  parm.presolve = GLP_OFF;      break;
          case 1:  parm.presolve = GLP_ON;       break;
@@ -536,7 +538,8 @@ int lpx_integer(LPX *lp)
       if (lpx_get_real_parm(lp, LPX_K_TMLIM) < 0.0)
          parm.tm_lim = INT_MAX;
       else
-         parm.tm_lim = 1000.0 * lpx_get_real_parm(lp, LPX_K_TMLIM);
+         parm.tm_lim =
+            (int)(1000.0 * lpx_get_real_parm(lp, LPX_K_TMLIM));
       if (lpx_get_int_parm(lp, LPX_K_USECUTS) & LPX_C_GOMORY)
          parm.gmi_cuts = GLP_ON;
       else
@@ -584,6 +587,46 @@ double lpx_mip_row_val(LPX *lp, int i)
 double lpx_mip_col_val(LPX *lp, int j)
 {     /* retrieve column value (MIP solution) */
       return glp_mip_col_val(lp, j);
+}
+
+LPX *lpx_read_mps(const char *fname)
+{     /* read problem data in fixed MPS format */
+      LPX *lp = lpx_create_prob();
+      if (glp_read_mps(lp, GLP_MPS_DECK, NULL, fname))
+         lpx_delete_prob(lp), lp = NULL;
+      return lp;
+}
+
+int lpx_write_mps(LPX *lp, const char *fname)
+{     /* write problem data in fixed MPS format */
+      return glp_write_mps(lp, GLP_MPS_DECK, NULL, fname);
+}
+
+LPX *lpx_read_freemps(const char *fname)
+{     /* read problem data in free MPS format */
+      LPX *lp = lpx_create_prob();
+      if (glp_read_mps(lp, GLP_MPS_FILE, NULL, fname))
+         lpx_delete_prob(lp), lp = NULL;
+      return lp;
+}
+
+int lpx_write_freemps(LPX *lp, const char *fname)
+{     /* write problem data in free MPS format */
+      return glp_write_mps(lp, GLP_MPS_FILE, NULL, fname);
+}
+
+LPX *lpx_read_cpxlp(const char *fname)
+{     /* read problem data in CPLEX LP format */
+      LPX *lp;
+      lp = lpx_create_prob();
+      if (glp_read_lp(lp, NULL, fname))
+         lpx_delete_prob(lp), lp = NULL;
+      return lp;
+}
+
+int lpx_write_cpxlp(LPX *lp, const char *fname)
+{     /* write problem data in CPLEX LP format */
+      return glp_write_lp(lp, NULL, fname);
 }
 
 int lpx_is_b_avail(glp_prob *lp)

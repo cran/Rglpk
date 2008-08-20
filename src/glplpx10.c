@@ -64,6 +64,13 @@ static void set_d_eps(mpq_t x, double val)
       double f, p, q, eps = 1e-9;
       mpq_t temp;
       xassert(-DBL_MAX <= val && val <= +DBL_MAX);
+#if 1 /* 30/VII-2008 */
+      if (val == floor(val))
+      {  /* if val is integral, do not approximate */
+         mpq_set_d(x, val);
+         goto done;
+      }
+#endif
       if (val > 0.0)
          s = +1;
       else if (val < 0.0)

@@ -797,10 +797,17 @@ static int reduce_bounds(IPP *ipp, IPPROW *row)
 #endif
          {  switch(ipp_tight_bnds(ipp, col, lb, ub))
             {  case 0:
+#if 0
                   /* bounds remain unchanged; can never be */
                   xassert(ipp != ipp);
+#else
+                  /* can be if lb or ub is large and x[j] is integer */
+                  break;
+#endif
                case 1:
                   /* bounds have been changed */
+                  /* activate x[j] for further processing */
+                  ipp_enque_col(ipp, col);
                   break;
                case 2:
                   /* new bounds are primal infeasible */
@@ -808,8 +815,6 @@ static int reduce_bounds(IPP *ipp, IPPROW *row)
                default:
                   xassert(ipp != ipp);
             }
-            /* activate x[j] for further processing */
-            ipp_enque_col(ipp, col);
          }
       }
       return 0;

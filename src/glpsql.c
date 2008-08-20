@@ -663,7 +663,7 @@ void *db_iodbc_open(TABDCA *dca, int mode)
          SQL_SUCCESS)
       {
          xprintf("db_iodbc_open: Query\n\"%s\"\nfailed.\n", sql->query);
-         extract_error("SQLDriverConnect", sql->hdbc, SQL_HANDLE_STMT);
+         extract_error("SQLExecDirect", sql->hstmt, SQL_HANDLE_STMT);
          dl_SQLFreeHandle(SQL_HANDLE_STMT, sql->hstmt);
          dl_SQLDisconnect(sql->hdbc);
          dl_SQLFreeHandle(SQL_HANDLE_DBC, sql->hdbc);

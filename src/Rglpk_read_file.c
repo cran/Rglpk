@@ -1,48 +1,50 @@
 /* These are the interface functions to GLPK's MPS reader/writer
  */
 
-#include "glpk.h"
+#include "Rglpk.h"
 #include <stdio.h>
-#include <R.h>
 
 // read in all necessary elements for retrieving the LP/MILP
-void Rglpk_read_file (char **file, int *type, /*char **lp_problem_name,*/
+void Rglpk_read_file (char **file, int *type, 
 		      int *lp_direction_of_optimization,
 		      int *lp_n_constraints, int *lp_n_objective_vars,
 		      int *lp_n_values_in_constraint_matrix,
 		      int *lp_n_integer_vars, int *lp_n_binary_vars,
 		      int *lp_verbosity) {
 
+  int status;
   glp_prob *lp;
-
+  
   // Turn on/off Terminal Output
-  if(*lp_verbosity==1)
+  if (*lp_verbosity==1)
     glp_term_out(GLP_ON);
   else
     glp_term_out(GLP_OFF);
+
+  // create problem object 
+  lp = glp_create_prob();
 
   // read file -> gets stored as an GLPK problem object 'lp'
   // which file type do we have?
   switch (*type){
   case 1: 
-    lp = lpx_read_mps(*file);
+    // Fixed (ancient) MPS Format, param argument currently NULL
+    status = glp_read_mps(lp, GLP_MPS_DECK, NULL, *file);
     break;
   case 2:
-    lp = lpx_read_freemps(*file);
+    // Free (modern) MPS format, param argument currently NULL
+    status = glp_read_mps(lp, GLP_MPS_FILE, NULL, *file);
     break;
   case 3:
-    lp = lpx_read_cpxlp(*file);
+    // CPLEX LP Format
+    status = glp_read_lp(lp, NULL, *file);
     break;
   }
-  
-  if ( lp == NULL ) {
-    error("Reading file %c failed", *file);
-  }
 
-  // retrieve name of problem (not for CPLEX_LP)
-  /*if ( ( *type == 1 ) || ( *type == 2 ) ) 
-    *lp_problem_name = glp_get_prob_name(lp);  
-  */  
+  // if file read successfully glp_read_* returns zero
+  if ( status != 0 ) {
+    error("Reading file %s failed", *file);
+  }
 
   // retrieve optimization direction flag
   *lp_direction_of_optimization = glp_get_obj_dir(lp);  
@@ -85,28 +87,39 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
 				  int *lp_verbosity) {
   glp_prob *lp;
   int i, j, lp_column_kind, tmp;
-  int ind_offset;
-  
+  int ind_offset, status;
+
   // Turn on/off Terminal Output
   if (*lp_verbosity==1)
     glp_term_out(GLP_ON);
   else
     glp_term_out(GLP_OFF);
 
+  // create problem object 
+  lp = glp_create_prob();
+
   // read file -> gets stored as an GLPK problem object 'lp'
   // which file type do we have?
   switch (*type){
   case 1: 
-    lp = lpx_read_mps(*file);
+    // Fixed (ancient) MPS Format, param argument currently NULL
+    status = glp_read_mps(lp, GLP_MPS_DECK, NULL, *file);
     break;
   case 2:
-    lp = lpx_read_freemps(*file);
+    // Free (modern) MPS format, param argument currently NULL
+    status = glp_read_mps(lp, GLP_MPS_FILE, NULL, *file);
     break;
   case 3:
-    lp = lpx_read_cpxlp(*file);
+    // CPLEX LP Format
+    status = glp_read_lp(lp, NULL, *file);
     break;
   }
 
+  // if file read successfully glp_read_* returns zero
+  if ( status != 0 ) {
+    error("Reading file %c failed", *file);
+  }
+  
   // retrieve column specific data (values, bounds and type)
   for (i = 0; i < *lp_n_objective_vars; i++) {
     lp_objective_coefficients[i] = glp_get_obj_coef(lp, i+1);

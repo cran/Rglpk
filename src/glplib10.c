@@ -97,7 +97,7 @@ xlong_t xtime(void)
          secs = (double)(clock() - c) / (double)CLOCKS_PER_SEC;
          if (0.0 <= secs && secs <= 1000.0)
          {  /* looks like correct value */
-            t = xladd(env->t_init, xlset(1000.0 * secs + 0.5));
+            t = xladd(env->t_init, xlset((int)(1000.0 * secs + 0.5)));
             goto done;
          }
       }

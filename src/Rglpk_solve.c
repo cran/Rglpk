@@ -1,9 +1,8 @@
 /* This is the GLPK C Interface
  */
 
-#include "glpk.h"
+#include "Rglpk.h"
 #include <stdio.h>
-#include <R.h>
 
 // this is the solve function called from R
 void R_glp_solve (int *lp_direction, int *lp_number_of_constraints,

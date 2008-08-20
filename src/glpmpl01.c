@@ -2608,6 +2608,12 @@ CODE *expression_10(MPL *mpl)
       switch (op)
       {  case O_EQ:
          case O_NE:
+#if 1 /* 02/VIII-2008 */
+         case O_LT:
+         case O_LE:
+         case O_GT:
+         case O_GE:
+#endif
             if (!(x->type == A_NUMERIC || x->type == A_SYMBOLIC))
                error_preceding(mpl, opstr);
             get_token(mpl /* <rho> */);
@@ -2620,6 +2626,7 @@ CODE *expression_10(MPL *mpl)
                y = make_unary(mpl, O_CVTSYM, y, A_SYMBOLIC, 0);
             x = make_binary(mpl, op, x, y, A_LOGICAL, 0);
             break;
+#if 0 /* 02/VIII-2008 */
          case O_LT:
          case O_LE:
          case O_GT:
@@ -2636,6 +2643,7 @@ CODE *expression_10(MPL *mpl)
                error_following(mpl, opstr);
             x = make_binary(mpl, op, x, y, A_LOGICAL, 0);
             break;
+#endif
          case O_IN:
          case O_NOTIN:
             if (x->type == A_NUMERIC)
@@ -3101,9 +3109,11 @@ bin:     {  if (binary_used)
                   temp->next);
                temp->next = cond;
             }
+#if 0 /* 13/VIII-2008 */
             if (par->type == A_SYMBOLIC &&
                !(cond->rho == O_EQ || cond->rho == O_NE))
                error(mpl, "inequality restriction not allowed");
+#endif
             get_token(mpl /* rho */);
             /* parse an expression that follows relational operator */
             cond->code = expression_5(mpl);

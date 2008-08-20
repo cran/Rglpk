@@ -6,7 +6,7 @@ function(obj, mat, dir, rhs, types = NULL, max = FALSE,
          bounds = NULL, verbose = FALSE)
 {
   ## validate direction of optimization
-  if(!identical(max, TRUE) && !identical(max, FALSE))
+  if(!identical( max, TRUE ) && !identical( max, FALSE ))
     stop("'Argument 'max' must be either TRUE or FALSE.")
   direction_of_optimization <- as.integer(max)
 
@@ -40,10 +40,10 @@ function(obj, mat, dir, rhs, types = NULL, max = FALSE,
   binaries <- types == "B"
   
   ## do we have a mixed integer linear program?
-  is_integer <- any(binaries | integers)
+  is_integer <- any( binaries | integers )
 
   ## bounds of objective coefficients
-  bounds <- as.glp_bounds(as.list(bounds), n_of_objective_vars)
+  bounds <- as.glp_bounds( as.list( bounds ), n_of_objective_vars )
 
   ## call the C interface - this actually runs the solver
   x <- glp_call_interface(obj, n_of_objective_vars, constraint_matrix$i,
@@ -52,15 +52,17 @@ function(obj, mat, dir, rhs, types = NULL, max = FALSE,
                           rhs, direction_of_constraints, n_of_constraints,
                           is_integer,
                           integers, binaries,
-                          direction_of_optimization, bounds[,1L],
-                          bounds[,2L], bounds[,3L], verb)
-  out <- list(optimum=NA, solution=NA, status=NA)
-  out$optimum <- x$lp_optimum
-  out$solution <- x$lp_objective_vars_values
+                          direction_of_optimization, bounds[, 1L],
+                          bounds[, 2L], bounds[, 3L], verb)
+  
+  solution <- x$lp_objective_vars_values
+  ## are integer variables really integers? better round values
+  solution[integers | binaries] <-
+    round( solution[integers | binaries])
   ## match status of solution
   ## 0 -> optimal solution (5 in GLPK) else 1
-  out$status <- as.integer(x$lp_status != 5L)
-  out
+  status <- as.integer(x$lp_status != 5L)
+  list(optimum = sum(solution * obj), solution = solution, status = status)
 }
 
 ## this function calls the C interface
@@ -88,7 +90,7 @@ function(lp_objective_coefficients, lp_n_of_objective_vars,
             lp_constraint_matrix_i      = as.integer(lp_constraint_matrix_i),
             lp_constraint_matrix_j      = as.integer(lp_constraint_matrix_j),
             lp_constraint_matrix_values = as.double(lp_constraint_matrix_v),
-            lp_bounds_type             = as.integer(lp_bounds_type),
+            lp_bounds_type              = as.integer(lp_bounds_type),
             lp_bounds_lower             = as.double(lp_bounds_lower),
             ## lp_n_of_bounds_l            = as.integer(length(lp_lower_bounds_i)),
             lp_bounds_upper             = as.double(lp_bounds_upper), 
@@ -100,3 +102,16 @@ function(lp_objective_coefficients, lp_n_of_objective_vars,
             NAOK = TRUE, PACKAGE = "Rglpk")
   out
 }
+
+## Convenience function for solving MILP objects (e.g., read by filereader)
+.Rglpk_solve <- function(x, control = list()){
+  if(!inherits(x, "MILP"))
+    stop("'x' must be of class 'MILP'")
+  if(is.null(control$verbose))
+    control$verbose <- FALSE
+  Rglpk_solve_LP(x$objective, x$constraints[[1]],
+                 x$constraints[[2]], x$constraints[[3]],
+                 x$types, x$maximum, x$bounds,
+                 verbose = control$verbose)
+}
+

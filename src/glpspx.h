@@ -24,7 +24,7 @@
 #ifndef _GLPSPX_H
 #define _GLPSPX_H
 
-#include "glpbfd.h"
+#include "glpapi.h"
 
 typedef struct SPX SPX;
 
@@ -256,151 +256,155 @@ struct SPX
       /* is used to save the original objective coefficients */
 };
 
-#define spx_invert            _glp_spx_invert
-#define spx_ftran             _glp_spx_ftran
-#define spx_btran             _glp_spx_btran
-#define spx_update            _glp_spx_update
-#define spx_eval_xn_j         _glp_spx_eval_xn_j
-#define spx_eval_bbar         _glp_spx_eval_bbar
-#define spx_eval_pi           _glp_spx_eval_pi
-#define spx_eval_cbar         _glp_spx_eval_cbar
-#define spx_eval_obj          _glp_spx_eval_obj
-#define spx_eval_col          _glp_spx_eval_col
-#define spx_eval_rho          _glp_spx_eval_rho
-#define spx_eval_row          _glp_spx_eval_row
-#define spx_check_bbar        _glp_spx_check_bbar
-#define spx_check_cbar        _glp_spx_check_cbar
-#define spx_prim_chuzc        _glp_spx_prim_chuzc
-#define spx_prim_chuzr        _glp_spx_prim_chuzr
-#define spx_dual_chuzr        _glp_spx_dual_chuzr
-#define spx_dual_chuzc        _glp_spx_dual_chuzc
-#define spx_update_bbar       _glp_spx_update_bbar
-#define spx_update_pi         _glp_spx_update_pi
-#define spx_update_cbar       _glp_spx_update_cbar
-#define spx_change_basis      _glp_spx_change_basis
-#define spx_err_in_bbar       _glp_spx_err_in_bbar
-#define spx_err_in_pi         _glp_spx_err_in_pi
-#define spx_err_in_cbar       _glp_spx_err_in_cbar
-#define spx_reset_refsp       _glp_spx_reset_refsp
-#define spx_update_gvec       _glp_spx_update_gvec
-#define spx_err_in_gvec       _glp_spx_err_in_gvec
-#define spx_update_dvec       _glp_spx_update_dvec
-#define spx_err_in_dvec       _glp_spx_err_in_dvec
-
-#define spx_warm_up           _glp_spx_warm_up
-#define spx_prim_opt          _glp_spx_prim_opt
-#define spx_prim_feas         _glp_spx_prim_feas
-#define spx_dual_opt          _glp_spx_dual_opt
-#define spx_simplex           _glp_spx_simplex
-
 /* simplex method generic routines -----------------------------------*/
 
+#define spx_invert _glp_spx_invert
 int spx_invert(SPX *spx);
 /* reinvert the basis matrix */
 
+#define spx_ftran _glp_spx_ftran
 void spx_ftran(SPX *spx, double x[]);
 /* perform forward transformation (FTRAN) */
 
+#define spx_btran _glp_spx_btran
 void spx_btran(SPX *spx, double x[]);
 /* perform backward transformation (BTRAN) */
 
+#define spx_update _glp_spx_update
 int spx_update(SPX *spx, int j);
 /* update factorization for adjacent basis matrix */
 
+#define spx_eval_xn_j _glp_spx_eval_xn_j
 double spx_eval_xn_j(SPX *spx, int j);
 /* determine value of non-basic variable */
 
+#define spx_eval_bbar _glp_spx_eval_bbar
 void spx_eval_bbar(SPX *spx);
 /* compute values of basic variables */
 
+#define spx_eval_pi _glp_spx_eval_pi
 void spx_eval_pi(SPX *spx);
 /* compute simplex multipliers */
 
+#define spx_eval_cbar _glp_spx_eval_cbar
 void spx_eval_cbar(SPX *spx);
 /* compute reduced costs of non-basic variables */
 
+#define spx_eval_obj _glp_spx_eval_obj
 double spx_eval_obj(SPX *spx);
 /* compute value of the objective function */
 
+#define spx_eval_col _glp_spx_eval_col
 void spx_eval_col(SPX *spx, int j, double col[], int save);
 /* compute column of the simplex table */
 
+#define spx_eval_rho _glp_spx_eval_rho
 void spx_eval_rho(SPX *spx, int i, double rho[]);
 /* compute row of the inverse */
 
+#define spx_eval_row _glp_spx_eval_row
 void spx_eval_row(SPX *spx, double rho[], double row[]);
 /* compute row of the simplex table */
 
+#define spx_check_bbar _glp_spx_check_bbar
 double spx_check_bbar(SPX *spx, double tol);
 /* check primal feasibility */
 
+#define spx_check_cbar _glp_spx_check_cbar
 double spx_check_cbar(SPX *spx, double tol);
 /* check dual feasibility */
 
+#define spx_prim_chuzc _glp_spx_prim_chuzc
 int spx_prim_chuzc(SPX *spx, double tol);
 /* choose non-basic variable (primal simplex) */
 
+#define spx_prim_chuzr _glp_spx_prim_chuzr
 int spx_prim_chuzr(SPX *spx, double relax);
 /* choose basic variable (primal simplex) */
 
+#define spx_dual_chuzr _glp_spx_dual_chuzr
 void spx_dual_chuzr(SPX *spx, double tol);
 /* choose basic variable (dual simplex) */
 
+#define spx_dual_chuzc _glp_spx_dual_chuzc
 int spx_dual_chuzc(SPX *spx, double relax);
 /* choose non-basic variable (dual simplex) */
 
+#define spx_update_bbar _glp_spx_update_bbar
 void spx_update_bbar(SPX *spx, double *obj);
 /* update values of basic variables */
 
+#define spx_update_pi _glp_spx_update_pi
 void spx_update_pi(SPX *spx);
 /* update simplex multipliers */
 
+#define spx_update_cbar _glp_spx_update_cbar
 void spx_update_cbar(SPX *spx, int all);
 /* update reduced costs of non-basic variables */
 
+#define spx_change_basis _glp_spx_change_basis
 int spx_change_basis(SPX *spx);
 /* change basis and update the factorization */
 
+#define spx_err_in_bbar _glp_spx_err_in_bbar
 double spx_err_in_bbar(SPX *spx);
 /* compute maximal absolute error in bbar */
 
+#define spx_err_in_pi _glp_spx_err_in_pi
 double spx_err_in_pi(SPX *spx);
 /* compute maximal absolute error in pi */
 
+#define spx_err_in_cbar _glp_spx_err_in_cbar
 double spx_err_in_cbar(SPX *spx, int all);
 /* compute maximal absolute error in cbar */
 
+#define spx_reset_refsp _glp_spx_reset_refsp
 void spx_reset_refsp(SPX *spx);
 /* reset the reference space */
 
+#define spx_update_gvec _glp_spx_update_gvec
 void spx_update_gvec(SPX *spx);
 /* update the vector gamma for adjacent basis */
 
+#define spx_err_in_gvec _glp_spx_err_in_gvec
 double spx_err_in_gvec(SPX *spx);
 /* compute maximal absolute error in gvec */
 
+#define spx_update_dvec _glp_spx_update_dvec
 void spx_update_dvec(SPX *spx);
 /* update the vector delta for adjacent basis */
 
+#define spx_err_in_dvec _glp_spx_err_in_dvec
 double spx_err_in_dvec(SPX *spx);
 /* compute maximal absolute error in dvec */
 
 /* simplex method solver routines ------------------------------------*/
 
+#define spx_warm_up _glp_spx_warm_up
 void spx_warm_up(SPX *spx);
 /* "warm up" the initial basis */
 
+#define spx_prim_opt _glp_spx_prim_opt
 int spx_prim_opt(SPX *spx);
 /* find optimal solution (primal simplex) */
 
+#define spx_prim_feas _glp_spx_prim_feas
 int spx_prim_feas(SPX *spx);
 /* find primal feasible solution (primal simplex) */
 
+#define spx_dual_opt _glp_spx_dual_opt
 int spx_dual_opt(SPX *spx);
 /* find optimal solution (dual simplex) */
 
+#define spx_simplex _glp_spx_simplex
 int spx_simplex(SPX *spx);
 /* base driver to the simplex method */
+
+/**********************************************************************/
+
+#define spx_primal _glp_spx_primal
+int spx_primal(glp_prob *lp, const glp_smcp *parm);
+/* core LP solver based on the primal simplex method */
 
 #endif
 

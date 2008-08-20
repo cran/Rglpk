@@ -256,7 +256,7 @@ void lpx_put_lp_basis(glp_prob *lp, int valid, int basis[], BFD *b_inv)
       lp->valid = valid;
       /* store basis header */
       if (basis != NULL)
-         for (i = 1; i <= lp->m; i++) lp->bhead[i] = basis[i];
+         for (i = 1; i <= lp->m; i++) lp->head[i] = basis[i];
       /* store factorization of the basis matrix */
       xassert(lp->bfd == b_inv);
       /* if the basis is claimed to be valid, check it */
@@ -264,7 +264,7 @@ void lpx_put_lp_basis(glp_prob *lp, int valid, int basis[], BFD *b_inv)
       {  for (k = 1; k <= lp->m; k++) lp->row[k]->bind = 0;
          for (k = 1; k <= lp->n; k++) lp->col[k]->bind = 0;
          for (i = 1; i <= lp->m; i++)
-         {  k = lp->bhead[i];
+         {  k = lp->head[i];
             if (!(1 <= k && k <= lp->m+lp->n))
                xfault("lpx_put_lp_basis: basis[%d] = %d; invalid refere"
                   "nce to basic variable\n", i, k);

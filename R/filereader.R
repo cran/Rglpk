@@ -50,7 +50,9 @@ Rglpk_read_file <- function(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP"),
   MP_data <- glp_merge_MP_data(meta_data, milp_data)
   ## Post processing
   MP_data$type <- names(type_db[type_db == MP_data$type])
-  dir_db <- c("FREE" = 1L, ">=" = 2L, "<=" = 3L, "DB" = 4L, "==" = 5L)
+  ## unbounded (FREE, 1L) variable gets an upper bound of Inf
+  ## and a direction '<='
+  dir_db <- c("<=" = 1L, ">=" = 2L, "<=" = 3L, "DB" = 4L, "==" = 5L)
   MP_data$direction_of_constraints <- names(dir_db[MP_data$direction_of_constraints])
   ## default is to have only continuous variables
   ## if any is binary or integer set the value accordingly
@@ -88,9 +90,6 @@ glp_get_meta_data_from_file <- function(x, verbose){
   res <- .C("Rglpk_read_file",
             file                          = as.character(x$file),
             type                          = as.integer(x$type),
-            ## generates segfaults
-            ##problem_name                  = character(1L),
-            ## objective_function_name       = character(1L),
             direction_of_optimization     = integer(1L),
             n_constraints                 = integer(1L),         
             n_objective_vars              = integer(1L),

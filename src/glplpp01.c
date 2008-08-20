@@ -594,8 +594,11 @@ LPX *lpp_build_prob(LPP *lpp)
       lpx_set_obj_coef(prob, 0,
          lpp->orig_dir == LPX_MIN ? + lpp->c0 : - lpp->c0);
       /* create rows of the resultant problem */
+#if 0 /* 03/VII-2008 */
       xassert(lpp->m > 0);
-      lpx_add_rows(prob, lpp->m);
+#endif
+      if (lpp->m > 0)
+         lpx_add_rows(prob, lpp->m);
       for (i = 1, row = lpp->row_ptr; i <= lpp->m; i++, row = row->next)
       {  xassert(row != NULL);
          lpp->row_ref[i] = row->i;
@@ -614,8 +617,11 @@ LPX *lpp_build_prob(LPP *lpp)
       }
       xassert(row == NULL);
       /* create columns of the resultant problem */
+#if 0 /* 03/VII-2008 */
       xassert(lpp->n > 0);
-      lpx_add_cols(prob, lpp->n);
+#endif
+      if (lpp->n > 0)
+         lpx_add_cols(prob, lpp->n);
       for (j = 1, col = lpp->col_ptr; j <= lpp->n; j++, col = col->next)
       {  xassert(col != NULL);
          lpp->col_ref[j] = col->j;

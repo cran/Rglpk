@@ -354,6 +354,49 @@ static int mat(void *info, int k, int ndx[], double val[])
       return len;
 }
 
+/* scaling algorithm: */
+#define GLP_SCAL_EQ     1  /* equilibration scaling */
+#define GLP_SCAL_GMEAN  2  /* geometric mean scaling */
+
+void glp_scale_prob(glp_prob *lp, int alg, const void *parm)
+{     /* scale problem data */
+      int m = lp->m;
+      int n = lp->n;
+      int i, j;
+      double *R, *S;
+      if (!(alg == GLP_SCAL_EQ || alg == GLP_SCAL_GMEAN))
+         xerror("glp_scale_prob: alg = %d; invalid parameter\n", alg);
+      if (parm != NULL)
+         xerror("glp_scale_prob: parm = %p; invalid parameter\n", parm);
+      /* if the problem has no rows or columns, skip computations */
+      if (m == 0 || n == 0) goto done;
+      /* obtain current scaling matrices R and S */
+      R = xcalloc(1+m, sizeof(double));
+      S = xcalloc(1+n, sizeof(double));
+      for (i = 1; i <= m; i++) R[i] = glp_get_rii(lp, i);
+      for (j = 1; j <= n; j++) S[j] = glp_get_sjj(lp, j);
+      /* perform scaling */
+      switch (alg)
+      {  case GLP_SCAL_EQ:
+            /* equilibration scaling */
+            eq_scal(m, n, lp, mat, R, S, 0);
+            break;
+         case GLP_SCAL_GMEAN:
+            /* geometric mean scaling */
+            gm_scal(m, n, lp, mat, R, S, 0, 20, 0.01);
+            break;
+         default:
+            xassert(alg != alg);
+      }
+      /* store new scaling matrices R' and S' */
+      for (i = 1; i <= m; i++) lpx_set_rii(lp, i, R[i]);
+      for (j = 1; j <= n; j++) lpx_set_sjj(lp, j, S[j]);
+      xfree(R);
+      xfree(S);
+done: return;
+}
+
+#if 0
 void lpx_scale_prob(LPX *lp)
 {     /* scale LP/MIP problem data */
       int m = lpx_get_num_rows(lp);
@@ -398,5 +441,32 @@ skip: /* enter the scaling matrices R and S into the problem object and
       xfree(S);
       return;
 }
+#else
+void lpx_scale_prob(LPX *lp)
+{     /* scale LP/MIP problem data */
+      glp_unscale_prob(lp);
+      switch (lpx_get_int_parm(lp, LPX_K_SCALE))
+      {  case 0:
+            /* no scaling */
+            break;
+         case 1:
+            /* equilibration scaling */
+            glp_scale_prob(lp, GLP_SCAL_EQ, NULL);
+            break;
+         case 2:
+            /* geometric mean scaling */
+            glp_scale_prob(lp, GLP_SCAL_GMEAN, NULL);
+            break;
+         case 3:
+            /* geometric mean scaling, then equilibration scaling */
+            glp_scale_prob(lp, GLP_SCAL_GMEAN, NULL);
+            glp_scale_prob(lp, GLP_SCAL_EQ, NULL);
+            break;
+         default:
+            xassert(lp != lp);
+      }
+      return;
+}
+#endif
 
 /* eof */

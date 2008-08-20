@@ -54,15 +54,10 @@
 *  The routine returns a pointer to the object created, which should be
 *  used in any subsequent operations on this object. */
 
-glp_prob *glp_create_prob(void)
-{     glp_prob *lp;
-      lp = xmalloc(sizeof(glp_prob));
-      lp->pool = dmp_create_pool();
+static void create_prob(glp_prob *lp)
+{     lp->pool = dmp_create_pool();
       lp->cps = xmalloc(sizeof(struct LPXCPS));
       lpx_reset_parms(lp);
-#if 0
-      lp->str_buf = xmalloc(255+1);
-#endif
       lp->tree = NULL;
       /* LP/MIP data */
       lp->name = NULL;
@@ -78,7 +73,7 @@ glp_prob *glp_create_prob(void)
       lp->r_tree = lp->c_tree = NULL;
       /* basis factorization */
       lp->valid = 0;
-      lp->bhead = xcalloc(1+lp->m_max, sizeof(int));
+      lp->head = xcalloc(1+lp->m_max, sizeof(int));
       lp->bfcp = NULL;
       lp->bfd = NULL;
       /* basic solution (LP) */
@@ -92,6 +87,13 @@ glp_prob *glp_create_prob(void)
       /* integer solution (MIP) */
       lp->mip_stat = GLP_UNDEF;
       lp->mip_obj = 0.0;
+      return;
+}
+
+glp_prob *glp_create_prob(void)
+{     glp_prob *lp;
+      lp = xmalloc(sizeof(glp_prob));
+      create_prob(lp);
       return lp;
 }
 
@@ -229,8 +231,8 @@ int glp_add_rows(glp_prob *lp, int nrs)
          memcpy(&lp->row[1], &save[1], lp->m * sizeof(GLPROW *));
          xfree(save);
          /* do not forget about the basis header */
-         xfree(lp->bhead);
-         lp->bhead = xcalloc(1+lp->m_max, sizeof(int));
+         xfree(lp->head);
+         lp->head = xcalloc(1+lp->m_max, sizeof(int));
       }
       /* add new rows to the end of the row list */
       for (i = lp->m+1; i <= m_new; i++)
@@ -1117,15 +1119,40 @@ void glp_del_cols(glp_prob *lp, int ncs, const int num[])
       /* if the basis header is still valid, adjust it */
       if (lp->valid)
       {  int m = lp->m;
-         int *bhead = lp->bhead;
+         int *head = lp->head;
          for (j = 1; j <= n_new; j++)
          {  k = lp->col[j]->bind;
             if (k != 0)
             {  xassert(1 <= k && k <= m);
-               bhead[k] = m + j;
+               head[k] = m + j;
             }
          }
       }
+      return;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  glp_erase_prob - erase problem object content
+*
+*  SYNOPSIS
+*
+*  void glp_erase_prob(glp_prob *lp);
+*
+*  DESCRIPTION
+*
+*  The routine glp_erase_prob erases the content of the specified
+*  problem object. The effect of this operation is the same as if the
+*  problem object would be deleted with the routine glp_delete_prob and
+*  then created anew with the routine glp_create_prob, with exception
+*  that the handle (pointer) to the problem object remains valid. */
+
+static void delete_prob(glp_prob *lp);
+
+void glp_erase_prob(glp_prob *lp)
+{     delete_prob(lp);
+      create_prob(lp);
       return;
 }
 
@@ -1143,20 +1170,22 @@ void glp_del_cols(glp_prob *lp, int ncs, const int num[])
 *  The routine glp_delete_prob deletes the specified problem object and
 *  frees all the memory allocated to it. */
 
-void glp_delete_prob(glp_prob *lp)
+static void delete_prob(glp_prob *lp)
 {     dmp_delete_pool(lp->pool);
       xfree(lp->cps);
-#if 0
-      xfree(lp->str_buf);
-#endif
       xassert(lp->tree == NULL);
       xfree(lp->row);
       xfree(lp->col);
       if (lp->r_tree != NULL) avl_delete_tree(lp->r_tree);
       if (lp->c_tree != NULL) avl_delete_tree(lp->c_tree);
-      xfree(lp->bhead);
+      xfree(lp->head);
       if (lp->bfcp != NULL) xfree(lp->bfcp);
       if (lp->bfd != NULL) bfd_delete_it(lp->bfd);
+      return;
+}
+
+void glp_delete_prob(glp_prob *lp)
+{     delete_prob(lp);
       xfree(lp);
       return;
 }

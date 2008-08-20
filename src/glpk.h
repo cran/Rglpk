@@ -30,7 +30,7 @@ extern "C" {
 
 /* library version numbers: */
 #define GLP_MAJOR_VERSION  4
-#define GLP_MINOR_VERSION  28
+#define GLP_MINOR_VERSION  30
 
 #ifndef _GLP_PROB
 #define _GLP_PROB
@@ -104,15 +104,16 @@ typedef struct
 #define GLP_MSG_ERR     1  /* warning and error messages only */
 #define GLP_MSG_ON      2  /* normal output */
 #define GLP_MSG_ALL     3  /* full output */
+#define GLP_MSG_DBG     4  /* debug output */
       int meth;            /* simplex method option: */
 #define GLP_PRIMAL      1  /* use primal simplex */
 #define GLP_DUALP       2  /* use dual simplex, if possible */
       int pricing;         /* pricing technique: */
-#define GLP_PT_STD   0x11  /* standard (textbook) */
+#define GLP_PT_STD   0x11  /* standard (Dantzig rule) */
 #define GLP_PT_PSE   0x22  /* projected steepest edge */
       int r_test;          /* ratio test technique: */
 #define GLP_RT_STD   0x11  /* standard (textbook) */
-#define GLP_RT_HAR   0x22  /* Harris' ratio test */
+#define GLP_RT_HAR   0x22  /* two-pass Harris' ratio test */
       double tol_bnd;      /* spx.tol_bnd */
       double tol_dj;       /* spx.tol_dj */
       double tol_piv;      /* spx.tol_piv */
@@ -198,7 +199,11 @@ typedef struct
 #define GLP_ENOPFS   0x0A  /* no primal feasible solution */
 #define GLP_ENODFS   0x0B  /* no dual feasible solution */
 #define GLP_EROOT    0x0C  /* root LP optimum not provided */
-#define GLP_ESTOP    0x0D  /* serach terminated by application */
+#define GLP_ESTOP    0x0D  /* search terminated by application */
+
+/* MPS file format: */
+#define GLP_MPS_DECK    1  /* fixed (ancient) */
+#define GLP_MPS_FILE    2  /* free (modern) */
 
 glp_prob *glp_create_prob(void);
 /* create problem object */
@@ -252,6 +257,9 @@ void glp_del_rows(glp_prob *lp, int nrs, const int num[]);
 
 void glp_del_cols(glp_prob *lp, int ncs, const int num[]);
 /* delete specified columns from problem object */
+
+void glp_erase_prob(glp_prob *lp);
+/* erase problem object content */
 
 void glp_delete_prob(glp_prob *lp);
 /* delete problem object */
@@ -557,6 +565,20 @@ void glp_mem_limit(int limit);
 
 void glp_free_env(void);
 /* free GLPK library environment */
+
+int glp_read_mps(glp_prob *lp, int fmt, const void *parm,
+      const char *fname);
+/* read problem data in MPS format */
+
+int glp_write_mps(glp_prob *lp, int fmt, const void *parm,
+      const char *fname);
+/* write problem data in MPS format */
+
+int glp_read_lp(glp_prob *lp, const void *parm, const char *fname);
+/* read problem data in CPLEX LP format */
+
+int glp_write_lp(glp_prob *lp, const void *parm, const char *fname);
+/* write problem data in CPLEX LP format */
 
 int glp_main(int argc, const char *argv[]);
 /* stand-alone LP/MIP solver */

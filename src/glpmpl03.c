@@ -2761,7 +2761,28 @@ void check_value_sym
          xassert(cond->code != NULL);
          bound = eval_symbolic(mpl, cond->code);
          switch (cond->rho)
-         {  case O_EQ:
+         {
+#if 1 /* 13/VIII-2008 */
+            case O_LT:
+               if (!(compare_symbols(mpl, value, bound) < 0))
+               {  strcpy(buf, format_symbol(mpl, bound));
+                  xassert(strlen(buf) < sizeof(buf));
+                  error(mpl, "%s%s = %s not < %s",
+                     par->name, format_tuple(mpl, '[', tuple),
+                     format_symbol(mpl, value), buf, eqno);
+               }
+               break;
+            case O_LE:
+               if (!(compare_symbols(mpl, value, bound) <= 0))
+               {  strcpy(buf, format_symbol(mpl, bound));
+                  xassert(strlen(buf) < sizeof(buf));
+                  error(mpl, "%s%s = %s not <= %s",
+                     par->name, format_tuple(mpl, '[', tuple),
+                     format_symbol(mpl, value), buf, eqno);
+               }
+               break;
+#endif
+            case O_EQ:
                if (!(compare_symbols(mpl, value, bound) == 0))
                {  strcpy(buf, format_symbol(mpl, bound));
                   xassert(strlen(buf) < sizeof(buf));
@@ -2770,6 +2791,26 @@ void check_value_sym
                      format_symbol(mpl, value), buf, eqno);
                }
                break;
+#if 1 /* 13/VIII-2008 */
+            case O_GE:
+               if (!(compare_symbols(mpl, value, bound) >= 0))
+               {  strcpy(buf, format_symbol(mpl, bound));
+                  xassert(strlen(buf) < sizeof(buf));
+                  error(mpl, "%s%s = %s not >= %s",
+                     par->name, format_tuple(mpl, '[', tuple),
+                     format_symbol(mpl, value), buf, eqno);
+               }
+               break;
+            case O_GT:
+               if (!(compare_symbols(mpl, value, bound) > 0))
+               {  strcpy(buf, format_symbol(mpl, bound));
+                  xassert(strlen(buf) < sizeof(buf));
+                  error(mpl, "%s%s = %s not > %s",
+                     par->name, format_tuple(mpl, '[', tuple),
+                     format_symbol(mpl, value), buf, eqno);
+               }
+               break;
+#endif
             case O_NE:
                if (!(compare_symbols(mpl, value, bound) != 0))
                {  strcpy(buf, format_symbol(mpl, bound));
@@ -3853,13 +3894,41 @@ int eval_logical(MPL *mpl, CODE *code)
             break;
          case O_LT:
             /* comparison on 'less than' */
+#if 0 /* 02/VIII-2008 */
             value = (eval_numeric(mpl, code->arg.arg.x) <
                      eval_numeric(mpl, code->arg.arg.y));
+#else
+            xassert(code->arg.arg.x != NULL);
+            if (code->arg.arg.x->type == A_NUMERIC)
+               value = (eval_numeric(mpl, code->arg.arg.x) <
+                        eval_numeric(mpl, code->arg.arg.y));
+            else
+            {  SYMBOL *sym1 = eval_symbolic(mpl, code->arg.arg.x);
+               SYMBOL *sym2 = eval_symbolic(mpl, code->arg.arg.y);
+               value = (compare_symbols(mpl, sym1, sym2) < 0);
+               delete_symbol(mpl, sym1);
+               delete_symbol(mpl, sym2);
+            }
+#endif
             break;
          case O_LE:
             /* comparison on 'not greater than' */
+#if 0 /* 02/VIII-2008 */
             value = (eval_numeric(mpl, code->arg.arg.x) <=
                      eval_numeric(mpl, code->arg.arg.y));
+#else
+            xassert(code->arg.arg.x != NULL);
+            if (code->arg.arg.x->type == A_NUMERIC)
+               value = (eval_numeric(mpl, code->arg.arg.x) <=
+                        eval_numeric(mpl, code->arg.arg.y));
+            else
+            {  SYMBOL *sym1 = eval_symbolic(mpl, code->arg.arg.x);
+               SYMBOL *sym2 = eval_symbolic(mpl, code->arg.arg.y);
+               value = (compare_symbols(mpl, sym1, sym2) <= 0);
+               delete_symbol(mpl, sym1);
+               delete_symbol(mpl, sym2);
+            }
+#endif
             break;
          case O_EQ:
             /* comparison on 'equal to' */
@@ -3877,13 +3946,41 @@ int eval_logical(MPL *mpl, CODE *code)
             break;
          case O_GE:
             /* comparison on 'not less than' */
+#if 0 /* 02/VIII-2008 */
             value = (eval_numeric(mpl, code->arg.arg.x) >=
                      eval_numeric(mpl, code->arg.arg.y));
+#else
+            xassert(code->arg.arg.x != NULL);
+            if (code->arg.arg.x->type == A_NUMERIC)
+               value = (eval_numeric(mpl, code->arg.arg.x) >=
+                        eval_numeric(mpl, code->arg.arg.y));
+            else
+            {  SYMBOL *sym1 = eval_symbolic(mpl, code->arg.arg.x);
+               SYMBOL *sym2 = eval_symbolic(mpl, code->arg.arg.y);
+               value = (compare_symbols(mpl, sym1, sym2) >= 0);
+               delete_symbol(mpl, sym1);
+               delete_symbol(mpl, sym2);
+            }
+#endif
             break;
          case O_GT:
             /* comparison on 'greater than' */
+#if 0 /* 02/VIII-2008 */
             value = (eval_numeric(mpl, code->arg.arg.x) >
                      eval_numeric(mpl, code->arg.arg.y));
+#else
+            xassert(code->arg.arg.x != NULL);
+            if (code->arg.arg.x->type == A_NUMERIC)
+               value = (eval_numeric(mpl, code->arg.arg.x) >
+                        eval_numeric(mpl, code->arg.arg.y));
+            else
+            {  SYMBOL *sym1 = eval_symbolic(mpl, code->arg.arg.x);
+               SYMBOL *sym2 = eval_symbolic(mpl, code->arg.arg.y);
+               value = (compare_symbols(mpl, sym1, sym2) > 0);
+               delete_symbol(mpl, sym1);
+               delete_symbol(mpl, sym2);
+            }
+#endif
             break;
          case O_NE:
             /* comparison on 'not equal to' */

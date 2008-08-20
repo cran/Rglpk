@@ -21,6 +21,7 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#define _GLPBFD_PRIVATE
 #include "glpapi.h"
 #define xfault xerror
 
@@ -83,7 +84,7 @@ static int b_col(void *info, int j, int ind[], double val[])
       xassert(1 <= j && j <= m);
       /* determine the ordinal number of basic auxiliary or structural
          variable x[k] corresponding to basic variable xB[j] */
-      k = lp->bhead[j];
+      k = lp->head[j];
       /* build j-th column of the basic matrix, which is k-th column of
          the scaled augmented matrix (I | -R*A*S) */
       if (k <= m)
@@ -109,7 +110,7 @@ int glp_factorize(glp_prob *lp)
       int n = lp->n;
       GLPROW **row = lp->row;
       GLPCOL **col = lp->col;
-      int *bhead = lp->bhead;
+      int *head = lp->head;
       int j, k, stat, ret;
       /* invalidate the basis factorization */
       lp->valid = 0;
@@ -131,7 +132,7 @@ int glp_factorize(glp_prob *lp)
                ret = GLP_EBADB;
                goto fini;
             }
-            bhead[j] = k;
+            head[j] = k;
             if (k <= m)
                row[k]->bind = j;
             else
@@ -147,7 +148,7 @@ int glp_factorize(glp_prob *lp)
       if (m > 0)
       {  _glp_access_bfd(lp);
          xassert(lp->bfd != NULL);
-         switch (bfd_factorize(lp->bfd, m, lp->bhead, b_col, lp))
+         switch (bfd_factorize(lp->bfd, m, lp->head, b_col, lp))
          {  case 0:
                /* ok */
                break;
@@ -357,7 +358,7 @@ int glp_get_bhead(glp_prob *lp, int k)
          xfault("glp_get_bhead: basis factorization does not exist\n");
       if (!(1 <= k && k <= lp->m))
          xfault("glp_get_bhead: k = %d; index out of range\n", k);
-      return lp->bhead[k];
+      return lp->head[k];
 }
 
 /***********************************************************************
@@ -484,7 +485,7 @@ void glp_ftran(glp_prob *lp, double x[])
       if (m > 0) bfd_ftran(lp->bfd, x);
       /* x := SB*x" */
       for (i = 1; i <= m; i++)
-      {  k = lp->bhead[i];
+      {  k = lp->head[i];
          if (k <= m)
             x[i] /= row[k]->rii;
          else
@@ -529,7 +530,7 @@ void glp_btran(glp_prob *lp, double x[])
          xfault("glp_btran: basis factorization does not exist\n");
       /* b" := SB*b */
       for (i = 1; i <= m; i++)
-      {  k = lp->bhead[i];
+      {  k = lp->head[i];
          if (k <= m)
             x[i] /= row[k]->rii;
          else

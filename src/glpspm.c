@@ -246,7 +246,7 @@ SPM *spm_test_mat_d(int n, int c)
 *
 *  The routine spm_show_mat writes pattern of the specified sparse
 *  matrix in uncompressed BMP file format (Windows bitmap) to a binary
-*  file whose name is spesified by the character string fname.
+*  file whose name is specified by the character string fname.
 *
 *  Each pixel corresponds to one matrix element. The pixel colors have
 *  the following meaning:
@@ -599,6 +599,235 @@ int spm_write_mat(const SPM *A, const char *fname)
       xprintf("spm_write_mat: %d lines were written\n", 1 + nnz);
 done: if (fp != NULL) fclose(fp);
       return ret;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  spm_transpose - transpose sparse matrix
+*
+*  SYNOPSIS
+*
+*  #include "glpspm.h"
+*  SPM *spm_transpose(const SPM *A);
+*
+*  RETURNS
+*
+*  The routine computes and returns sparse matrix B, which is a matrix
+*  transposed to sparse matrix A. */
+
+SPM *spm_transpose(const SPM *A)
+{     SPM *B;
+      int i;
+      B = spm_create_mat(A->n, A->m);
+      for (i = 1; i <= A->m; i++)
+      {  SPME *e;
+         for (e = A->row[i]; e != NULL; e = e->r_next)
+            spm_new_elem(B, e->j, i, e->val);
+      }
+      return B;
+}
+
+SPM *spm_add_sym(const SPM *A, const SPM *B)
+{     /* add two sparse matrices (symbolic phase) */
+      SPM *C;
+      int i, j, *flag;
+      xassert(A->m == B->m);
+      xassert(A->n == B->n);
+      /* create resultant matrix */
+      C = spm_create_mat(A->m, A->n);
+      /* allocate and clear the flag array */
+      flag = xcalloc(1+C->n, sizeof(int));
+      for (j = 1; j <= C->n; j++)
+         flag[j] = 0;
+      /* compute pattern of C = A + B */
+      for (i = 1; i <= C->m; i++)
+      {  SPME *e;
+         /* at the beginning i-th row of C is empty */
+         /* (i-th row of C) := (i-th row of C) union (i-th row of A) */
+         for (e = A->row[i]; e != NULL; e = e->r_next)
+         {  /* (note that i-th row of A may have duplicate elements) */
+            j = e->j;
+            if (!flag[j])
+            {  spm_new_elem(C, i, j, 0.0);
+               flag[j] = 1;
+            }
+         }
+         /* (i-th row of C) := (i-th row of C) union (i-th row of B) */
+         for (e = B->row[i]; e != NULL; e = e->r_next)
+         {  /* (note that i-th row of B may have duplicate elements) */
+            j = e->j;
+            if (!flag[j])
+            {  spm_new_elem(C, i, j, 0.0);
+               flag[j] = 1;
+            }
+         }
+         /* reset the flag array */
+         for (e = C->row[i]; e != NULL; e = e->r_next)
+            flag[e->j] = 0;
+      }
+      /* check and deallocate the flag array */
+      for (j = 1; j <= C->n; j++)
+         xassert(!flag[j]);
+      xfree(flag);
+      return C;
+}
+
+void spm_add_num(SPM *C, double alfa, const SPM *A, double beta,
+      const SPM *B)
+{     /* add two sparse matrices (numeric phase) */
+      int i, j;
+      double *work;
+      /* allocate and clear the working array */
+      work = xcalloc(1+C->n, sizeof(double));
+      for (j = 1; j <= C->n; j++)
+         work[j] = 0.0;
+      /* compute matrix C = alfa * A + beta * B */
+      for (i = 1; i <= C->n; i++)
+      {  SPME *e;
+         /* work := alfa * (i-th row of A) + beta * (i-th row of B) */
+         /* (note that A and/or B may have duplicate elements) */
+         for (e = A->row[i]; e != NULL; e = e->r_next)
+            work[e->j] += alfa * e->val;
+         for (e = B->row[i]; e != NULL; e = e->r_next)
+            work[e->j] += beta * e->val;
+         /* (i-th row of C) := work, work := 0 */
+         for (e = C->row[i]; e != NULL; e = e->r_next)
+         {  j = e->j;
+            e->val = work[j];
+            work[j] = 0.0;
+         }
+      }
+      /* check and deallocate the working array */
+      for (j = 1; j <= C->n; j++)
+         xassert(work[j] == 0.0);
+      xfree(work);
+      return;
+}
+
+SPM *spm_add_mat(double alfa, const SPM *A, double beta, const SPM *B)
+{     /* add two sparse matrices (driver routine) */
+      SPM *C;
+      C = spm_add_sym(A, B);
+      spm_add_num(C, alfa, A, beta, B);
+      return C;
+}
+
+SPM *spm_mul_sym(const SPM *A, const SPM *B)
+{     /* multiply two sparse matrices (symbolic phase) */
+      int i, j, k, *flag;
+      SPM *C;
+      xassert(A->n == B->m);
+      /* create resultant matrix */
+      C = spm_create_mat(A->m, B->n);
+      /* allocate and clear the flag array */
+      flag = xcalloc(1+C->n, sizeof(int));
+      for (j = 1; j <= C->n; j++)
+         flag[j] = 0;
+      /* compute pattern of C = A * B */
+      for (i = 1; i <= C->m; i++)
+      {  SPME *e, *ee;
+         /* compute pattern of i-th row of C */
+         for (e = A->row[i]; e != NULL; e = e->r_next)
+         {  k = e->j;
+            for (ee = B->row[k]; ee != NULL; ee = ee->r_next)
+            {  j = ee->j;
+               /* if a[i,k] != 0 and b[k,j] != 0 then c[i,j] != 0 */
+               if (!flag[j])
+               {  /* c[i,j] does not exist, so create it */
+                  spm_new_elem(C, i, j, 0.0);
+                  flag[j] = 1;
+               }
+            }
+         }
+         /* reset the flag array */
+         for (e = C->row[i]; e != NULL; e = e->r_next)
+            flag[e->j] = 0;
+      }
+      /* check and deallocate the flag array */
+      for (j = 1; j <= C->n; j++)
+         xassert(!flag[j]);
+      xfree(flag);
+      return C;
+}
+
+void spm_mul_num(SPM *C, const SPM *A, const SPM *B)
+{     /* multiply two sparse matrices (numeric phase) */
+      int i, j;
+      double *work;
+      /* allocate and clear the working array */
+      work = xcalloc(1+A->n, sizeof(double));
+      for (j = 1; j <= A->n; j++)
+         work[j] = 0.0;
+      /* compute matrix C = A * B */
+      for (i = 1; i <= C->m; i++)
+      {  SPME *e, *ee;
+         double temp;
+         /* work := (i-th row of A) */
+         /* (note that A may have duplicate elements) */
+         for (e = A->row[i]; e != NULL; e = e->r_next)
+            work[e->j] += e->val;
+         /* compute i-th row of C */
+         for (e = C->row[i]; e != NULL; e = e->r_next)
+         {  j = e->j;
+            /* c[i,j] := work * (j-th column of B) */
+            temp = 0.0;
+            for (ee = B->col[j]; ee != NULL; ee = ee->c_next)
+               temp += work[ee->i] * ee->val;
+            e->val = temp;
+         }
+         /* reset the working array */
+         for (e = A->row[i]; e != NULL; e = e->r_next)
+            work[e->j] = 0.0;
+      }
+      /* check and deallocate the working array */
+      for (j = 1; j <= A->n; j++)
+         xassert(work[j] == 0.0);
+      xfree(work);
+      return;
+}
+
+SPM *spm_mul_mat(const SPM *A, const SPM *B)
+{     /* multiply two sparse matrices (driver routine) */
+      SPM *C;
+      C = spm_mul_sym(A, B);
+      spm_mul_num(C, A, B);
+      return C;
+}
+
+PER *spm_create_per(int n)
+{     /* create permutation matrix */
+      PER *P;
+      int k;
+      xassert(n >= 0);
+      P = xmalloc(sizeof(PER));
+      P->n = n;
+      P->row = xcalloc(1+n, sizeof(int));
+      P->col = xcalloc(1+n, sizeof(int));
+      /* initially it is identity matrix */
+      for (k = 1; k <= n; k++)
+         P->row[k] = P->col[k] = k;
+      return P;
+}
+
+void spm_check_per(PER *P)
+{     /* check permutation matrix for correctness */
+      int i, j;
+      xassert(P->n >= 0);
+      for (i = 1; i <= P->n; i++)
+      {  j = P->row[i];
+         xassert(1 <= j && j <= P->n);
+         xassert(P->col[j] == i);
+      }
+      return;
+}
+
+void spm_delete_per(PER *P)
+{     /* delete permutation matrix */
+      xfree(P->row);
+      xfree(P->col);
+      xfree(P);
+      return;
 }
 
 /* eof */

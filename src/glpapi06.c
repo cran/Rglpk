@@ -251,6 +251,12 @@ static int simplex1(glp_prob *lp, const glp_smcp *parm)
                xassert(ret != ret);
          }
       }
+#if 1 /* 12/VIII-2008 */
+      if (parm->meth == GLP_PRIMAL)
+      {  ret = spx_primal(lp, parm);
+         goto done;
+      }
+#endif
       spx->type = xcalloc(1+m+n, sizeof(int));
       spx->lb = xcalloc(1+m+n, sizeof(double));
       spx->ub = xcalloc(1+m+n, sizeof(double));

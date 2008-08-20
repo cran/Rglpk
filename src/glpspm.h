@@ -61,6 +61,18 @@ struct SPME
       /* pointer to next element in the same column */
 };
 
+typedef struct PER PER;
+
+struct PER
+{     /* permutation matrix */
+      int n;
+      /* matrix order, n >= 0 */
+      int *row; /* int row[1+n]; */
+      /* row[i] = j means p[i,j] = 1 */
+      int *col; /* int col[1+n]; */
+      /* col[j] = i means p[i,j] = 1 */
+};
+
 #define spm_create_mat _glp_spm_create_mat
 SPM *spm_create_mat(int m, int n);
 /* create general sparse matrix */
@@ -104,6 +116,48 @@ SPM *spm_read_mat(const char *fname);
 #define spm_write_mat _glp_spm_write_mat
 int spm_write_mat(const SPM *A, const char *fname);
 /* write sparse matrix to text file */
+
+#define spm_transpose _glp_spm_transpose
+SPM *spm_transpose(const SPM *A);
+/* transpose sparse matrix */
+
+#define spm_add_sym _glp_spm_add_sym
+SPM *spm_add_sym(const SPM *A, const SPM *B);
+/* add two sparse matrices (symbolic phase) */
+
+#define spm_add_num _glp_spm_add_num
+void spm_add_num(SPM *C, double alfa, const SPM *A, double beta,
+      const SPM *B);
+/* add two sparse matrices (numeric phase) */
+
+#define spm_add_mat _glp_spm_add_mat
+SPM *spm_add_mat(double alfa, const SPM *A, double beta,
+      const SPM *B);
+/* add two sparse matrices (driver routine) */
+
+#define spm_mul_sym _glp_spm_mul_sym
+SPM *spm_mul_sym(const SPM *A, const SPM *B);
+/* multiply two sparse matrices (symbolic phase) */
+
+#define spm_mul_num _glp_spm_mul_num
+void spm_mul_num(SPM *C, const SPM *A, const SPM *B);
+/* multiply two sparse matrices (numeric phase) */
+
+#define spm_mul_mat _glp_spm_mul_mat
+SPM *spm_mul_mat(const SPM *A, const SPM *B);
+/* multiply two sparse matrices (driver routine) */
+
+#define spm_create_per _glp_spm_create_per
+PER *spm_create_per(int n);
+/* create permutation matrix */
+
+#define spm_check_per _glp_spm_check_per
+void spm_check_per(PER *P);
+/* check permutation matrix for correctness */
+
+#define spm_delete_per _glp_spm_delete_per
+void spm_delete_per(PER *P);
+/* delete permutation matrix */
 
 #endif
 

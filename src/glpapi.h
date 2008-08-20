@@ -87,9 +87,9 @@ struct glp_prob
       /* basis factorization (LP) */
       int valid;
       /* the factorization is valid only if this flag is set */
-      int *bhead; /* int bhead[1+m_max]; */
+      int *head; /* int head[1+m_max]; */
       /* basis header (valid only if the factorization is valid);
-         bhead[i] = k is the ordinal number of auxiliary (1 <= k <= m)
+         head[i] = k is the ordinal number of auxiliary (1 <= k <= m)
          or structural (m+1 <= k <= m+n) variable which corresponds to
          i-th basic variable xB[i], 1 <= i <= m */
       glp_bfcp *bfcp;
@@ -175,7 +175,7 @@ struct GLPROW
          GLP_NF - non-basic free variable
          GLP_NS - non-basic fixed variable */
       int bind;
-      /* if the auxiliary variable is basic, bhead[bind] refers to this
+      /* if the auxiliary variable is basic, head[bind] refers to this
          row, otherwise, bind is 0; this attribute is valid only if the
          basis factorization is valid */
       double prim; /* non-scaled */
@@ -233,7 +233,7 @@ struct GLPCOL
          GLP_NF - non-basic free variable
          GLP_NS - non-basic fixed variable */
       int bind;
-      /* if the structural variable is basic, bhead[bind] refers to
+      /* if the structural variable is basic, head[bind] refers to
          this column; otherwise, bind is 0; this attribute is valid only
          if the basis factorization is valid */
       double prim; /* non-scaled */

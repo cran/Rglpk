@@ -29,6 +29,9 @@
 
 typedef struct BFD BFD;
 
+#ifndef _GLPBFD_PRIVATE
+struct BFD { double _bfd; };
+#else
 struct BFD
 {     /* LP basis factorization */
       int valid;
@@ -58,6 +61,7 @@ struct BFD
       int upd_cnt;
       /* the factorization update count */
 };
+#endif
 
 /* return codes: */
 #define BFD_ESING    1  /* singular matrix */
