@@ -22,7 +22,7 @@
 ***********************************************************************/
 
 #include "glpapi.h"
-#define xfault xerror
+#include "glpscl.h"
 
 /***********************************************************************
 *  NAME
@@ -40,9 +40,9 @@
 
 void glp_set_rii(glp_prob *lp, int i, double rii)
 {     if (!(1 <= i && i <= lp->m))
-         xfault("glp_set_rii: i = %d; row number out of range\n", i);
+         xerror("glp_set_rii: i = %d; row number out of range\n", i);
       if (rii <= 0.0)
-         xfault("glp_set_rii: i = %d; rii = %g; invalid scale factor\n",
+         xerror("glp_set_rii: i = %d; rii = %g; invalid scale factor\n",
             i, rii);
       if (lp->valid && lp->row[i]->rii != rii)
       {  GLPAIJ *aij;
@@ -74,9 +74,9 @@ void glp_set_rii(glp_prob *lp, int i, double rii)
 
 void glp_set_sjj(glp_prob *lp, int j, double sjj)
 {     if (!(1 <= j && j <= lp->n))
-         xfault("glp_set_sjj: j = %d; column number out of range\n", j);
+         xerror("glp_set_sjj: j = %d; column number out of range\n", j);
       if (sjj <= 0.0)
-         xfault("glp_set_sjj: j = %d; sjj = %g; invalid scale factor\n",
+         xerror("glp_set_sjj: j = %d; sjj = %g; invalid scale factor\n",
             j, sjj);
       if (lp->valid && lp->col[j]->sjj != sjj && lp->col[j]->stat ==
          GLP_BS)
@@ -103,7 +103,7 @@ void glp_set_sjj(glp_prob *lp, int j, double sjj)
 
 double glp_get_rii(glp_prob *lp, int i)
 {     if (!(1 <= i && i <= lp->m))
-         xfault("glp_get_rii: i = %d; row number out of range\n", i);
+         xerror("glp_get_rii: i = %d; row number out of range\n", i);
       return lp->row[i]->rii;
 }
 
@@ -123,8 +123,45 @@ double glp_get_rii(glp_prob *lp, int i)
 
 double glp_get_sjj(glp_prob *lp, int j)
 {     if (!(1 <= j && j <= lp->n))
-         xfault("glp_get_sjj: j = %d; column number out of range\n", j);
+         xerror("glp_get_sjj: j = %d; column number out of range\n", j);
       return lp->col[j]->sjj;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  glp_scale_prob - scale problem data
+*
+*  SYNOPSIS
+*
+*  void glp_scale_prob(glp_prob *lp, int flags);
+*
+*  DESCRIPTION
+*
+*  The routine glp_scale_prob performs automatic scaling of problem
+*  data for the specified problem object.
+*
+*  The parameter flags specifies scaling options used by the routine.
+*  Options can be combined with the bitwise OR operator and may be the
+*  following:
+*
+*  GLP_SF_GM      perform geometric mean scaling;
+*  GLP_SF_EQ      perform equilibration scaling;
+*  GLP_SF_2N      round scale factors to nearest power of two;
+*  GLP_SF_SKIP    skip scaling, if the problem is well scaled.
+*
+*  The parameter flags may be specified as GLP_SF_AUTO, in which case
+*  the routine chooses scaling options automatically. */
+
+void glp_scale_prob(glp_prob *lp, int flags)
+{     if (flags & ~(GLP_SF_GM | GLP_SF_EQ | GLP_SF_2N | GLP_SF_SKIP |
+                    GLP_SF_AUTO))
+         xerror("glp_scale_prob: flags = 0x%02X; invalid scaling option"
+            "s\n", flags);
+      if (flags & GLP_SF_AUTO)
+         flags = (GLP_SF_GM | GLP_SF_EQ | GLP_SF_SKIP);
+      scale_prob(lp, flags);
+      return;
 }
 
 /***********************************************************************

@@ -21,13 +21,9 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
 #include "glplib.h"
 
-#if defined(__WOE32__) && defined(VC6_MT_DLL)
+#if defined(__WOE__) && defined(VC6_MT_DLL)
 
 /**********************************************************************/
 /*                   Multi-threaded DLL for VC 6.0                    */

@@ -865,7 +865,7 @@ skip:    ;
 
 #define TAB_CSV   1
 #define TAB_XBASE 2
-#define TAB_IODBC 3
+#define TAB_ODBC  3
 #define TAB_MYSQL 4
 
 void mpl_tab_drv_open(MPL *mpl, int mode)
@@ -881,8 +881,9 @@ void mpl_tab_drv_open(MPL *mpl, int mode)
       {  dca->id = TAB_XBASE;
          dca->link = dbf_open_file(dca, mode);
       }
-      else if (strcmp(dca->arg[1], "iODBC") == 0)
-      {  dca->id = TAB_IODBC;
+      else if (strcmp(dca->arg[1], "ODBC") == 0 ||
+               strcmp(dca->arg[1], "iODBC") == 0)
+      {  dca->id = TAB_ODBC;
          dca->link = db_iodbc_open(dca, mode);
       }
       else if (strcmp(dca->arg[1], "MySQL") == 0)
@@ -907,7 +908,7 @@ int mpl_tab_drv_read(MPL *mpl)
          case TAB_XBASE:
             ret = dbf_read_record(dca, dca->link);
             break;
-         case TAB_IODBC:
+         case TAB_ODBC:
             ret = db_iodbc_read(dca, dca->link);
             break;
          case TAB_MYSQL:
@@ -932,7 +933,7 @@ void mpl_tab_drv_write(MPL *mpl)
          case TAB_XBASE:
             ret = dbf_write_record(dca, dca->link);
             break;
-         case TAB_IODBC:
+         case TAB_ODBC:
             ret = db_iodbc_write(dca, dca->link);
             break;
          case TAB_MYSQL:
@@ -957,7 +958,7 @@ void mpl_tab_drv_close(MPL *mpl)
          case TAB_XBASE:
             ret = dbf_close_file(dca, dca->link);
             break;
-         case TAB_IODBC:
+         case TAB_ODBC:
             ret = db_iodbc_close(dca, dca->link);
             break;
          case TAB_MYSQL:

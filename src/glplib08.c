@@ -21,10 +21,6 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
 #define _GLPSTD_ERRNO
 #define _GLPSTD_STDIO
 #include "glplib.h"

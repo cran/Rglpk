@@ -24,7 +24,6 @@
 #include "glpapi.h"
 #include "glplpp.h"
 #include "glpspx.h"
-#define xfault xerror
 
 /***********************************************************************
 *  NAME
@@ -218,17 +217,10 @@ static void trivial2(glp_prob *lp, const glp_smcp *parm)
       return;
 }
 
+#if 1 /* 18/VIII-2008 */
 static int simplex1(glp_prob *lp, const glp_smcp *parm)
 {     /* base driver which does not use LP presolver */
-      GLPROW **row = lp->row;
-      GLPCOL **col = lp->col;
-      GLPAIJ *aij;
-      SPX _spx, *spx = &_spx;
-      int i, j, k, m, n, t, nnz, loc, ret;
-      double prim, dual;
-      m = spx->m = lp->m;
-      n = spx->n = lp->n;
-      xassert(m > 0 && n > 0);
+      int ret;
       if (!glp_bf_exists(lp))
       {  ret = glp_factorize(lp);
          switch (ret)
@@ -251,275 +243,33 @@ static int simplex1(glp_prob *lp, const glp_smcp *parm)
                xassert(ret != ret);
          }
       }
-#if 1 /* 12/VIII-2008 */
-      if (parm->meth == GLP_PRIMAL)
-      {  ret = spx_primal(lp, parm);
-         goto done;
-      }
-#endif
-      spx->type = xcalloc(1+m+n, sizeof(int));
-      spx->lb = xcalloc(1+m+n, sizeof(double));
-      spx->ub = xcalloc(1+m+n, sizeof(double));
-      for (i = 1; i <= m; i++)
-      {  spx->type[i] = row[i]->type;
-         spx->lb[i] = row[i]->lb * row[i]->rii;
-         spx->ub[i] = row[i]->ub * row[i]->rii;
-      }
-      for (j = 1; j <= n; j++)
-      {  spx->type[m+j] = col[j]->type;
-         spx->lb[m+j] = col[j]->lb / col[j]->sjj;
-         spx->ub[m+j] = col[j]->ub / col[j]->sjj;
-      }
-      for (k = 1; k <= m+n; k++)
-      {  switch (spx->type[k])
-         {  case GLP_FR:
-               spx->type[k] = GLP_FR;
-               xassert(spx->lb[k] == 0.0);
-               xassert(spx->ub[k] == 0.0);
-               break;
-            case GLP_LO:
-               spx->type[k] = GLP_LO;
-               xassert(spx->ub[k] == 0.0);
-               break;
-            case GLP_UP:
-               spx->type[k] = GLP_UP;
-               xassert(spx->lb[k] == 0.0);
-               break;
-            case GLP_DB:
-               spx->type[k] = GLP_DB;
-               break;
-            case GLP_FX:
-               spx->type[k] = GLP_FX;
-               break;
-            default:
-               xassert(lp != lp);
-         }
-      }
-      switch (lp->dir)
-      {  case GLP_MIN:
-            spx->dir = GLP_MIN;
+      switch (parm->meth)
+      {  case GLP_PRIMAL:
+            ret = spx_primal(lp, parm);
             break;
-         case GLP_MAX:
-            spx->dir = GLP_MAX;
+         case GLP_DUALP:
+            {  glp_smcp parm1 = *parm;
+#if 0
+               parm1.msg_lev = GLP_MSG_DBG;
+               parm1.out_frq = 1;
+               parm1.out_dly = 0;
+#endif
+               ret = spx_dual(lp, &parm1);
+#if 1
+               if (ret == GLP_EFAIL && lp->valid)
+                  ret = spx_primal(lp, parm);
+#endif
+            }
+            break;
+         case GLP_DUAL:
+            ret = spx_dual(lp, parm);
             break;
          default:
-            xassert(lp != lp);
+            xassert(parm != parm);
       }
-      spx->coef = xcalloc(1+m+n, sizeof(double));
-      spx->coef[0] = lp->c0;
-      for (i = 1; i <= m; i++)
-         spx->coef[i] = 0.0;
-      for (j = 1; j <= n; j++)
-         spx->coef[m+j] = col[j]->coef * col[j]->sjj;
-      nnz = glp_get_num_nz(lp);
-      spx->A_ptr = xcalloc(1+m+1, sizeof(int));
-      spx->A_ind = xcalloc(1+nnz, sizeof(int));
-      spx->A_val = xcalloc(1+nnz, sizeof(double));
-      loc = 1;
-      for (i = 1; i <= m; i++)
-      {  spx->A_ptr[i] = loc;
-         for (aij = row[i]->ptr; aij != NULL; aij = aij->r_next)
-         {  spx->A_ind[loc] = aij->col->j;
-            spx->A_val[loc] = aij->row->rii * aij->val * aij->col->sjj;
-            loc++;
-         }
-      }
-      spx->A_ptr[m+1] = loc;
-      xassert(loc - 1 == nnz);
-      spx->AT_ptr = xcalloc(1+n+1, sizeof(int));
-      spx->AT_ind = xcalloc(1+nnz, sizeof(int));
-      spx->AT_val = xcalloc(1+nnz, sizeof(double));
-      loc = 1;
-      for (j = 1; j <= n; j++)
-      {  spx->AT_ptr[j] = loc;
-         for (aij = col[j]->ptr; aij != NULL; aij = aij->c_next)
-         {  spx->AT_ind[loc] = aij->row->i;
-            spx->AT_val[loc] = aij->row->rii * aij->val * aij->col->sjj;
-            loc++;
-         }
-      }
-      spx->AT_ptr[n+1] = loc;
-      xassert(loc - 1 == nnz);
-      spx->col = xcalloc(1+m, sizeof(double));
-      xassert(glp_bf_exists(lp));
-      spx->valid = 1;
-      spx->p_stat = spx->d_stat = GLP_UNDEF;
-      spx->stat = xcalloc(1+m+n, sizeof(int));
-      for (i = 1; i <= m; i++)
-         spx->stat[i] = row[i]->stat;
-      for (j = 1; j <= n; j++)
-         spx->stat[m+j] = col[j]->stat;
-      for (k = 1; k <= m+n; k++)
-      {  switch (spx->stat[k])
-         {  case GLP_BS:
-               spx->stat[k] = GLP_BS;
-               break;
-            case GLP_NL:
-               spx->stat[k] = GLP_NL;
-               xassert(spx->type[k] == GLP_LO || spx->type[k] == GLP_DB)
-                  ;
-               break;
-            case GLP_NU:
-               spx->stat[k] = GLP_NU;
-               xassert(spx->type[k] == GLP_UP || spx->type[k] == GLP_DB)
-                  ;
-               break;
-            case GLP_NF:
-               spx->stat[k] = GLP_NF;
-               xassert(spx->type[k] == GLP_FR);
-               break;
-            case GLP_NS:
-               spx->stat[k] = GLP_NS;
-               xassert(spx->type[k] == GLP_FX);
-               break;
-            default:
-               xassert(lp != lp);
-         }
-      }
-      spx->posx = xcalloc(1+m+n, sizeof(int));
-      spx->indx = xcalloc(1+m+n, sizeof(int));
-      spx->bfd = _glp_access_bfd(lp);
-      for (k = 1; k <= m+n; k++)
-         spx->posx[k] = spx->indx[k] = 0;
-      for (i = 1; i <= m; i++)
-      {  k = glp_get_bhead(lp, i); /* xB[i] = x[k] */
-         xassert(1 <= k && k <= m+n);
-         xassert(spx->posx[k] == 0);
-         xassert(spx->indx[i] == 0);
-         spx->posx[k] = i, spx->indx[i] = k;
-      }
-      j = 0;
-      for (k = 1; k <= m+n; k++)
-      {  if (spx->posx[k] == 0)
-         {  j++;
-            spx->posx[k] = m+j, spx->indx[m+j] = k;
-         }
-      }
-      xassert(j == n);
-      spx->bbar = xcalloc(1+m, sizeof(double));
-      spx->pi = xcalloc(1+m, sizeof(double));
-      spx->cbar = xcalloc(1+n, sizeof(double));
-      spx->some = 0;
-      switch (parm->msg_lev)
-      {  case GLP_MSG_OFF: spx->msg_lev = 0; break;
-         case GLP_MSG_ERR: spx->msg_lev = 1; break;
-         case GLP_MSG_ON:  spx->msg_lev = 2; break;
-         case GLP_MSG_ALL: spx->msg_lev = 3; break;
-         default:          xassert(parm != parm);
-      }
-      switch (parm->meth)
-      {  case GLP_PRIMAL:  spx->dual = 0;    break;
-         case GLP_DUALP:   spx->dual = 1;    break;
-         default:          xassert(parm != parm);
-      }
-      switch (parm->pricing)
-      {  case GLP_PT_STD:  spx->price = 0;   break;
-         case GLP_PT_PSE:  spx->price = 1;   break;
-         default:          xassert(parm != parm);
-      }
-      switch (parm->r_test)
-      {  case GLP_RT_STD:  spx->relax = .00; break;
-         case GLP_RT_HAR:  spx->relax = .07; break;
-         default:          xassert(parm != parm);
-      }
-      spx->tol_bnd = parm->tol_bnd;
-      spx->tol_dj  = parm->tol_dj;
-      spx->tol_piv = parm->tol_piv;
-      spx->obj_ll  = parm->obj_ll;
-      spx->obj_ul  = parm->obj_ul;
-      spx->it_lim  = parm->it_lim;
-      spx->it_cnt  = lp->it_cnt;
-      spx->tm_lim  = 0.001 * (double)parm->tm_lim;
-      spx->out_frq = parm->out_frq;
-      spx->out_dly = 0.001 * (double)parm->out_dly;
-      spx->meth = 0;
-      ret = spx_simplex(spx);
-      lp->it_cnt = spx->it_cnt;
-      switch (ret)
-      {  case 0:           ret = 0;          break;
-         case GLP_EOBJLL:  ret = GLP_EOBJLL; break;
-         case GLP_EOBJUL:  ret = GLP_EOBJUL; break;
-         case GLP_EITLIM:  ret = GLP_EITLIM; break;
-         case GLP_ETMLIM:  ret = GLP_ETMLIM; break;
-         case GLP_EFAIL:   ret = GLP_EFAIL;  break;
-         default:          xassert(ret != ret);
-      }
-      if (ret == GLP_EFAIL) goto skip;
-      xassert(spx->valid);
-      switch (spx->p_stat)
-      {  case GLP_UNDEF:   lp->pbs_stat = GLP_UNDEF;  break;
-         case GLP_FEAS:    lp->pbs_stat = GLP_FEAS;   break;
-         case GLP_INFEAS:  lp->pbs_stat = GLP_INFEAS; break;
-         case GLP_NOFEAS:  lp->pbs_stat = GLP_NOFEAS; break;
-         default: xassert(spx != spx);
-      }
-      switch (spx->d_stat)
-      {  case GLP_UNDEF:   lp->dbs_stat = GLP_UNDEF;  break;
-         case GLP_FEAS:    lp->dbs_stat = GLP_FEAS;   break;
-         case GLP_INFEAS:  lp->dbs_stat = GLP_INFEAS; break;
-         case GLP_NOFEAS:  lp->dbs_stat = GLP_NOFEAS; break;
-         default: xassert(spx != spx);
-      }
-      lp->obj_val = spx_eval_obj(spx);
-      if (lp->pbs_stat == GLP_FEAS && lp->dbs_stat == GLP_NOFEAS)
-         lp->some = spx->some;
-      else
-         lp->some = 0;
-      for (k = 1; k <= m+n; k++)
-      {  /* status */
-         switch (spx->stat[k])
-         {  case GLP_BS: t = GLP_BS; break;
-            case GLP_NL: t = GLP_NL; break;
-            case GLP_NU: t = GLP_NU; break;
-            case GLP_NF: t = GLP_NF; break;
-            case GLP_NS: t = GLP_NS; break;
-            default: xassert(spx != spx);
-         }
-         if (k <= m)
-            row[k]->stat = t;
-         else
-            col[k-m]->stat = t;
-         /* primal and dual values */
-         t = spx->posx[k];
-         if (t <= m)
-         {  prim = spx->bbar[t];
-            dual = 0.0;
-         }
-         else
-         {  prim = spx_eval_xn_j(spx, t-m);
-            dual = spx->cbar[t-m];
-         }
-         if (k <= m)
-         {  row[k]->prim = prim / row[k]->rii;
-            row[k]->dual = dual * row[k]->rii;
-         }
-         else
-         {  col[k-m]->prim = prim * col[k-m]->sjj;
-            col[k-m]->dual = dual / col[k-m]->sjj;
-         }
-      }
-      xassert(spx->valid);
-      lpx_put_lp_basis(lp, spx->valid, &spx->indx[0], spx->bfd);
-skip: xfree(spx->type);
-      xfree(spx->lb);
-      xfree(spx->ub);
-      xfree(spx->coef);
-      xfree(spx->A_ptr);
-      xfree(spx->A_ind);
-      xfree(spx->A_val);
-      xfree(spx->AT_ptr);
-      xfree(spx->AT_ind);
-      xfree(spx->AT_val);
-      xfree(spx->col);
-      xfree(spx->stat);
-      xfree(spx->posx);
-      xfree(spx->indx);
-      xfree(spx->bbar);
-      xfree(spx->pi);
-      xfree(spx->cbar);
-      xassert(spx->meth == 0);
 done: return ret;
 }
+#endif
 
 static int simplex2(glp_prob *orig, const glp_smcp *parm)
 {     /* extended driver which uses LP presolver */
@@ -592,7 +342,15 @@ static int simplex2(glp_prob *orig, const glp_smcp *parm)
       glp_get_bfcp(orig, &bfcp);
       glp_set_bfcp(prob, &bfcp);
       /* scale the resultant problem */
-      lpx_scale_prob(prob);
+      {  LIBENV *env = lib_link_env();
+         int term_out = env->term_out;
+         if (!term_out || parm->msg_lev < GLP_MSG_ALL)
+            env->term_out = GLP_OFF;
+         else
+            env->term_out = GLP_ON;
+         glp_scale_prob(prob, GLP_SF_AUTO);
+         env->term_out = term_out;
+      }
       /* build advanced initial basis */
       {  LIBENV *env = lib_link_env();
          int term_out = env->term_out;
@@ -650,43 +408,44 @@ int glp_simplex(glp_prob *lp, const glp_smcp *parm)
             parm->msg_lev == GLP_MSG_ERR ||
             parm->msg_lev == GLP_MSG_ON  ||
             parm->msg_lev == GLP_MSG_ALL))
-         xfault("glp_simplex: msg_lev = %d; invalid parameter\n",
+         xerror("glp_simplex: msg_lev = %d; invalid parameter\n",
             parm->msg_lev);
       if (!(parm->meth == GLP_PRIMAL ||
-            parm->meth == GLP_DUALP))
-         xfault("glp_simplex: meth = %d; invalid parameter\n",
+            parm->meth == GLP_DUALP  ||
+            parm->meth == GLP_DUAL))
+         xerror("glp_simplex: meth = %d; invalid parameter\n",
             parm->meth);
       if (!(parm->pricing == GLP_PT_STD ||
             parm->pricing == GLP_PT_PSE))
-         xfault("glp_simplex: pricing = %d; invalid parameter\n",
+         xerror("glp_simplex: pricing = %d; invalid parameter\n",
             parm->pricing);
       if (!(parm->r_test == GLP_RT_STD ||
             parm->r_test == GLP_RT_HAR))
-         xfault("glp_simplex: r_test = %d; invalid parameter\n",
+         xerror("glp_simplex: r_test = %d; invalid parameter\n",
             parm->r_test);
       if (!(0.0 < parm->tol_bnd && parm->tol_bnd < 1.0))
-         xfault("glp_simplex: tol_bnd = %g; invalid parameter\n",
+         xerror("glp_simplex: tol_bnd = %g; invalid parameter\n",
             parm->tol_bnd);
       if (!(0.0 < parm->tol_dj && parm->tol_dj < 1.0))
-         xfault("glp_simplex: tol_dj = %g; invalid parameter\n",
+         xerror("glp_simplex: tol_dj = %g; invalid parameter\n",
             parm->tol_dj);
       if (!(0.0 < parm->tol_piv && parm->tol_piv < 1.0))
-         xfault("glp_simplex: tol_piv = %g; invalid parameter\n",
+         xerror("glp_simplex: tol_piv = %g; invalid parameter\n",
             parm->tol_piv);
       if (parm->it_lim < 0)
-         xfault("glp_simplex: it_lim = %d; invalid parameter\n",
+         xerror("glp_simplex: it_lim = %d; invalid parameter\n",
             parm->it_lim);
       if (parm->tm_lim < 0)
-         xfault("glp_simplex: tm_lim = %d; invalid parameter\n",
+         xerror("glp_simplex: tm_lim = %d; invalid parameter\n",
             parm->tm_lim);
       if (parm->out_frq < 1)
-         xfault("glp_simplex: out_frq = %d; invalid parameter\n",
+         xerror("glp_simplex: out_frq = %d; invalid parameter\n",
             parm->out_frq);
       if (parm->out_dly < 0)
-         xfault("glp_simplex: out_dly = %d; invalid parameter\n",
+         xerror("glp_simplex: out_dly = %d; invalid parameter\n",
             parm->out_dly);
       if (!(parm->presolve == GLP_ON || parm->presolve == GLP_OFF))
-         xfault("glp_simplex: presolve = %d; invalid parameter\n",
+         xerror("glp_simplex: presolve = %d; invalid parameter\n",
             parm->presolve);
       /* basic solution is currently undefined */
       lp->pbs_stat = lp->dbs_stat = GLP_UNDEF;
@@ -886,6 +645,33 @@ double glp_get_obj_val(glp_prob *lp)
 /***********************************************************************
 *  NAME
 *
+*  glp_get_row_stat - retrieve row status
+*
+*  SYNOPSIS
+*
+*  int glp_get_row_stat(glp_prob *lp, int i);
+*
+*  RETURNS
+*
+*  The routine glp_get_row_stat returns current status assigned to the
+*  auxiliary variable associated with i-th row as follows:
+*
+*  GLP_BS - basic variable;
+*  GLP_NL - non-basic variable on its lower bound;
+*  GLP_NU - non-basic variable on its upper bound;
+*  GLP_NF - non-basic free (unbounded) variable;
+*  GLP_NS - non-basic fixed variable. */
+
+int glp_get_row_stat(glp_prob *lp, int i)
+{     if (!(1 <= i && i <= lp->m))
+         xerror("glp_get_row_stat: i = %d; row number out of range\n",
+            i);
+      return lp->row[i]->stat;
+}
+
+/***********************************************************************
+*  NAME
+*
 *  glp_get_row_prim - retrieve row primal value (basic solution)
 *
 *  SYNOPSIS
@@ -901,7 +687,7 @@ double glp_get_row_prim(glp_prob *lp, int i)
 {     struct LPXCPS *cps = lp->cps;
       double prim;
       if (!(1 <= i && i <= lp->m))
-         xfault("glp_get_row_prim: i = %d; row number out of range\n",
+         xerror("glp_get_row_prim: i = %d; row number out of range\n",
             i);
       prim = lp->row[i]->prim;
       if (cps->round && fabs(prim) < 1e-9) prim = 0.0;
@@ -926,11 +712,38 @@ double glp_get_row_dual(glp_prob *lp, int i)
 {     struct LPXCPS *cps = lp->cps;
       double dual;
       if (!(1 <= i && i <= lp->m))
-         xfault("glp_get_row_dual: i = %d; row number out of range\n",
+         xerror("glp_get_row_dual: i = %d; row number out of range\n",
             i);
       dual = lp->row[i]->dual;
       if (cps->round && fabs(dual) < 1e-9) dual = 0.0;
       return dual;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  glp_get_col_stat - retrieve column status
+*
+*  SYNOPSIS
+*
+*  int glp_get_col_stat(glp_prob *lp, int j);
+*
+*  RETURNS
+*
+*  The routine glp_get_col_stat returns current status assigned to the
+*  structural variable associated with j-th column as follows:
+*
+*  GLP_BS - basic variable;
+*  GLP_NL - non-basic variable on its lower bound;
+*  GLP_NU - non-basic variable on its upper bound;
+*  GLP_NF - non-basic free (unbounded) variable;
+*  GLP_NS - non-basic fixed variable. */
+
+int glp_get_col_stat(glp_prob *lp, int j)
+{     if (!(1 <= j && j <= lp->n))
+         xerror("glp_get_col_stat: j = %d; column number out of range\n"
+            , j);
+      return lp->col[j]->stat;
 }
 
 /***********************************************************************
@@ -951,7 +764,7 @@ double glp_get_col_prim(glp_prob *lp, int j)
 {     struct LPXCPS *cps = lp->cps;
       double prim;
       if (!(1 <= j && j <= lp->n))
-         xfault("glp_get_col_prim: j = %d; column number out of range\n"
+         xerror("glp_get_col_prim: j = %d; column number out of range\n"
             , j);
       prim = lp->col[j]->prim;
       if (cps->round && fabs(prim) < 1e-9) prim = 0.0;
@@ -976,11 +789,47 @@ double glp_get_col_dual(glp_prob *lp, int j)
 {     struct LPXCPS *cps = lp->cps;
       double dual;
       if (!(1 <= j && j <= lp->n))
-         xfault("glp_get_col_dual: j = %d; column number out of range\n"
+         xerror("glp_get_col_dual: j = %d; column number out of range\n"
             , j);
       dual = lp->col[j]->dual;
       if (cps->round && fabs(dual) < 1e-9) dual = 0.0;
       return dual;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  glp_get_unbnd_ray - determine variable causing unboundedness
+*
+*  SYNOPSIS
+*
+*  int glp_get_unbnd_ray(glp_prob *lp);
+*
+*  RETURNS
+*
+*  The routine glp_get_unbnd_ray returns the number k of a variable,
+*  which causes primal or dual unboundedness. If 1 <= k <= m, it is
+*  k-th auxiliary variable, and if m+1 <= k <= m+n, it is (k-m)-th
+*  structural variable, where m is the number of rows, n is the number
+*  of columns in the problem object. If such variable is not defined,
+*  the routine returns 0.
+*
+*  COMMENTS
+*
+*  If it is not exactly known which version of the simplex solver
+*  detected unboundedness, i.e. whether the unboundedness is primal or
+*  dual, it is sufficient to check the status of the variable reported
+*  with the routine glp_get_row_stat or glp_get_col_stat. If the
+*  variable is non-basic, the unboundedness is primal, otherwise, if
+*  the variable is basic, the unboundedness is dual (the latter case
+*  means that the problem has no primal feasible dolution). */
+
+int glp_get_unbnd_ray(glp_prob *lp)
+{     int k;
+      k = lp->some;
+      xassert(k >= 0);
+      if (k > lp->m + lp->n) k = 0;
+      return k;
 }
 
 /* eof */

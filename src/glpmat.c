@@ -111,7 +111,7 @@ done: if (flag != NULL) xfree(flag);
 -- 2 - the number of columns (n) is negative;
 -- 3 - A_ptr[1] is not 1;
 -- 4 - some column index is out of range;
--- 5 - some column index is duplicate. */
+-- 5 - some column indices are duplicate. */
 
 int check_pattern(int m, int n, int A_ptr[], int A_ind[])
 {     int i, j, ptr, ret, *flag = NULL;

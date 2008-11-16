@@ -1,0 +1,32 @@
+\* UE 5 *\
+Maximize
+	z: 310 y1 + 380 y2 + 350 y3 + 285 y4
+
+subject to
+	A1: x1B + x1M + x1H - y1 = 0
+	A2: x2B + x2M + x2H - y2 = 0
+	A3: x3B + x3M + x3H - y3 = 0
+	A4: x4B + x4M + x4H - y4 = 0
+
+	B1: 14 x1B + 15 x2B + 11 x3B + 12 x4B <= 1800
+	B2: 14 x1M + 15 x2M + 11 x3M + 12 x4M <= 4600
+	B3: 14 x1H + 15 x2H + 11 x3H + 12 x4H <= 1800
+
+	C1: 48 x1B + 65 x2B + 58 x3B + 39 x4B <= 6800
+	C2: 48 x1M + 65 x2M + 58 x3M + 39 x4M <= 8700
+	C3: 48 x1H + 65 x2H + 58 x3H + 39 x4H <= 5300
+integer
+	x1B
+	x2B	
+	x3B
+	x4B		
+	x1M
+	x2M	
+	x3M
+	x4M		
+	x1H
+	x2H
+	x3H
+	x4H
+		
+end

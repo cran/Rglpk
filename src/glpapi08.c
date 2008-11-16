@@ -1,4 +1,4 @@
-/* glpapi08.c (mixed integer programming routines) */
+/* glpapi08.c (interior-point method routines) */
 
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
@@ -21,448 +21,639 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
-#include "glpios.h"
-#define xfault xerror
+#include "glpapi.h"
+#include "glpipm.h"
 
 /***********************************************************************
 *  NAME
 *
-*  glp_set_col_kind - set (change) column kind
+*  glp_interior - solve LP problem with the interior-point method
 *
 *  SYNOPSIS
 *
-*  void glp_set_col_kind(glp_prob *mip, int j, int kind);
+*  int glp_interior(glp_prob *lp, const void *parm);
 *
 *  DESCRIPTION
 *
-*  The routine glp_set_col_kind sets (changes) the kind of j-th column
-*  (structural variable) as specified by the parameter kind:
+*  The routine glp_interior is a driver to the LP solver based on the
+*  interior-point method.
 *
-*  GLP_CV - continuous variable;
-*  GLP_IV - integer variable;
-*  GLP_BV - binary variable. */
+*  The parameter parm is reserved for use in the future and must be
+*  specified as NULL.
+*
+*  Currently this routine implements an easy variant of the primal-dual
+*  interior-point method based on Mehrotra's technique.
+*
+*  This routine transforms the original LP problem to an equivalent LP
+*  problem in the standard formulation (all constraints are equalities,
+*  all variables are non-negative), calls the routine ipm_main to solve
+*  the transformed problem, and then transforms an obtained solution to
+*  the solution of the original problem.
+*
+*  RETURNS
+*
+*  0  The LP problem instance has been successfully solved. This code
+*     does not necessarily mean that the solver has found optimal
+*     solution. It only means that the solution process was successful.
+*
+*  GLP_EFAIL
+*     The problem has no rows/columns.
+*
+*  GLP_ENOFEAS
+*     The problem has no feasible (primal/dual) solution.
+*
+*  GLP_ENOCVG
+*     Very slow convergence or divergence.
+*
+*  GLP_EITLIM
+*     Iteration limit exceeded.
+*
+*  GLP_EINSTAB
+*     Numerical instability on solving Newtonian system. */
 
-void glp_set_col_kind(glp_prob *mip, int j, int kind)
-{     GLPCOL *col;
-      if (!(1 <= j && j <= mip->n))
-         xfault("glp_set_col_kind: j = %d; column number out of range\n"
-            , j);
-      col = mip->col[j];
-      switch (kind)
-      {  case GLP_CV:
-            col->kind = GLP_CV;
-            break;
-         case GLP_IV:
-            col->kind = GLP_IV;
-            break;
-         case GLP_BV:
-            col->kind = GLP_IV;
-            if (!(col->type == GLP_DB && col->lb == 0.0 && col->ub ==
-               1.0)) glp_set_col_bnds(mip, j, GLP_DB, 0.0, 1.0);
-            break;
-         default:
-            xfault("glp_set_col_kind: j = %d; kind = %d; invalid column"
-               " kind\n", j, kind);
+struct dsa
+{     /* working area used by glp_interior routine */
+      LPX *lp;
+      /* original LP instance to be solved */
+      int orig_m;
+      /* number of rows in original LP */
+      int orig_n;
+      /* number of columns in original LP */
+      int *ref; /* int ref[1+orig_m+orig_n]; */
+      /* this array contains references from components of original LP
+         to components of transformed LP */
+      /*--------------------------------------------------------------*/
+      /* following components define transformed LP in standard form:
+         minimize    c * x + c[0]
+         subject to  A * x = b,   x >= 0 */
+      int m;
+      /* number of rows (constraints) in transformed LP */
+      int n;
+      /* number of columns (variables) in transformed LP */
+      int size;
+      /* size of arrays ia, ja, ar (enlarged automatically) */
+      int ne;
+      /* number of non-zeros in transformed constraint matrix */
+      int *ia; /* int ia[1+size]; */
+      int *ja; /* int ja[1+size]; */
+      double *ar; /* double ar[1+size]; */
+      /* transformed constraint matrix in storage-by-indices format
+         which has m rows and n columns */
+      double *b; /* double b[1+m]; */
+      /* right-hand sides; b[0] is not used */
+      double *c; /* double c[1+n]; */
+      /* objective coefficients; c[0] is constant term */
+      /*--------------------------------------------------------------*/
+      /* following arrays define solution of transformed LP computed by
+         interior-point solver */
+      double *x; /* double x[1+n]; */
+      /* values of primal variables */
+      double *y; /* double y[1+m]; */
+      /* values of dual variables for equality constraints */
+      double *z; /* double z[1+n]; */
+      /* values of dual variables for non-negativity constraints */
+};
+
+static void calc_mn(struct dsa *dsa)
+{     /* calculate the number of constraints (m) and variables (n) for
+         transformed LP */
+      LPX *lp = dsa->lp;
+      int orig_m = dsa->orig_m;
+      int orig_n = dsa->orig_n;
+      int i, j, m = 0, n = 0;
+      for (i = 1; i <= orig_m; i++)
+      {  switch (lpx_get_row_type(lp, i))
+         {  case LPX_FR:                  break;
+            case LPX_LO: m++; n++;        break;
+            case LPX_UP: m++; n++;        break;
+            case LPX_DB: m += 2; n += 2;  break;
+            case LPX_FX: m++;             break;
+            default: xassert(lp != lp);
+         }
+      }
+      for (j = 1; j <= orig_n; j++)
+      {  switch (lpx_get_col_type(lp, j))
+         {  case LPX_FR: n += 2;          break;
+            case LPX_LO: n++;             break;
+            case LPX_UP: n++;             break;
+            case LPX_DB: m++; n += 2;     break;
+            case LPX_FX:                  break;
+            default: xassert(lp != lp);
+         }
+      }
+      dsa->m = m;
+      dsa->n = n;
+      return;
+}
+
+static void new_coef(struct dsa *dsa, int i, int j, double aij)
+{     /* add new element to the transformed constraint matrix */
+      xassert(1 <= i && i <= dsa->m);
+      xassert(1 <= j && j <= dsa->n);
+      xassert(aij != 0.0);
+      if (dsa->ne == dsa->size)
+      {  int *ia = dsa->ia;
+         int *ja = dsa->ja;
+         double *ar = dsa->ar;
+         dsa->size += dsa->size;
+         dsa->ia = xcalloc(1+dsa->size, sizeof(int));
+         memcpy(&dsa->ia[1], &ia[1], dsa->ne * sizeof(int));
+         xfree(ia);
+         dsa->ja = xcalloc(1+dsa->size, sizeof(int));
+         memcpy(&dsa->ja[1], &ja[1], dsa->ne * sizeof(int));
+         xfree(ja);
+         dsa->ar = xcalloc(1+dsa->size, sizeof(double));
+         memcpy(&dsa->ar[1], &ar[1], dsa->ne * sizeof(double));
+         xfree(ar);
+      }
+      xassert(dsa->ne < dsa->size);
+      dsa->ne++;
+      dsa->ia[dsa->ne] = i;
+      dsa->ja[dsa->ne] = j;
+      dsa->ar[dsa->ne] = aij;
+      return;
+}
+
+static void transform(struct dsa *dsa)
+{     /* transform original LP to standard formulation */
+      LPX *lp = dsa->lp;
+      int orig_m = dsa->orig_m;
+      int orig_n = dsa->orig_n;
+      int *ref = dsa->ref;
+      int m = dsa->m;
+      int n = dsa->n;
+      double *b = dsa->b;
+      double *c = dsa->c;
+      int i, j, k, type, t, ii, len, *ind;
+      double lb, ub, coef, rii, sjj, *val;
+      /* initialize components of transformed LP */
+      dsa->ne = 0;
+      for (i = 1; i <= m; i++) b[i] = 0.0;
+      c[0] = lpx_get_obj_coef(lp, 0);
+      for (j = 1; j <= n; j++) c[j] = 0.0;
+      /* i and j are, respectively, ordinal number of current row and
+         ordinal number of current column in transformed LP */
+      i = j = 0;
+      /* transform rows (auxiliary variables) */
+      for (k = 1; k <= orig_m; k++)
+      {  type = lpx_get_row_type(lp, k);
+         rii = glp_get_rii(lp, k);
+         lb = lpx_get_row_lb(lp, k) * rii;
+         ub = lpx_get_row_ub(lp, k) * rii;
+         switch (type)
+         {  case LPX_FR:
+               /* source: -inf < (L.F.) < +inf */
+               /* result: ignore free row */
+               ref[k] = 0;
+               break;
+            case LPX_LO:
+               /* source: lb <= (L.F.) < +inf */
+               /* result: (L.F.) - x' = lb, x' >= 0 */
+               i++; j++;
+               ref[k] = i;
+               new_coef(dsa, i, j, -1.0);
+               b[i] = lb;
+               break;
+            case LPX_UP:
+               /* source: -inf < (L.F.) <= ub */
+               /* result: (L.F.) + x' = ub, x' >= 0 */
+               i++; j++;
+               ref[k] = i;
+               new_coef(dsa, i, j, +1.0);
+               b[i] = ub;
+               break;
+            case LPX_DB:
+               /* source: lb <= (L.F.) <= ub */
+               /* result: (L.F.) - x' = lb, x' + x'' = ub - lb */
+               i++; j++;
+               ref[k] = i;
+               new_coef(dsa, i, j, -1.0);
+               b[i] = lb;
+               i++;
+               new_coef(dsa, i, j, +1.0);
+               j++;
+               new_coef(dsa, i, j, +1.0);
+               b[i] = ub - lb;
+               break;
+            case LPX_FX:
+               /* source: (L.F.) = lb */
+               /* result: (L.F.) = lb */
+               i++;
+               ref[k] = i;
+               b[i] = lb;
+               break;
+            default:
+               xassert(type != type);
+         }
+      }
+      /* transform columns (structural variables) */
+      ind = xcalloc(1+orig_m, sizeof(int));
+      val = xcalloc(1+orig_m, sizeof(double));
+      for (k = 1; k <= orig_n; k++)
+      {  type = lpx_get_col_type(lp, k);
+         sjj = glp_get_sjj(lp, k);
+         lb = lpx_get_col_lb(lp, k) / sjj;
+         ub = lpx_get_col_ub(lp, k) / sjj;
+         coef = lpx_get_obj_coef(lp, k) * sjj;
+         len = lpx_get_mat_col(lp, k, ind, val);
+         for (t = 1; t <= len; t++)
+            val[t] *= (glp_get_rii(lp, ind[t]) * sjj);
+         switch (type)
+         {  case LPX_FR:
+               /* source: -inf < x < +inf */
+               /* result: x = x' - x'', x' >= 0, x'' >= 0 */
+               j++;
+               ref[orig_m+k] = j;
+               for (t = 1; t <= len; t++)
+               {  ii = ref[ind[t]];
+                  if (ii != 0) new_coef(dsa, ii, j, +val[t]);
+               }
+               c[j] = +coef;
+               j++;
+               for (t = 1; t <= len; t++)
+               {  ii = ref[ind[t]];
+                  if (ii != 0) new_coef(dsa, ii, j, -val[t]);
+               }
+               c[j] = -coef;
+               break;
+            case LPX_LO:
+               /* source: lb <= x < +inf */
+               /* result: x = lb + x', x' >= 0 */
+               j++;
+               ref[orig_m+k] = j;
+               for (t = 1; t <= len; t++)
+               {  ii = ref[ind[t]];
+                  if (ii != 0)
+                  {  new_coef(dsa, ii, j, val[t]);
+                     b[ii] -= val[t] * lb;
+                  }
+               }
+               c[j] = +coef;
+               c[0] += c[j] * lb;
+               break;
+            case LPX_UP:
+               /* source: -inf < x <= ub */
+               /* result: x = ub - x', x' >= 0 */
+               j++;
+               ref[orig_m+k] = j;
+               for (t = 1; t <= len; t++)
+               {  ii = ref[ind[t]];
+                  if (ii != 0)
+                  {  new_coef(dsa, ii, j, -val[t]);
+                     b[ii] -= val[t] * ub;
+                  }
+               }
+               c[j] = -coef;
+               c[0] -= c[j] * ub;
+               break;
+            case LPX_DB:
+               /* source: lb <= x <= ub */
+               /* result: x = lb + x', x' + x'' = ub - lb */
+               j++;
+               ref[orig_m+k] = j;
+               for (t = 1; t <= len; t++)
+               {  ii = ref[ind[t]];
+                  if (ii != 0)
+                  {  new_coef(dsa, ii, j, val[t]);
+                     b[ii] -= val[t] * lb;
+                  }
+               }
+               c[j] = +coef;
+               c[0] += c[j] * lb;
+               i++;
+               new_coef(dsa, i, j, +1.0);
+               j++;
+               new_coef(dsa, i, j, +1.0);
+               b[i] = ub - lb;
+               break;
+            case LPX_FX:
+               /* source: x = lb */
+               /* result: just substitute */
+               ref[orig_m+k] = 0;
+               for (t = 1; t <= len; t++)
+               {  ii = ref[ind[t]];
+                  if (ii != 0) b[ii] -= val[t] * lb;
+               }
+               c[0] += coef * lb;
+               break;
+            default:
+               xassert(type != type);
+         }
+      }
+      xfree(ind);
+      xfree(val);
+      /* end of transformation */
+      xassert(i == m && j == n);
+      /* change the objective sign in case of maximization */
+      if (lpx_get_obj_dir(lp) == LPX_MAX)
+         for (j = 0; j <= n; j++) c[j] = -c[j];
+      return;
+}
+
+static void restore(struct dsa *dsa, double row_pval[],
+      double row_dval[], double col_pval[], double col_dval[])
+{     /* restore solution of original LP */
+      LPX *lp = dsa->lp;
+      int orig_m = dsa->orig_m;
+      int orig_n = dsa->orig_n;
+      int *ref = dsa->ref;
+      int m = dsa->m;
+      double *x = dsa->x;
+      double *y = dsa->y;
+      int dir = lpx_get_obj_dir(lp);
+      int i, j, k, type, t, len, *ind;
+      double lb, ub, rii, sjj, temp, *val;
+      /* compute primal values of structural variables */
+      for (k = 1; k <= orig_n; k++)
+      {  j = ref[orig_m+k];
+         type = lpx_get_col_type(lp, k);
+         sjj = glp_get_sjj(lp, k);
+         lb = lpx_get_col_lb(lp, k) / sjj;
+         ub = lpx_get_col_ub(lp, k) / sjj;
+         switch (type)
+         {  case LPX_FR:
+               /* source: -inf < x < +inf */
+               /* result: x = x' - x'', x' >= 0, x'' >= 0 */
+               col_pval[k] = x[j] - x[j+1];
+               break;
+            case LPX_LO:
+               /* source: lb <= x < +inf */
+               /* result: x = lb + x', x' >= 0 */
+               col_pval[k] = lb + x[j];
+               break;
+            case LPX_UP:
+               /* source: -inf < x <= ub */
+               /* result: x = ub - x', x' >= 0 */
+               col_pval[k] = ub - x[j];
+               break;
+            case LPX_DB:
+               /* source: lb <= x <= ub */
+               /* result: x = lb + x', x' + x'' = ub - lb */
+               col_pval[k] = lb + x[j];
+               break;
+            case LPX_FX:
+               /* source: x = lb */
+               /* result: just substitute */
+               col_pval[k] = lb;
+               break;
+            default:
+               xassert(type != type);
+         }
+      }
+      /* compute primal values of auxiliary variables */
+      /* xR = A * xS */
+      ind = xcalloc(1+orig_n, sizeof(int));
+      val = xcalloc(1+orig_n, sizeof(double));
+      for (k = 1; k <= orig_m; k++)
+      {  rii = glp_get_rii(lp, k);
+         temp = 0.0;
+         len = lpx_get_mat_row(lp, k, ind, val);
+         for (t = 1; t <= len; t++)
+         {  sjj = glp_get_sjj(lp, ind[t]);
+            temp += (rii * val[t] * sjj) * col_pval[ind[t]];
+         }
+         row_pval[k] = temp;
+      }
+      xfree(ind);
+      xfree(val);
+      /* compute dual values of auxiliary variables */
+      for (k = 1; k <= orig_m; k++)
+      {  type = lpx_get_row_type(lp, k);
+         i = ref[k];
+         switch (type)
+         {  case LPX_FR:
+               xassert(i == 0);
+               row_dval[k] = 0.0;
+               break;
+            case LPX_LO:
+            case LPX_UP:
+            case LPX_DB:
+            case LPX_FX:
+               xassert(1 <= i && i <= m);
+               row_dval[k] = (dir == LPX_MIN ? +1.0 : -1.0) * y[i];
+               break;
+            default:
+               xassert(type != type);
+         }
+      }
+      /* compute dual values of structural variables */
+      /* dS = cS - A' * (dR - cR) */
+      ind = xcalloc(1+orig_m, sizeof(int));
+      val = xcalloc(1+orig_m, sizeof(double));
+      for (k = 1; k <= orig_n; k++)
+      {  sjj = glp_get_sjj(lp, k);
+         temp = lpx_get_obj_coef(lp, k) / sjj;
+         len = lpx_get_mat_col(lp, k, ind, val);
+         for (t = 1; t <= len; t++)
+         {  rii = glp_get_rii(lp, ind[t]);
+            temp -= (rii * val[t] * sjj) * row_dval[ind[t]];
+         }
+         col_dval[k] = temp;
+      }
+      xfree(ind);
+      xfree(val);
+      /* unscale solution of original LP */
+      for (i = 1; i <= orig_m; i++)
+      {  rii = glp_get_rii(lp, i);
+         row_pval[i] /= rii;
+         row_dval[i] *= rii;
+      }
+      for (j = 1; j <= orig_n; j++)
+      {  sjj = glp_get_sjj(lp, j);
+         col_pval[j] *= sjj;
+         col_dval[j] /= sjj;
       }
       return;
 }
 
-/***********************************************************************
-*  NAME
-*
-*  glp_get_col_kind - retrieve column kind
-*
-*  SYNOPSIS
-*
-*  int glp_get_col_kind(glp_prob *mip, int j);
-*
-*  RETURNS
-*
-*  The routine glp_get_col_kind returns the kind of j-th column, i.e.
-*  the kind of corresponding structural variable, as follows:
-*
-*  GLP_CV - continuous variable;
-*  GLP_IV - integer variable;
-*  GLP_BV - binary variable */
-
-int glp_get_col_kind(glp_prob *mip, int j)
-{     GLPCOL *col;
-      int kind;
-      if (!(1 <= j && j <= mip->n))
-         xfault("glp_get_col_kind: j = %d; column number out of range\n"
-            , j);
-      col = mip->col[j];
-      kind = col->kind;
-      switch (kind)
-      {  case GLP_CV:
-            break;
-         case GLP_IV:
-            if (col->type == GLP_DB && col->lb == 0.0 && col->ub == 1.0)
-               kind = GLP_BV;
-            break;
-         default:
-            xassert(kind != kind);
-      }
-      return kind;
-}
-
-/***********************************************************************
-*  NAME
-*
-*  glp_get_num_int - retrieve number of integer columns
-*
-*  SYNOPSIS
-*
-*  int glp_get_num_int(glp_prob *mip);
-*
-*  RETURNS
-*
-*  The routine glp_get_num_int returns the current number of columns,
-*  which are marked as integer. */
-
-int glp_get_num_int(glp_prob *mip)
-{     GLPCOL *col;
-      int j, count = 0;
-      for (j = 1; j <= mip->n; j++)
-      {  col = mip->col[j];
-         if (col->kind == GLP_IV) count++;
-      }
-      return count;
-}
-
-/***********************************************************************
-*  NAME
-*
-*  glp_get_num_bin - retrieve number of binary columns
-*
-*  SYNOPSIS
-*
-*  int glp_get_num_bin(glp_prob *mip);
-*
-*  RETURNS
-*
-*  The routine glp_get_num_bin returns the current number of columns,
-*  which are marked as binary. */
-
-int glp_get_num_bin(glp_prob *mip)
-{     GLPCOL *col;
-      int j, count = 0;
-      for (j = 1; j <= mip->n; j++)
-      {  col = mip->col[j];
-         if (col->kind == GLP_IV && col->type == GLP_DB && col->lb ==
-            0.0 && col->ub == 1.0) count++;
-      }
-      return count;
-}
-
-/***********************************************************************
-*  NAME
-*
-*  glp_intopt - solve MIP problem with the branch-and-bound method
-*
-*  SYNOPSIS
-*
-*  int glp_intopt(glp_prob *mip, const glp_iocp *parm);
-*
-*  DESCRIPTION
-*
-*  The routine glp_intopt is a driver to the MIP solver based on the
-*  branch-and-bound method.
-*
-*  On entry the problem object should contain optimal solution to LP
-*  relaxation (which can be obtained with the routine glp_simplex).
-*
-*  The MIP solver has a set of control parameters. Values of the control
-*  parameters can be passed in a structure glp_iocp, which the parameter
-*  parm points to.
-*
-*  The parameter parm can be specified as NULL, in which case the MIP
-*  solver uses default settings.
-*
-*  RETURNS
-*
-*  0  The MIP problem instance has been successfully solved. This code
-*     does not necessarily mean that the solver has found optimal
-*     solution. It only means that the solution process was successful.
-*
-*  GLP_EBOUND
-*     Unable to start the search, because some double-bounded variables
-*     have incorrect bounds or some integer variables have non-integer
-*     (fractional) bounds.
-*
-*  GLP_EROOT
-*     Unable to start the search, because optimal basis for initial LP
-*     relaxation is not provided.
-*
-*  GLP_EFAIL
-*     The search was prematurely terminated due to the solver failure.
-*
-*  GLP_ETMLIM
-*     The search was prematurely terminated, because the time limit has
-*     been exceeded.
-*
-*  GLP_ESTOP
-*     The search was prematurely terminated by application. */
-
-int glp_intopt(glp_prob *mip, const glp_iocp *parm)
-{     glp_iocp _parm;
-      int m = mip->m;
-      int n = mip->n;
-      glp_tree *tree;
-      int i, j, ret;
-      if (mip->tree != NULL)
-         xfault("glp_intopt: problem object is already used by the MIP "
-            "solver\n");
-      if (parm == NULL)
-         glp_init_iocp(&_parm);
-      else
-         memcpy(&_parm, parm, sizeof(glp_iocp));
-      parm = &_parm;
-      /* check control parameters */
-      if (!(parm->msg_lev == GLP_MSG_OFF ||
-            parm->msg_lev == GLP_MSG_ERR ||
-            parm->msg_lev == GLP_MSG_ON  ||
-            parm->msg_lev == GLP_MSG_ALL ||
-            parm->msg_lev == GLP_MSG_DBG))
-         xfault("glp_intopt: msg_lev = %d; invalid parameter\n",
-            parm->msg_lev);
-      if (!(parm->br_tech == GLP_BR_FFV ||
-            parm->br_tech == GLP_BR_LFV ||
-            parm->br_tech == GLP_BR_MFV ||
-            parm->br_tech == GLP_BR_DTH))
-         xfault("glp_intopt: br_tech = %d; invalid parameter\n",
-            parm->br_tech);
-      if (!(parm->bt_tech == GLP_BT_DFS ||
-            parm->bt_tech == GLP_BT_BFS ||
-            parm->bt_tech == GLP_BT_BLB ||
-            parm->bt_tech == GLP_BT_BPH))
-         xfault("glp_intopt: bt_tech = %d; invalid parameter\n",
-            parm->bt_tech);
-      if (!(0.0 < parm->tol_int && parm->tol_int < 1.0))
-         xfault("glp_intopt: tol_int = %g; invalid parameter\n",
-            parm->tol_int);
-      if (!(0.0 < parm->tol_obj && parm->tol_obj < 1.0))
-         xfault("glp_intopt: tol_obj = %g; invalid parameter\n",
-            parm->tol_obj);
-      if (parm->tm_lim < 0)
-         xfault("glp_intopt: tm_lim = %d; invalid parameter\n",
-            parm->tm_lim);
-      if (parm->out_frq < 0)
-         xfault("glp_intopt: out_frq = %d; invalid parameter\n",
-            parm->out_frq);
-      if (parm->out_dly < 0)
-         xfault("glp_intopt: out_dly = %d; invalid parameter\n",
-            parm->out_dly);
-      if (!(0 <= parm->cb_size && parm->cb_size <= 256))
-         xfault("glp_intopt: cb_size = %d; invalid parameter\n",
-            parm->cb_size);
-      if (!(parm->pp_tech == GLP_PP_NONE ||
-            parm->pp_tech == GLP_PP_ROOT ||
-            parm->pp_tech == GLP_PP_ALL))
-         xfault("glp_intopt: pp_tech = %d; invalid parameter\n",
-            parm->pp_tech);
-      if (parm->mip_gap < 0.0)
-         xfault("glp_intopt: mip_gap = %g; invalid parameter\n",
-            parm->mip_gap);
-      if (!(parm->mir_cuts == GLP_ON || parm->mir_cuts == GLP_OFF))
-         xfault("glp_intopt: mir_cuts = %d; invalid parameter\n",
-            parm->mir_cuts);
-      if (!(parm->gmi_cuts == GLP_ON || parm->gmi_cuts == GLP_OFF))
-         xfault("glp_intopt: gmi_cuts = %d; invalid parameter\n",
-            parm->gmi_cuts);
-      /* integer solution is currently undefined */
-      mip->mip_stat = GLP_UNDEF;
-      mip->mip_obj = 0.0;
-      /* check bounds of double-bounded variables */
-      for (i = 1; i <= m; i++)
-      {  GLPROW *row = mip->row[i];
-         if (row->type == GLP_DB && row->lb >= row->ub)
-         {  if (parm->msg_lev >= GLP_MSG_ERR)
-               xprintf("glp_intopt: row %d: lb = %g, ub = %g; incorrect"
-                  " bounds\n", i, row->lb, row->ub);
-            ret = GLP_EBOUND;
-            goto done;
-         }
-      }
-      for (j = 1; j <= n; j++)
-      {  GLPCOL *col = mip->col[j];
-         if (col->type == GLP_DB && col->lb >= col->ub)
-         {  if (parm->msg_lev >= GLP_MSG_ERR)
-               xprintf("glp_intopt: column %d: lb = %g, ub = %g; incorr"
-                  "ect bounds\n", j, col->lb, col->ub);
-            ret = GLP_EBOUND;
-            goto done;
-         }
-      }
-      /* bounds of all integer variables must be integral */
-      for (j = 1; j <= n; j++)
-      {  GLPCOL *col = mip->col[j];
-         if (col->kind != GLP_IV) continue;
-         if (col->type == GLP_LO || col->type == GLP_DB)
-         {  if (col->lb != floor(col->lb))
-            {  if (parm->msg_lev >= GLP_MSG_ERR)
-                  xprintf("glp_intopt: integer column %d has non-intege"
-                     "r lower bound %g\n", j, col->lb);
-               ret = GLP_EBOUND;
-               goto done;
-            }
-         }
-         if (col->type == GLP_UP || col->type == GLP_DB)
-         {  if (col->ub != floor(col->ub))
-            {  if (parm->msg_lev >= GLP_MSG_ERR)
-                  xprintf("glp_intopt: integer column %d has non-intege"
-                     "r upper bound %g\n", j, col->ub);
-               ret = GLP_EBOUND;
-               goto done;
-            }
-         }
-         if (col->type == GLP_FX)
-         {  if (col->lb != floor(col->lb))
-            {  if (parm->msg_lev >= GLP_MSG_ERR)
-                  xprintf("glp_intopt: integer column %d has non-intege"
-                     "r fixed value %g\n", j, col->lb);
-               ret = GLP_EBOUND;
-               goto done;
-            }
-         }
-      }
-      /* optimal solution to LP relaxation must be known */
-      if (glp_get_status(mip) != GLP_OPT)
-      {  if (parm->msg_lev >= GLP_MSG_ERR)
-            xprintf("glp_intopt: optimal basis to initial LP relaxation"
-               " not provided\n");
-         ret = GLP_EROOT;
+int glp_interior(glp_prob *_lp, const void *parm)
+{     /* easy-to-use driver to the interior-point method */
+      struct dsa _dsa, *dsa = &_dsa;
+      int ret, status;
+      double *row_pval, *row_dval, *col_pval, *col_dval;
+      if (parm != NULL)
+         xerror("glp_interior: parm = %p; invalid parameter\n", parm);
+      /* interior-point solution is currently undefined */
+      _lp->ipt_stat = GLP_UNDEF;
+      _lp->ipt_obj = 0.0;
+      /* initialize working area */
+      dsa->lp = _lp;
+      dsa->orig_m = lpx_get_num_rows(dsa->lp);
+      dsa->orig_n = lpx_get_num_cols(dsa->lp);
+      dsa->ref = NULL;
+      dsa->m = 0;
+      dsa->n = 0;
+      dsa->size = 0;
+      dsa->ne = 0;
+      dsa->ia = NULL;
+      dsa->ja = NULL;
+      dsa->ar = NULL;
+      dsa->b = NULL;
+      dsa->c = NULL;
+      dsa->x = NULL;
+      dsa->y = NULL;
+      dsa->z = NULL;
+      /* check if the problem is empty */
+      if (!(dsa->orig_m > 0 && dsa->orig_n > 0))
+      {  xprintf("glp_interior: problem has no rows and/or columns\n");
+         ret = GLP_EFAIL;
          goto done;
       }
-      /* it seems all is ok */
-      if (parm->msg_lev >= GLP_MSG_ALL)
-         xprintf("Integer optimization begins...\n");
-      /* create the branch-and-bound tree */
-      tree = ios_create_tree(mip, parm);
-#if 0
-      if (parm->msg_lev >= GLP_MSG_ALL && tree->int_obj)
-         xprintf("Objective function is integral\n");
-#endif
-      /* try to solve the problem */
-      ret = ios_driver(tree);
-      /* analyze exit code reported by the mip driver */
+      /* issue warning about dense columns */
+      if (dsa->orig_m >= 200)
+      {  int j, len, ndc = 0;
+         for (j = 1; j <= dsa->orig_n; j++)
+         {  len = lpx_get_mat_col(dsa->lp, j, NULL, NULL);
+            if ((double)len > 0.30 * (double)dsa->orig_m) ndc++;
+         }
+         if (ndc == 1)
+            xprintf("glp_interior: WARNING: PROBLEM HAS ONE DENSE COLUM"
+               "N\n");
+         else if (ndc > 0)
+            xprintf("glp_interior: WARNING: PROBLEM HAS %d DENSE COLUMN"
+               "S\n", ndc);
+      }
+      /* determine dimension of transformed LP */
+      xprintf("glp_interior: original LP problem has %d rows and %d col"
+         "umns\n", dsa->orig_m, dsa->orig_n);
+      calc_mn(dsa);
+      xprintf("glp_interior: transformed LP problem has %d rows and %d "
+         "columns\n", dsa->m, dsa->n);
+      /* transform original LP to standard formulation */
+      dsa->ref = xcalloc(1+dsa->orig_m+dsa->orig_n, sizeof(int));
+      dsa->size = lpx_get_num_nz(dsa->lp);
+      if (dsa->size < dsa->m) dsa->size = dsa->m;
+      if (dsa->size < dsa->n) dsa->size = dsa->n;
+      dsa->ne = 0;
+      dsa->ia = xcalloc(1+dsa->size, sizeof(int));
+      dsa->ja = xcalloc(1+dsa->size, sizeof(int));
+      dsa->ar = xcalloc(1+dsa->size, sizeof(double));
+      dsa->b = xcalloc(1+dsa->m, sizeof(double));
+      dsa->c = xcalloc(1+dsa->n, sizeof(double));
+      transform(dsa);
+      /* solve the transformed LP problem */
+      {  int *A_ptr = xcalloc(1+dsa->m+1, sizeof(int));
+         int *A_ind = xcalloc(1+dsa->ne, sizeof(int));
+         double *A_val = xcalloc(1+dsa->ne, sizeof(double));
+         int i, k, pos, len;
+         /* determine row lengths */
+         for (i = 1; i <= dsa->m; i++)
+            A_ptr[i] = 0;
+         for (k = 1; k <= dsa->ne; k++)
+            A_ptr[dsa->ia[k]]++;
+         /* set up row pointers */
+         pos = 1;
+         for (i = 1; i <= dsa->m; i++)
+            len = A_ptr[i], pos += len, A_ptr[i] = pos;
+         A_ptr[dsa->m+1] = pos;
+         xassert(pos - 1 == dsa->ne);
+         /* build the matrix */
+         for (k = 1; k <= dsa->ne; k++)
+         {  pos = --A_ptr[dsa->ia[k]];
+            A_ind[pos] = dsa->ja[k];
+            A_val[pos] = dsa->ar[k];
+         }
+         xfree(dsa->ia), dsa->ia = NULL;
+         xfree(dsa->ja), dsa->ja = NULL;
+         xfree(dsa->ar), dsa->ar = NULL;
+         dsa->x = xcalloc(1+dsa->n, sizeof(double));
+         dsa->y = xcalloc(1+dsa->m, sizeof(double));
+         dsa->z = xcalloc(1+dsa->n, sizeof(double));
+         ret = ipm_main(dsa->m, dsa->n, A_ptr, A_ind, A_val, dsa->b,
+            dsa->c, dsa->x, dsa->y, dsa->z);
+         xfree(A_ptr);
+         xfree(A_ind);
+         xfree(A_val);
+         xfree(dsa->b), dsa->b = NULL;
+         xfree(dsa->c), dsa->c = NULL;
+      }
+      /* analyze return code reported by the solver */
       switch (ret)
       {  case 0:
-            if (tree->mip->mip_stat == GLP_FEAS)
-            {  if (parm->msg_lev >= GLP_MSG_ALL)
-                  xprintf("INTEGER OPTIMAL SOLUTION FOUND\n");
-               tree->mip->mip_stat = GLP_OPT;
-            }
-            else
-            {  if (parm->msg_lev >= GLP_MSG_ALL)
-                  xprintf("PROBLEM HAS NO INTEGER FEASIBLE SOLUTION\n");
-               tree->mip->mip_stat = GLP_NOFEAS;
-            }
+            /* optimal solution found */
+            ret = 0;
             break;
-         case GLP_ETMLIM:
-            if (parm->msg_lev >= GLP_MSG_ALL)
-               xprintf("TIME LIMIT EXCEEDED; SEARCH TERMINATED\n");
+         case 1:
+            /* problem has no feasible (primal or dual) solution */
+            ret = GLP_ENOFEAS;
             break;
-         case GLP_EFAIL:
-            if (parm->msg_lev >= GLP_MSG_ERR)
-               xprintf("glp_intopt: cannot solve current LP relaxation "
-                  "\n");
+         case 2:
+            /* no convergence */
+            ret = GLP_ENOCVG;
             break;
-         case GLP_ESTOP:
-            if (parm->msg_lev >= GLP_MSG_ALL)
-               xprintf("SEARCH TERMINATED BY APPLICATION\n");
+         case 3:
+            /* iteration limit exceeded */
+            ret = GLP_EITLIM;
+            break;
+         case 4:
+            /* numerical instability on solving Newtonian system */
+            ret = GLP_EINSTAB;
             break;
          default:
             xassert(ret != ret);
       }
-      /* delete the branch-and-bound tree */
-      ios_delete_tree(tree);
-done: /* return to the application program */
+      /* recover solution of original LP */
+      row_pval = xcalloc(1+dsa->orig_m, sizeof(double));
+      row_dval = xcalloc(1+dsa->orig_m, sizeof(double));
+      col_pval = xcalloc(1+dsa->orig_n, sizeof(double));
+      col_dval = xcalloc(1+dsa->orig_n, sizeof(double));
+      restore(dsa, row_pval, row_dval, col_pval, col_dval);
+      xfree(dsa->ref), dsa->ref = NULL;
+      xfree(dsa->x), dsa->x = NULL;
+      xfree(dsa->y), dsa->y = NULL;
+      xfree(dsa->z), dsa->z = NULL;
+      /* store solution components into the problem object */
+      status = (ret == 0 ? LPX_T_OPT : LPX_T_UNDEF);
+      lpx_put_ipt_soln(dsa->lp, status, row_pval, row_dval, col_pval,
+         col_dval);
+      xfree(row_pval);
+      xfree(row_dval);
+      xfree(col_pval);
+      xfree(col_dval);
+done: /* return to the calling program */
       return ret;
 }
 
 /***********************************************************************
 *  NAME
 *
-*  glp_init_iocp - initialize integer optimizer control parameters
+*  glp_ipt_status - retrieve status of interior-point solution
 *
 *  SYNOPSIS
 *
-*  void glp_init_iocp(glp_iocp *parm);
+*  int glp_ipt_status(glp_prob *lp);
 *
-*  DESCRIPTION
+*  RETURNS
 *
-*  The routine glp_init_iocp initializes control parameters, which are
-*  used by the integer optimizer, with default values.
+*  The routine glp_ipt_status reports the status of solution found by
+*  the interior-point solver as follows:
 *
-*  Default values of the control parameters are stored in a glp_iocp
-*  structure, which the parameter parm points to. */
+*  GLP_UNDEF  - interior-point solution is undefined;
+*  GLP_OPT    - interior-point solution is optimal. */
 
-void glp_init_iocp(glp_iocp *parm)
-{     parm->msg_lev = GLP_MSG_ALL;
-      parm->br_tech = GLP_BR_DTH;
-      parm->bt_tech = GLP_BT_BLB;
-      parm->tol_int = 1e-5;
-      parm->tol_obj = 1e-7;
-      parm->tm_lim = INT_MAX;
-      parm->out_frq = 5000;
-      parm->out_dly = 10000;
-      parm->cb_func = NULL;
-      parm->cb_info = NULL;
-      parm->cb_size = 0;
-      parm->pp_tech = GLP_PP_ALL;
-      parm->mip_gap = 0.0;
-      parm->mir_cuts = GLP_OFF;
-      parm->gmi_cuts = GLP_OFF;
-      parm->fn_sol = NULL;
-      return;
+int glp_ipt_status(glp_prob *lp)
+{     int ipt_stat = lp->ipt_stat;
+      return ipt_stat;
 }
 
 /***********************************************************************
 *  NAME
 *
-*  glp_mip_status - retrieve status of MIP solution
+*  glp_ipt_obj_val - retrieve objective value (interior point)
 *
 *  SYNOPSIS
 *
-*  int glp_mip_status(glp_prob *mip);
+*  double glp_ipt_obj_val(glp_prob *lp);
 *
 *  RETURNS
 *
-*  The routine lpx_mip_status reports the status of MIP solution found
-*  by the branch-and-bound solver as follows:
-*
-*  GLP_UNDEF  - MIP solution is undefined;
-*  GLP_OPT    - MIP solution is integer optimal;
-*  GLP_FEAS   - MIP solution is integer feasible but its optimality
-*               (or non-optimality) has not been proven, perhaps due to
-*               premature termination of the search;
-*  GLP_NOFEAS - problem has no integer feasible solution (proven by the
-*               solver). */
+*  The routine glp_ipt_obj_val returns value of the objective function
+*  for interior-point solution. */
 
-int glp_mip_status(glp_prob *mip)
-{     int mip_stat = mip->mip_stat;
-      return mip_stat;
-}
-
-/***********************************************************************
-*  NAME
-*
-*  glp_mip_obj_val - retrieve objective value (MIP solution)
-*
-*  SYNOPSIS
-*
-*  double glp_mip_obj_val(glp_prob *mip);
-*
-*  RETURNS
-*
-*  The routine glp_mip_obj_val returns value of the objective function
-*  for MIP solution. */
-
-double glp_mip_obj_val(glp_prob *mip)
-{     struct LPXCPS *cps = mip->cps;
+double glp_ipt_obj_val(glp_prob *lp)
+{     struct LPXCPS *cps = lp->cps;
       double z;
-      z = mip->mip_obj;
+      z = lp->ipt_obj;
       if (cps->round && fabs(z) < 1e-9) z = 0.0;
       return z;
 }
@@ -470,51 +661,102 @@ double glp_mip_obj_val(glp_prob *mip)
 /***********************************************************************
 *  NAME
 *
-*  glp_mip_row_val - retrieve row value (MIP solution)
+*  glp_ipt_row_prim - retrieve row primal value (interior point)
 *
 *  SYNOPSIS
 *
-*  double glp_mip_row_val(glp_prob *mip, int i);
+*  double glp_ipt_row_prim(glp_prob *lp, int i);
 *
 *  RETURNS
 *
-*  The routine glp_mip_row_val returns value of the auxiliary variable
-*  associated with i-th row. */
+*  The routine glp_ipt_row_prim returns primal value of the auxiliary
+*  variable associated with i-th row. */
 
-double glp_mip_row_val(glp_prob *mip, int i)
-{     struct LPXCPS *cps = mip->cps;
-      double mipx;
-      if (!(1 <= i && i <= mip->m))
-         xfault("glp_mip_row_val: i = %d; row number out of range\n", i)
-            ;
-      mipx = mip->row[i]->mipx;
-      if (cps->round && fabs(mipx) < 1e-9) mipx = 0.0;
-      return mipx;
+double glp_ipt_row_prim(glp_prob *lp, int i)
+{     struct LPXCPS *cps = lp->cps;
+      double pval;
+      if (!(1 <= i && i <= lp->m))
+         xerror("glp_ipt_row_prim: i = %d; row number out of range\n",
+            i);
+      pval = lp->row[i]->pval;
+      if (cps->round && fabs(pval) < 1e-9) pval = 0.0;
+      return pval;
 }
 
 /***********************************************************************
 *  NAME
 *
-*  glp_mip_col_val - retrieve column value (MIP solution)
+*  glp_ipt_row_dual - retrieve row dual value (interior point)
 *
 *  SYNOPSIS
 *
-*  double glp_mip_col_val(glp_prob *mip, int j);
+*  double glp_ipt_row_dual(glp_prob *lp, int i);
 *
 *  RETURNS
 *
-*  The routine glp_mip_col_val returns value of the structural variable
-*  associated with j-th column. */
+*  The routine glp_ipt_row_dual returns dual value (i.e. reduced cost)
+*  of the auxiliary variable associated with i-th row. */
 
-double glp_mip_col_val(glp_prob *mip, int j)
-{     struct LPXCPS *cps = mip->cps;
-      double mipx;
-      if (!(1 <= j && j <= mip->n))
-         xfault("glp_mip_col_val: j = %d; column number out of range\n",
-            j);
-      mipx = mip->col[j]->mipx;
-      if (cps->round && fabs(mipx) < 1e-9) mipx = 0.0;
-      return mipx;
+double glp_ipt_row_dual(glp_prob *lp, int i)
+{     struct LPXCPS *cps = lp->cps;
+      double dval;
+      if (!(1 <= i && i <= lp->m))
+         xerror("glp_ipt_row_dual: i = %d; row number out of range\n",
+            i);
+      dval = lp->row[i]->dval;
+      if (cps->round && fabs(dval) < 1e-9) dval = 0.0;
+      return dval;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  glp_ipt_col_prim - retrieve column primal value (interior point)
+*
+*  SYNOPSIS
+*
+*  double glp_ipt_col_prim(glp_prob *lp, int j);
+*
+*  RETURNS
+*
+*  The routine glp_ipt_col_prim returns primal value of the structural
+*  variable associated with j-th column. */
+
+double glp_ipt_col_prim(glp_prob *lp, int j)
+{     struct LPXCPS *cps = lp->cps;
+      double pval;
+      if (!(1 <= j && j <= lp->n))
+         xerror("glp_ipt_col_prim: j = %d; column number out of range\n"
+            , j);
+      pval = lp->col[j]->pval;
+      if (cps->round && fabs(pval) < 1e-9) pval = 0.0;
+      return pval;
+}
+
+/***********************************************************************
+*  NAME
+*
+*  glp_ipt_col_dual - retrieve column dual value (interior point)
+*
+*  SYNOPSIS
+*
+*  #include "glplpx.h"
+*  double glp_ipt_col_dual(glp_prob *lp, int j);
+*
+*  RETURNS
+*
+*  The routine glp_ipt_col_dual returns dual value (i.e. reduced cost)
+*  of the structural variable associated with j-th column. */
+
+double glp_ipt_col_dual(glp_prob *lp, int j)
+{     struct LPXCPS *cps = lp->cps;
+      double dval;
+      if (!(1 <= j && j <= lp->n))
+         xerror("glp_ipt_col_dual: j = %d; column number out of range\n"
+            , j);
+      dval = lp->col[j]->dval;
+      if (cps->round && fabs(dval) < 1e-9) dval = 0.0;
+      return dval;
 }
 
 /* eof */

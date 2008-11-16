@@ -1,4 +1,4 @@
-/* glplpx01.c (obsolete api routines) */
+/* glplpx01.c (obsolete API routines) */
 
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
@@ -23,6 +23,7 @@
 
 #include "glpapi.h"
 #include "glplib.h"
+#include "glpmps.h"
 #define xfault xerror
 
 LPX *lpx_create_prob(void)
@@ -264,6 +265,31 @@ void lpx_delete_index(LPX *lp)
       return;
 }
 
+void lpx_scale_prob(LPX *lp)
+{     /* scale problem data */
+      switch (lpx_get_int_parm(lp, LPX_K_SCALE))
+      {  case 0:
+            /* no scaling */
+            glp_unscale_prob(lp);
+            break;
+         case 1:
+            /* equilibration scaling */
+            glp_scale_prob(lp, GLP_SF_EQ);
+            break;
+         case 2:
+            /* geometric mean scaling */
+            glp_scale_prob(lp, GLP_SF_GM);
+            break;
+         case 3:
+            /* geometric mean scaling, then equilibration scaling */
+            glp_scale_prob(lp, GLP_SF_GM | GLP_SF_EQ);
+            break;
+         default:
+            xassert(lp != lp);
+      }
+      return;
+}
+
 void lpx_unscale_prob(LPX *lp)
 {     /* unscale problem data */
       glp_unscale_prob(lp);
@@ -282,54 +308,77 @@ void lpx_set_col_stat(LPX *lp, int j, int stat)
       return;
 }
 
+void lpx_std_basis(LPX *lp)
+{     /* construct standard initial LP basis */
+      glp_std_basis(lp);
+      return;
+}
+
+void lpx_adv_basis(LPX *lp)
+{     /* construct advanced initial LP basis */
+      glp_adv_basis(lp, 0);
+      return;
+}
+
+void lpx_cpx_basis(LPX *lp)
+{     /* construct Bixby's initial LP basis */
+      glp_cpx_basis(lp);
+      return;
+}
+
+static void fill_smcp(LPX *lp, glp_smcp *parm)
+{     glp_init_smcp(parm);
+      switch (lpx_get_int_parm(lp, LPX_K_MSGLEV))
+      {  case 0:  parm->msg_lev = GLP_MSG_OFF;   break;
+         case 1:  parm->msg_lev = GLP_MSG_ERR;   break;
+         case 2:  parm->msg_lev = GLP_MSG_ON;    break;
+         case 3:  parm->msg_lev = GLP_MSG_ALL;   break;
+         default: xassert(lp != lp);
+      }
+      switch (lpx_get_int_parm(lp, LPX_K_DUAL))
+      {  case 0:  parm->meth = GLP_PRIMAL;       break;
+         case 1:  parm->meth = GLP_DUAL;         break;
+         default: xassert(lp != lp);
+      }
+      switch (lpx_get_int_parm(lp, LPX_K_PRICE))
+      {  case 0:  parm->pricing = GLP_PT_STD;    break;
+         case 1:  parm->pricing = GLP_PT_PSE;    break;
+         default: xassert(lp != lp);
+      }
+      if (lpx_get_real_parm(lp, LPX_K_RELAX) == 0.0)
+         parm->r_test = GLP_RT_STD;
+      else
+         parm->r_test = GLP_RT_HAR;
+      parm->tol_bnd = lpx_get_real_parm(lp, LPX_K_TOLBND);
+      parm->tol_dj  = lpx_get_real_parm(lp, LPX_K_TOLDJ);
+      parm->tol_piv = lpx_get_real_parm(lp, LPX_K_TOLPIV);
+      parm->obj_ll  = lpx_get_real_parm(lp, LPX_K_OBJLL);
+      parm->obj_ul  = lpx_get_real_parm(lp, LPX_K_OBJUL);
+      if (lpx_get_int_parm(lp, LPX_K_ITLIM) < 0)
+         parm->it_lim = INT_MAX;
+      else
+         parm->it_lim = lpx_get_int_parm(lp, LPX_K_ITLIM);
+      if (lpx_get_real_parm(lp, LPX_K_TMLIM) < 0.0)
+         parm->tm_lim = INT_MAX;
+      else
+         parm->tm_lim =
+            (int)(1000.0 * lpx_get_real_parm(lp, LPX_K_TMLIM));
+      parm->out_frq = lpx_get_int_parm(lp, LPX_K_OUTFRQ);
+      parm->out_dly =
+            (int)(1000.0 * lpx_get_real_parm(lp, LPX_K_OUTDLY));
+      switch (lpx_get_int_parm(lp, LPX_K_PRESOL))
+      {  case 0:  parm->presolve = GLP_OFF;      break;
+         case 1:  parm->presolve = GLP_ON;       break;
+         default: xassert(lp != lp);
+      }
+      return;
+}
+
 int lpx_simplex(LPX *lp)
 {     /* easy-to-use driver to the simplex method */
       glp_smcp parm;
       int ret;
-      glp_init_smcp(&parm);
-      switch (lpx_get_int_parm(lp, LPX_K_MSGLEV))
-      {  case 0:  parm.msg_lev = GLP_MSG_OFF;   break;
-         case 1:  parm.msg_lev = GLP_MSG_ERR;   break;
-         case 2:  parm.msg_lev = GLP_MSG_ON;    break;
-         case 3:  parm.msg_lev = GLP_MSG_ALL;   break;
-         default: xassert(lp != lp);
-      }
-      switch (lpx_get_int_parm(lp, LPX_K_DUAL))
-      {  case 0:  parm.meth = GLP_PRIMAL;       break;
-         case 1:  parm.meth = GLP_DUALP;        break;
-         default: xassert(lp != lp);
-      }
-      switch (lpx_get_int_parm(lp, LPX_K_PRICE))
-      {  case 0:  parm.pricing = GLP_PT_STD;    break;
-         case 1:  parm.pricing = GLP_PT_PSE;    break;
-         default: xassert(lp != lp);
-      }
-      if (lpx_get_real_parm(lp, LPX_K_RELAX) == 0.0)
-         parm.r_test = GLP_RT_STD;
-      else
-         parm.r_test = GLP_RT_HAR;
-      parm.tol_bnd = lpx_get_real_parm(lp, LPX_K_TOLBND);
-      parm.tol_dj  = lpx_get_real_parm(lp, LPX_K_TOLDJ);
-      parm.tol_piv = lpx_get_real_parm(lp, LPX_K_TOLPIV);
-      parm.obj_ll  = lpx_get_real_parm(lp, LPX_K_OBJLL);
-      parm.obj_ul  = lpx_get_real_parm(lp, LPX_K_OBJUL);
-      if (lpx_get_int_parm(lp, LPX_K_ITLIM) < 0)
-         parm.it_lim = INT_MAX;
-      else
-         parm.it_lim = lpx_get_int_parm(lp, LPX_K_ITLIM);
-      if (lpx_get_real_parm(lp, LPX_K_TMLIM) < 0.0)
-         parm.tm_lim = INT_MAX;
-      else
-         parm.tm_lim =
-            (int)(1000.0 * lpx_get_real_parm(lp, LPX_K_TMLIM));
-      parm.out_frq = lpx_get_int_parm(lp, LPX_K_OUTFRQ);
-      parm.out_dly =
-            (int)(1000.0 * lpx_get_real_parm(lp, LPX_K_OUTDLY));
-      switch (lpx_get_int_parm(lp, LPX_K_PRESOL))
-      {  case 0:  parm.presolve = GLP_OFF;      break;
-         case 1:  parm.presolve = GLP_ON;       break;
-         default: xassert(lp != lp);
-      }
+      fill_smcp(lp, &parm);
       ret = glp_simplex(lp, &parm);
       switch (ret)
       {  case 0:           ret = LPX_E_OK;      break;
@@ -344,6 +393,25 @@ int lpx_simplex(LPX *lp)
          case GLP_ETMLIM:  ret = LPX_E_TMLIM;   break;
          case GLP_ENOPFS:  ret = LPX_E_NOPFS;   break;
          case GLP_ENODFS:  ret = LPX_E_NODFS;   break;
+         default:          xassert(ret != ret);
+      }
+      return ret;
+}
+
+int lpx_exact(LPX *lp)
+{     /* easy-to-use driver to the exact simplex method */
+      glp_smcp parm;
+      int ret;
+      fill_smcp(lp, &parm);
+      ret = glp_exact(lp, &parm);
+      switch (ret)
+      {  case 0:           ret = LPX_E_OK;      break;
+         case GLP_EBADB:
+         case GLP_ESING:
+         case GLP_EBOUND:
+         case GLP_EFAIL:   ret = LPX_E_FAULT;   break;
+         case GLP_EITLIM:  ret = LPX_E_ITLIM;   break;
+         case GLP_ETMLIM:  ret = LPX_E_TMLIM;   break;
          default:          xassert(ret != ret);
       }
       return ret;
@@ -427,6 +495,11 @@ void lpx_get_col_info(glp_prob *lp, int j, int *tagx, double *vx,
       return;
 }
 
+int lpx_get_ray_info(LPX *lp)
+{     /* determine what causes primal unboundness */
+      return glp_get_unbnd_ray(lp);
+}
+
 int lpx_eval_tab_row(LPX *lp, int k, int ind[], double val[])
 {     /* compute row of the simplex tableau */
       return glp_eval_tab_row(lp, k, ind, val);
@@ -435,6 +508,22 @@ int lpx_eval_tab_row(LPX *lp, int k, int ind[], double val[])
 int lpx_eval_tab_col(LPX *lp, int k, int ind[], double val[])
 {     /* compute column of the simplex tableau */
       return glp_eval_tab_col(lp, k, ind, val);
+}
+
+int lpx_interior(LPX *lp)
+{     /* easy-to-use driver to the interior-point method */
+      int ret;
+      ret = glp_interior(lp, NULL);
+      switch (ret)
+      {  case 0:           ret = LPX_E_OK;      break;
+         case GLP_EFAIL:   ret = LPX_E_FAULT;   break;
+         case GLP_ENOFEAS: ret = LPX_E_NOFEAS;  break;
+         case GLP_ENOCVG:  ret = LPX_E_NOCONV;  break;
+         case GLP_EITLIM:  ret = LPX_E_ITLIM;   break;
+         case GLP_EINSTAB: ret = LPX_E_INSTAB;  break;
+         default:          xassert(ret != ret);
+      }
+      return ret;
 }
 
 int lpx_ipt_status(glp_prob *lp)
@@ -507,9 +596,8 @@ int lpx_get_num_bin(LPX *lp)
       return glp_get_num_bin(lp);
 }
 
-int lpx_integer(LPX *lp)
-{     /* easy-to-use driver to the branch-and-bound method */
-      glp_iocp parm;
+static int solve_mip(LPX *lp, int presolve)
+{     glp_iocp parm;
       int ret;
       glp_init_iocp(&parm);
       switch (lpx_get_int_parm(lp, LPX_K_MSGLEV))
@@ -535,11 +623,13 @@ int lpx_integer(LPX *lp)
       }
       parm.tol_int = lpx_get_real_parm(lp, LPX_K_TOLINT);
       parm.tol_obj = lpx_get_real_parm(lp, LPX_K_TOLOBJ);
-      if (lpx_get_real_parm(lp, LPX_K_TMLIM) < 0.0)
+      if (lpx_get_real_parm(lp, LPX_K_TMLIM) < 0.0 ||
+          lpx_get_real_parm(lp, LPX_K_TMLIM) > 1e6)
          parm.tm_lim = INT_MAX;
       else
          parm.tm_lim =
             (int)(1000.0 * lpx_get_real_parm(lp, LPX_K_TMLIM));
+      parm.mip_gap = lpx_get_real_parm(lp, LPX_K_MIPGAP);
       if (lpx_get_int_parm(lp, LPX_K_USECUTS) & LPX_C_GOMORY)
          parm.gmi_cuts = GLP_ON;
       else
@@ -548,17 +638,40 @@ int lpx_integer(LPX *lp)
          parm.mir_cuts = GLP_ON;
       else
          parm.mir_cuts = GLP_OFF;
-      parm.mip_gap = lpx_get_real_parm(lp, LPX_K_MIPGAP);
+      if (lpx_get_int_parm(lp, LPX_K_USECUTS) & LPX_C_COVER)
+         parm.cov_cuts = GLP_ON;
+      else
+         parm.cov_cuts = GLP_OFF;
+      if (lpx_get_int_parm(lp, LPX_K_USECUTS) & LPX_C_CLIQUE)
+         parm.clq_cuts = GLP_ON;
+      else
+         parm.clq_cuts = GLP_OFF;
+      parm.presolve = presolve;
+      if (lpx_get_int_parm(lp, LPX_K_BINARIZE))
+         parm.binarize = GLP_ON;
       ret = glp_intopt(lp, &parm);
       switch (ret)
       {  case 0:           ret = LPX_E_OK;      break;
+         case GLP_ENOPFS:  ret = LPX_E_NOPFS;   break;
+         case GLP_ENODFS:  ret = LPX_E_NODFS;   break;
          case GLP_EBOUND:
          case GLP_EROOT:   ret = LPX_E_FAULT;   break;
          case GLP_EFAIL:   ret = LPX_E_SING;    break;
+         case GLP_EMIPGAP: ret = LPX_E_MIPGAP;  break;
          case GLP_ETMLIM:  ret = LPX_E_TMLIM;   break;
          default:          xassert(ret != ret);
       }
       return ret;
+}
+
+int lpx_integer(LPX *lp)
+{     /* easy-to-use driver to the branch-and-bound method */
+      return solve_mip(lp, GLP_OFF);
+}
+
+int lpx_intopt(LPX *lp)
+{     /* easy-to-use driver to the branch-and-bound method */
+      return solve_mip(lp, GLP_ON);
 }
 
 int lpx_mip_status(glp_prob *lp)
@@ -602,6 +715,16 @@ int lpx_write_mps(LPX *lp, const char *fname)
       return glp_write_mps(lp, GLP_MPS_DECK, NULL, fname);
 }
 
+int lpx_read_bas(LPX *lp, const char *fname)
+{     /* read LP basis in fixed MPS format */
+      return read_bas(lp, fname);
+}
+
+int lpx_write_bas(LPX *lp, const char *fname)
+{     /* write LP basis in fixed MPS format */
+      return write_bas(lp, fname);
+}
+
 LPX *lpx_read_freemps(const char *fname)
 {     /* read problem data in free MPS format */
       LPX *lp = lpx_create_prob();
@@ -629,9 +752,37 @@ int lpx_write_cpxlp(LPX *lp, const char *fname)
       return glp_write_lp(lp, NULL, fname);
 }
 
+LPX *lpx_read_model(const char *model, const char *data, const char
+      *output)
+{     /* read LP/MIP model written in GNU MathProg language */
+      LPX *lp = NULL;
+      glp_tran *tran;
+      /* allocate the translator workspace */
+      tran = glp_mpl_alloc_wksp();
+      /* read model section and optional data section */
+      if (glp_mpl_read_model(tran, model, data != NULL)) goto done;
+      /* read separate data section, if required */
+      if (data != NULL)
+         if (glp_mpl_read_data(tran, data)) goto done;
+      /* generate the model */
+      if (glp_mpl_generate(tran, output)) goto done;
+      /* build the problem instance from the model */
+      lp = glp_create_prob();
+      glp_mpl_build_prob(tran, lp);
+done: /* free the translator workspace */
+      glp_mpl_free_wksp(tran);
+      /* bring the problem object to the calling program */
+      return lp;
+}
+
 int lpx_is_b_avail(glp_prob *lp)
 {     /* check if LP basis is available */
       return glp_bf_exists(lp);
+}
+
+int lpx_main(int argc, const char *argv[])
+{     /* stand-alone LP/MIP solver */
+      return glp_main(argc, argv);
 }
 
 /* eof */

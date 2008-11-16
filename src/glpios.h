@@ -151,6 +151,8 @@ struct glp_tree
       /* statuses of all variables */
       /*--------------------------------------------------------------*/
       /* cut generator (under construction) */
+      IOSPOOL *local;
+      /* local cut pool */
       int first_attempt;
       int max_added_cuts;
       double min_eff;
@@ -158,6 +160,8 @@ struct glp_tree
       int just_selected;
       void *mir_gen;
       /* pointer to working area used by the MIR cut generator */
+      void *clq_gen;
+      /* pointer to working area used by the clique cut generator */
       int round;
       /* round number; shows how many times the cut generating routine
          is called for the same subproblem; 1 means call for the first
@@ -179,6 +183,13 @@ struct glp_tree
       /* j_ref[k], 1 <= k <= g->n, is the number of a binary variable,
          which refers to node k, that is, j_ref[k] = j if n_ref[j] = k
          or c_ref[j] = k */
+      /*--------------------------------------------------------------*/
+      void *pcost;
+      /* pointer to working area used on pseudocost branching */
+      int *iwrk; /* int iwrk[1+n]; */
+      /* working array */
+      double *dwrk; /* double dwrk[1+n]; */
+      /* working array */
       /*--------------------------------------------------------------*/
       /* control parameters and statistics */
       const glp_iocp *parm;
@@ -204,9 +215,9 @@ struct glp_tree
       int br_sel;
       /* flag indicating which branch (subproblem) should be selected
          to continue the search:
-         'D' - down branch
-         'U' - up branch
-         'N' - none of them */
+         GLP_DN_BRNCH - select down-branch
+         GLP_UP_BRNCH - select up-branch
+         GLP_NO_BRNCH - use general selection technique */
       IOSNPD *btrack;
       /* pointer to active subproblem selected to continue the search;
          NULL means no subproblem has been selected */
@@ -261,6 +272,15 @@ struct IOSNPD
       /* linked list of new edges added for this subproblem, where both
          endpoints were added in some ancestor subproblem */
       /*--------------------------------------------------------------*/
+#if 1 /* 04/X-2008 */
+      double lp_obj;
+      /* optimal objective value to LP relaxation of this subproblem;
+         on creating a subproblem this value is inherited from its
+         parent; for the root subproblem, which has no parent, this
+         value is initially set to -DBL_MAX (minimization) or +DBL_MAX
+         (maximization); each time the subproblem is re-optimized, this
+         value is appropriately changed */
+#endif
       double bound;
       /* local lower (minimization) or upper (maximization) bound for
          integer optimal solution to *this* subproblem; this bound is
@@ -271,6 +291,15 @@ struct IOSNPD
          root subproblem its local bound is initially set to -DBL_MAX
          (minimization) or +DBL_MAX (maximization) and then improved as
          the root LP relaxation has been solved */
+#if 1 /* 04/X-2008 */
+      int br_var;
+      /* ordinal number of branching variable, 1 <= br_var <= n, used
+         to split this subproblem; 0 means that either this subproblem
+         is active or branching was made on a constraint */
+      double br_val;
+      /* (fractional) value of branching variable in optimal solution
+         to final LP relaxation of this subproblem */
+#endif
       /* if this subproblem is inactive, the following two quantities
          correspond to final optimal solution of its LP relaxation; for
          active subproblems these quantities are undefined */
@@ -321,6 +350,10 @@ struct IOSROW
 {     /* row (cut) addition entry */
       char *name;
       /* row name or NULL */
+#if 1 /* 20/IX-2008 */
+      unsigned char origin;
+      unsigned char klass;
+#endif
       int type;
       /* row type */
       double lb;
@@ -355,10 +388,18 @@ struct IOSPOOL
       /* pointer to the first cut row */
       IOSCUT *tail;
       /* pointer to the last cut row */
+      int ord;
+      /* ordinal number of the current cut row, 1 <= ord <= size */
+      IOSCUT *curr;
+      /* pointer to the current cut row */
 };
 
 struct IOSCUT
 {     /* cut row (cutting plane constraint) */
+#if 1 /* 20/IX-2008 */
+      char *name;
+      unsigned char klass;
+#endif
       IOSAIJ *ptr;
       /* pointer to the list of row coefficients */
       int type;
@@ -411,6 +452,18 @@ void ios_delete_node(glp_tree *tree, int p);
 void ios_delete_tree(glp_tree *tree);
 /* delete branch-and-bound tree */
 
+#define ios_eval_degrad _glp_ios_eval_degrad
+void ios_eval_degrad(glp_tree *tree, int j, double *dn, double *up);
+/* estimate obj. degrad. for down- and up-branches */
+
+#define ios_round_bound _glp_ios_round_bound
+double ios_round_bound(glp_tree *tree, double bound);
+/* improve local bound by rounding */
+
+#define ios_is_hopeful _glp_ios_is_hopeful
+int ios_is_hopeful(glp_tree *tree, double bound);
+/* check if subproblem is hopeful */
+
 #define ios_best_node _glp_ios_best_node
 int ios_best_node(glp_tree *tree);
 /* find active node with best local bound */
@@ -427,14 +480,23 @@ int ios_solve_node(glp_tree *tree);
 IOSPOOL *ios_create_pool(glp_tree *tree);
 /* create cut pool */
 
-#define ios_add_cut_row _glp_ios_add_cut_row
-IOSCUT *ios_add_cut_row(glp_tree *tree, IOSPOOL *pool, int len,
-      int ind[], double val[], int type, double rhs);
-/* add cut row to the cut pool */
+#define ios_add_row _glp_ios_add_row
+int ios_add_row(glp_tree *tree, IOSPOOL *pool,
+      const char *name, int klass, int flags, int len, const int ind[],
+      const double val[], int type, double rhs);
+/* add row (constraint) to the cut pool */
 
-#define ios_del_cut_row _glp_ios_del_cut_row
-void ios_del_cut_row(glp_tree *tree, IOSPOOL *pool, IOSCUT *cut);
-/* remove cut row from the cut pool */
+#define ios_find_row _glp_ios_find_row
+IOSCUT *ios_find_row(IOSPOOL *pool, int i);
+/* find row (constraint) in the cut pool */
+
+#define ios_del_row _glp_ios_del_row
+void ios_del_row(glp_tree *tree, IOSPOOL *pool, int i);
+/* remove row (constraint) from the cut pool */
+
+#define ios_clear_pool _glp_ios_clear_pool
+void ios_clear_pool(glp_tree *tree, IOSPOOL *pool);
+/* remove all rows (constraints) from the cut pool */
 
 #define ios_delete_pool _glp_ios_delete_pool
 void ios_delete_pool(glp_tree *tree, IOSPOOL *pool);
@@ -511,7 +573,7 @@ void ios_delete_vec(IOSVEC *v);
 /**********************************************************************/
 
 #define ios_gmi_gen _glp_ios_gmi_gen
-void ios_gmi_gen(glp_tree *tree, IOSPOOL *pool);
+void ios_gmi_gen(glp_tree *tree);
 /* generate Gomory's mixed integer cuts */
 
 #define ios_mir_init _glp_ios_mir_init
@@ -519,12 +581,36 @@ void *ios_mir_init(glp_tree *tree);
 /* initialize MIR cut generator */
 
 #define ios_mir_gen _glp_ios_mir_gen
-void ios_mir_gen(glp_tree *tree, void *gen, IOSPOOL *pool);
+void ios_mir_gen(glp_tree *tree, void *gen);
 /* generate MIR cuts */
 
 #define ios_mir_term _glp_ios_mir_term
 void ios_mir_term(void *gen);
 /* terminate MIR cut generator */
+
+#define ios_cov_gen _glp_ios_cov_gen
+void ios_cov_gen(glp_tree *tree);
+/* generate mixed cover cuts */
+
+#define ios_clq_init _glp_ios_clq_init
+void *ios_clq_init(glp_tree *tree);
+/* initialize clique cut generator */
+
+#define ios_clq_gen _glp_ios_clq_gen
+void ios_clq_gen(glp_tree *tree, void *gen);
+/* generate clique cuts */
+
+#define ios_clq_term _glp_ios_clq_term
+void ios_clq_term(void *gen);
+/* terminate clique cut generator */
+
+#define ios_pcost_branch _glp_ios_pcost_branch
+void ios_pcost_branch(glp_tree *tree);
+/* choose branching variable using hybrid pseudocost technique */
+
+#define ios_pcost_free _glp_ios_pcost_free
+void ios_pcost_free(glp_tree *tree);
+/* free working area used on pseudocost branching */
 
 #endif
 

@@ -1,4 +1,4 @@
-/* glplpx04.c (problem scaling routines) */
+/* glplpx04.c */
 
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
@@ -22,451 +22,565 @@
 ***********************************************************************/
 
 #include "glpapi.h"
-#include "glplib.h"
 #define xfault xerror
-#define lpx_set_rii glp_set_rii
-#define lpx_set_sjj glp_set_sjj
+#define lpx_get_rii glp_get_rii
+#define lpx_get_sjj glp_get_sjj
 
 /*----------------------------------------------------------------------
--- eq_scal - implicit equilibration scaling.
---
--- *Synopsis*
---
--- static void eq_scal(int m, int n, void *info,
---    int (*mat)(void *info, int k, int ndx[], double val[]),
---    double R[], double S[], int ord);
---
--- *Description*
---
--- The routine eq_scal performs the implicit equilibration scaling of
--- the matrix R*A*S, where A is a given rectangular matrix, R and S are
--- given diagonal scaling matrices. The result of the scaling is the
--- matrix R'*A*S', where R' and S' are new scaling matrices computed by
--- the routine and stored on exit in the same arrays as the matrices R
--- and S.
---
--- Diagonal elements of the matrices R and S are stored in locations
--- R[1], ..., R[m] and S[1], ..., S[n] respectively, where m and n are
--- number of rows and number of columns of the matrix A. The locations
--- R[0] and S[0] are not used.
---
--- The parameter info is a transit pointer passed to the formal routine
--- mat (see below).
---
--- The formal routine mat specifies the given matrix A in both row- and
--- column-wise formats. In order to obtain an i-th row of the matrix A
--- the routine eq_scal calls the routine mat with the parameter k = +i,
--- 1 <= i <= m. In response the routine mat should store column indices
--- and values of (non-zero) elements of the i-th row to the locations
--- ndx[1], ..., ndx[len] and val[1], ..., val[len] respectively, where
--- len is number of non-zeros in the i-th row returned by the routine
--- mat on exit. Similarly, in order to obtain a j-th column the routine
--- mat is called with the parameter k = -j, 1 <= j <= n, and should
--- return the j-th column of the matrix A in the same way as explained
--- above for rows. Note that the routine mat is called more than once
--- for the same row and column numbers.
---
--- To perform equilibration scaling the routine eq_scal just divides
--- all elements of each row (column) by the largest absolute value of
--- elements in this row (column).
---
--- On entry the matrices R and S should be defined (if the matrix A is
--- unscaled, R and S should be untity matrices). On exit the routine
--- computes new matrices R' and S' that define the scaled matrix R'*A*S'
--- (thus scaling is implicit, since the matrix A is not changed).
---
--- The parameter ord defines the order of scaling:
---
--- if ord = 0, at first rows, then columns;
--- if ord = 1, at first columns, then rows. */
-
-static void eq_scal(int m, int n, void *info,
-      int (*mat)(void *info, int k, int ndx[], double val[]),
-      double R[], double S[], int ord)
-{     int i, j, len, t, pass, *ndx;
-      double big, temp, *val;
-      if (!(m > 0 && n > 0))
-         xfault("eq_scal: m = %d; n = %d; invalid parameters\n", m, n);
-      ndx = xcalloc(1 + (m >= n ? m : n), sizeof(int));
-      val = xcalloc(1 + (m >= n ? m : n), sizeof(double));
-      for (pass = 0; pass <= 1; pass++)
-      {  if (ord == pass)
-         {  /* scale rows of the matrix R*A*S */
-            for (i = 1; i <= m; i++)
-            {  big = 0.0;
-               /* obtain the i-th row of the matrix A */
-               len = mat(info, +i, ndx, val);
-               if (!(0 <= len && len <= n))
-                  xfault("eq_scal: i = %d; len = %d; invalid row length"
-                     "\n", i, len);
-               /* compute big = max(a[i,j]) for the i-th row */
-               for (t = 1; t <= len; t++)
-               {  j = ndx[t];
-                  if (!(1 <= j && j <= n))
-                     xfault("eq_scal: i = %d; j = %d; invalid column in"
-                        "dex\n", i, j);
-                  temp = R[i] * fabs(val[t]) * S[j];
-                  if (big < temp) big = temp;
-               }
-               /* scale the i-th row */
-               if (big != 0.0) R[i] /= big;
-            }
-         }
-         else
-         {  /* scale columns of the matrix R*A*S */
-            for (j = 1; j <= n; j++)
-            {  big = 0.0;
-               /* obtain the j-th column of the matrix A */
-               len = mat(info, -j, ndx, val);
-               if (!(0 <= len && len <= m))
-                  xfault("eq_scal: j = %d; len = %d; invalid column len"
-                     "gth\n", j, len);
-               /* compute big = max(a[i,j]) for the j-th column */
-               for (t = 1; t <= len; t++)
-               {  i = ndx[t];
-                  if (!(1 <= i && i <= m))
-                     xfault("eq_scal: i = %d; j = %d; invalid row index"
-                        "\n", i, j);
-                  temp = R[i] * fabs(val[t]) * S[j];
-                  if (big < temp) big = temp;
-               }
-               /* scale the j-th column */
-               if (big != 0.0) S[j] /= big;
-            }
-         }
-      }
-      xfree(ndx);
-      xfree(val);
-      return;
-}
-
-/*----------------------------------------------------------------------
--- gm_scal - implicit geometric mean scaling.
---
--- *Synopsis*
---
--- static void gm_scal(int m, int n, void *info,
---    int (*mat)(void *info, int k, int ndx[], double val[]),
---    double R[], double S[], int ord, int it_max, double eps);
---
--- *Description*
---
--- The routine gm_scal performs the implicit geometric mean scaling of
--- the matrix R*A*S, where A is a given rectangular matrix, R and S are
--- given diagonal scaling matrices. The result of the scaling is the
--- matrix R'*A*S', where R' and S' are new scaling matrices computed by
--- the routine and stored on exit in the same arrays as the matrices R
--- and S.
---
--- Diagonal elements of the matrices R and S are stored in locations
--- R[1], ..., R[m] and S[1], ..., S[n] respectively, where m and n are
--- number of rows and number of columns of the matrix A. The locations
--- R[0] and S[0] are not used.
---
--- The parameter info is a transit pointer passed to the formal routine
--- mat (see below).
---
--- The formal routine mat specifies the given matrix A in both row- and
--- column-wise formats. In order to obtain an i-th row of the matrix A
--- the routine gm_scal calls the routine mat with the parameter k = +i,
--- 1 <= i <= m. In response the routine mat should store column indices
--- and values of (non-zero) elements of the i-th row to the locations
--- ndx[1], ..., ndx[len] and val[1], ..., val[len] respectively, where
--- len is number of non-zeros in the i-th row returned by the routine
--- mat on exit. Similarly, in order to obtain a j-th column the routine
--- mat is called with the parameter k = -j, 1 <= j <= n, and should
--- return the j-th column of the matrix A in the same way as explained
--- above for rows. Note that the routine mat is called more than once
--- for the same row and column numbers.
---
--- To perform geometric mean scaling the routine gm_scal divides all
--- elements of each row (column) by sqrt(beta/alfa), where alfa and beta
--- are, respectively, smallest and largest absolute values of non-zero
--- elements of the corresponding row (column). In order to improve the
--- scaling quality the routine scales rows and columns several times.
---
--- On entry the matrices R and S should be defined (if the matrix A is
--- unscaled, R and S should be untity matrices). On exit the routine
--- computes new matrices R' and S' that define the scaled matrix R'*A*S'
--- (thus scaling is implicit, since the matrix A is not changed).
---
--- The parameter ord defines the order of scaling:
---
--- if ord = 0, at first rows, then columns;
--- if ord = 1, at first columns, then rows.
---
--- The parameter it_max defines maximal number of scaling iterations.
--- Recommended value it_max = 10 .. 50.
---
--- The parameter eps > 0 is a criterion used to decide when the scaling
--- process should stop. The process stops if the condition
---
---    t[k-1] - t[k] < eps * t[k-1]                                   (1)
---
--- becomes true, where
---
---    t[k] = beta[k] / alfa[k]                                       (2)
---
--- is the "quality" of scaling, alfa[k] and beta[k] are, respectively,
--- smallest and largest absolute values of (non-zero) elements of the
--- current matrix R'*A*S', k is the number of iteration. For most cases
--- eps = 0.10 .. 0.01 may be recommended.
---
--- The routine gm_scal prints the "quality" of scaling (2) on entry and
--- on exit. */
-
-static void gm_scal(int m, int n, void *info,
-      int (*mat)(void *info, int k, int ndx[], double val[]),
-      double R[], double S[], int ord, int it_max, double eps)
-{     int iter, i, j, len, t, pass, *ndx;
-      double alfa, beta, told, tnew, temp, *val;
-      if (!(m > 0 && n > 0))
-         xfault("gm_scal: m = %d; n = %d; invalid parameters\n", m, n);
-      ndx = xcalloc(1 + (m >= n ? m : n), sizeof(int));
-      val = xcalloc(1 + (m >= n ? m : n), sizeof(double));
-      told = DBL_MAX;
-      for (iter = 1; ; iter++)
-      {  /* compute the scaling "quality" */
-         alfa = DBL_MAX, beta = 0.0;
-         for (i = 1; i <= m; i++)
-         {  /* obtain the i-th row of the matrix A */
-            len = mat(info, +i, ndx, val);
-            if (!(0 <= len && len <= n)) goto err1;
-            /* compute alfa = min(a[i,j]) and beta = max(a[i,j]) */
-            for (t = 1; t <= len; t++)
-            {  j = ndx[t];
-               if (!(1 <= j && j <= n)) goto err2;
-               temp = R[i] * fabs(val[t]) * S[j];
-               if (temp == 0.0) continue;
-               if (alfa > temp) alfa = temp;
-               if (beta < temp) beta = temp;
-            }
-         }
-         tnew = (beta == 0.0 ? 1.0 : beta / alfa);
-         /* print the initial scaling "quality" */
-         if (iter == 1)
-            xprintf("gm_scal: max / min = %9.3e\n", tnew);
-         /* check if the scaling process should stop */
-         if (iter > it_max || told - tnew < eps * told)
-         {  /* print the final scaling "quality" and leave the loop */
-            xprintf("gm_scal: max / min = %9.3e\n", tnew);
-            break;
-         }
-         told = tnew;
-         /* perform the next scaling iteration */
-         for (pass = 0; pass <= 1; pass++)
-         {  if (ord == pass)
-            {  /* scale rows of the matrix R*A*S */
-               for (i = 1; i <= m; i++)
-               {  alfa = DBL_MAX, beta = 0.0;
-                  /* obtain the i-th row of the matrix A */
-                  len = mat(info, +i, ndx, val);
-                  if (!(0 <= len && len <= n))
-err1:                xfault("gm_scal: i = %d; len = %d; invalid row len"
-                        "gth", i, len);
-                  /* compute alfa = min(a[i,j]) and beta = max(a[i,j])
-                     for non-zero elements in the i-th row */
-                  for (t = 1; t <= len; t++)
-                  {  j = ndx[t];
-                     if (!(1 <= j && j <= n))
-err2:                   xfault("gm_scal: i = %d; j = %d; invalid column"
-                           " index\n", i, j);
-                     temp = R[i] * fabs(val[t]) * S[j];
-                     if (temp == 0.0) continue;
-                     if (alfa > temp) alfa = temp;
-                     if (beta < temp) beta = temp;
-                  }
-                  /* scale the i-th row */
-                  if (beta != 0.0) R[i] /= sqrt(alfa * beta);
-               }
-            }
-            else
-            {  /* scale columns of the matrix R*A*S */
-               for (j = 1; j <= n; j++)
-               {  alfa = DBL_MAX, beta = 0.0;
-                  /* obtain the j-th column of the matrix A */
-                  len = mat(info, -j, ndx, val);
-                  if (!(0 <= len && len <= m))
-                     xfault("gm_scal: j = %d; len = %d; invalid column "
-                        "length\n", j, len);
-                  /* compute alfa = min(a[i,j]) and beta = max(a[i,j])
-                     for non-zero elements in the j-th column */
-                  for (t = 1; t <= len; t++)
-                  {  i = ndx[t];
-                     if (!(1 <= i && i <= m))
-                        xfault("gm_scal: i = %d; j = %d; invalid row in"
-                           "dex\n", i, j);
-                     temp = R[i] * fabs(val[t]) * S[j];
-                     if (temp == 0.0) continue;
-                     if (alfa > temp) alfa = temp;
-                     if (beta < temp) beta = temp;
-                  }
-                  /* scale the j-th column */
-                  if (beta != 0.0) S[j] /= sqrt(alfa * beta);
-               }
-            }
-         }
-      }
-      xfree(ndx);
-      xfree(val);
-      return;
-}
-
-/*----------------------------------------------------------------------
--- lpx_scale_prob - scale problem data.
+-- lpx_check_kkt - check Karush-Kuhn-Tucker conditions.
 --
 -- *Synopsis*
 --
 -- #include "glplpx.h"
--- void lpx_scale_prob(LPX *lp);
+-- void lpx_check_kkt(LPX *lp, int scaled, LPXKKT *kkt);
 --
 -- *Description*
 --
--- The routine lpx_scale_prob performs scaling of problem data for the
--- specified problem object.
+-- The routine lpx_check_kkt checks Karush-Kuhn-Tucker conditions for
+-- the current basic solution specified by an LP problem object, which
+-- the parameter lp points to. Both primal and dual components of the
+-- basic solution should be defined.
 --
--- The purpose of scaling is to replace the original constraint matrix
--- A by the scaled matrix A' = R*A*S, where R and S are diagonal scaling
--- matrices, in the hope that A' has better numerical properties than A.
+-- If the parameter scaled is zero, the conditions are checked for the
+-- original, unscaled LP problem. Otherwise, if the parameter scaled is
+-- non-zero, the routine checks the conditions for an internally scaled
+-- LP problem.
 --
--- May note that the scaling is implicit in the sense that the original
--- constraint matrix A is not changed. */
+-- The parameter kkt is a pointer to the structure LPXKKT, to which the
+-- routine stores the results of checking (for details see below).
+--
+-- The routine performs all computations using only components of the
+-- given LP problem and the current basic solution.
+--
+-- *Background*
+--
+-- The first condition checked by the routine is:
+--
+--    xR - A * xS = 0,                                          (KKT.PE)
+--
+-- where xR is the subvector of auxiliary variables (rows), xS is the
+-- subvector of structural variables (columns), A is the constraint
+-- matrix. This condition expresses the requirement that all primal
+-- variables must satisfy to the system of equality constraints of the
+-- original LP problem. In case of exact arithmetic this condition is
+-- satisfied for any basic solution; however, if the arithmetic is
+-- inexact, it shows how accurate the primal basic solution is, that
+-- depends on accuracy of a representation of the basis matrix.
+--
+-- The second condition checked by the routines is:
+--
+--    l[k] <= x[k] <= u[k]  for all k = 1, ..., m+n,            (KKT.PB)
+--
+-- where x[k] is auxiliary or structural variable, l[k] and u[k] are,
+-- respectively, lower and upper bounds of the variable x[k] (including
+-- cases of infinite bounds). This condition expresses the requirement
+-- that all primal variables must satisfy to bound constraints of the
+-- original LP problem. Since in case of basic solution all non-basic
+-- variables are placed on their bounds, actually the condition (KKT.PB)
+-- is checked for basic variables only. If the primal basic solution
+-- has sufficient accuracy, this condition shows primal feasibility of
+-- the solution.
+--
+-- The third condition checked by the routine is:
+--
+--    grad Z = c = (A~)' * pi + d,
+--
+-- where Z is the objective function, c is the vector of objective
+-- coefficients, (A~)' is a matrix transposed to the expanded constraint
+-- matrix A~ = (I | -A), pi is a vector of Lagrange multiplers that
+-- correspond to equality constraints of the original LP problem, d is
+-- a vector of Lagrange multipliers that correspond to bound constraints
+-- for all (i.e. auxiliary and structural) variables of the original LP
+-- problem. Geometrically the third condition expresses the requirement
+-- that the gradient of the objective function must belong to the
+-- orthogonal complement of a linear subspace defined by the equality
+-- and active bound constraints, i.e. that the gradient must be a linear
+-- combination of normals to the constraint planes, where Lagrange
+-- multiplers pi and d are coefficients of that linear combination. To
+-- eliminate the vector pi the third condition can be rewritten as:
+--
+--    (  I  )      ( dR )   ( cR )
+--    (     ) pi + (    ) = (    ),
+--    ( -A' )      ( dS )   ( cS )
+--
+-- or, equivalently:
+--
+--          pi + dR = cR,
+--
+--    -A' * pi + dS = cS.
+--
+-- Substituting the vector pi from the first equation into the second
+-- one we have:
+--
+--    A' * (dR - cR) + (dS - cS) = 0,                           (KKT.DE)
+--
+-- where dR is the subvector of reduced costs of auxiliary variables
+-- (rows), dS is the subvector of reduced costs of structural variables
+-- (columns), cR and cS are, respectively, subvectors of objective
+-- coefficients at auxiliary and structural variables, A' is a matrix
+-- transposed to the constraint matrix of the original LP problem. In
+-- case of exact arithmetic this condition is satisfied for any basic
+-- solution; however, if the arithmetic is inexact, it shows how
+-- accurate the dual basic solution is, that depends on accuracy of a
+-- representation of the basis matrix.
+--
+-- The last, fourth condition checked by the routine is:
+--
+--           d[k] = 0,    if x[k] is basic or free non-basic
+--
+--      0 <= d[k] < +inf, if x[k] is non-basic on its lower
+--                        (minimization) or upper (maximization)
+--                        bound
+--                                                              (KKT.DB)
+--    -inf < d[k] <= 0,   if x[k] is non-basic on its upper
+--                        (minimization) or lower (maximization)
+--                        bound
+--
+--    -inf < d[k] < +inf, if x[k] is non-basic fixed
+--
+-- for all k = 1, ..., m+n, where d[k] is a reduced cost (i.e. Lagrange
+-- multiplier) of auxiliary or structural variable x[k]. Geometrically
+-- this condition expresses the requirement that constraints of the
+-- original problem must "hold" the point preventing its movement along
+-- the antigradient (in case of minimization) or the gradient (in case
+-- of maximization) of the objective function. Since in case of basic
+-- solution reduced costs of all basic variables are placed on their
+-- (zero) bounds, actually the condition (KKT.DB) is checked for
+-- non-basic variables only. If the dual basic solution has sufficient
+-- accuracy, this condition shows dual feasibility of the solution.
+--
+-- Should note that the complete set of Karush-Kuhn-Tucker conditions
+-- also includes the fifth, so called complementary slackness condition,
+-- which expresses the requirement that at least either a primal
+-- variable x[k] or its dual conterpart d[k] must be on its bound for
+-- all k = 1, ..., m+n. However, being always satisfied for any basic
+-- solution by definition that condition is not checked by the routine.
+--
+-- To check the first condition (KKT.PE) the routine computes a vector
+-- of residuals
+--
+--    g = xR - A * xS,
+--
+-- determines components of this vector that correspond to largest
+-- absolute and relative errors:
+--
+--    pe_ae_max = max |g[i]|,
+--
+--    pe_re_max = max |g[i]| / (1 + |xR[i]|),
+--
+-- and stores these quantities and corresponding row indices to the
+-- structure LPXKKT.
+--
+-- To check the second condition (KKT.PB) the routine computes a vector
+-- of residuals
+--
+--           ( 0,            if lb[k] <= x[k] <= ub[k]
+--           |
+--    h[k] = < x[k] - lb[k], if x[k] < lb[k]
+--           |
+--           ( x[k] - ub[k], if x[k] > ub[k]
+--
+-- for all k = 1, ..., m+n, determines components of this vector that
+-- correspond to largest absolute and relative errors:
+--
+--    pb_ae_max = max |h[k]|,
+--
+--    pb_re_max = max |h[k]| / (1 + |x[k]|),
+--
+-- and stores these quantities and corresponding variable indices to
+-- the structure LPXKKT.
+--
+-- To check the third condition (KKT.DE) the routine computes a vector
+-- of residuals
+--
+--    u = A' * (dR - cR) + (dS - cS),
+--
+-- determines components of this vector that correspond to largest
+-- absolute and relative errors:
+--
+--    de_ae_max = max |u[j]|,
+--
+--    de_re_max = max |u[j]| / (1 + |dS[j] - cS[j]|),
+--
+-- and stores these quantities and corresponding column indices to the
+-- structure LPXKKT.
+--
+-- To check the fourth condition (KKT.DB) the routine computes a vector
+-- of residuals
+--
+--           ( 0,    if d[k] has correct sign
+--    v[k] = <
+--           ( d[k], if d[k] has wrong sign
+--
+-- for all k = 1, ..., m+n, determines components of this vector that
+-- correspond to largest absolute and relative errors:
+--
+--    db_ae_max = max |v[k]|,
+--
+--    db_re_max = max |v[k]| / (1 + |d[k] - c[k]|),
+--
+-- and stores these quantities and corresponding variable indices to
+-- the structure LPXKKT. */
 
-static int mat(void *info, int k, int ndx[], double val[])
-{     /* this auxiliary routine obtains a required row or column of the
-         original constraint matrix */
-      LPX *lp = info;
-      int m = lpx_get_num_rows(lp);
+void lpx_check_kkt(LPX *lp, int scaled, LPXKKT *kkt)
+{     int m = lpx_get_num_rows(lp);
       int n = lpx_get_num_cols(lp);
-      int i, j, len;
-      if (k > 0)
-      {  /* i-th row required */
-         i = +k;
-         xassert(1 <= i && i <= m);
-         len = lpx_get_mat_row(lp, i, ndx, val);
-      }
-      else
-      {  /* j-th column required */
-         j = -k;
-         xassert(1 <= j && j <= n);
-         len = lpx_get_mat_col(lp, j, ndx, val);
-      }
-      return len;
-}
-
-/* scaling algorithm: */
-#define GLP_SCAL_EQ     1  /* equilibration scaling */
-#define GLP_SCAL_GMEAN  2  /* geometric mean scaling */
-
-void glp_scale_prob(glp_prob *lp, int alg, const void *parm)
-{     /* scale problem data */
-      int m = lp->m;
-      int n = lp->n;
-      int i, j;
-      double *R, *S;
-      if (!(alg == GLP_SCAL_EQ || alg == GLP_SCAL_GMEAN))
-         xerror("glp_scale_prob: alg = %d; invalid parameter\n", alg);
-      if (parm != NULL)
-         xerror("glp_scale_prob: parm = %p; invalid parameter\n", parm);
-      /* if the problem has no rows or columns, skip computations */
-      if (m == 0 || n == 0) goto done;
-      /* obtain current scaling matrices R and S */
-      R = xcalloc(1+m, sizeof(double));
-      S = xcalloc(1+n, sizeof(double));
-      for (i = 1; i <= m; i++) R[i] = glp_get_rii(lp, i);
-      for (j = 1; j <= n; j++) S[j] = glp_get_sjj(lp, j);
-      /* perform scaling */
-      switch (alg)
-      {  case GLP_SCAL_EQ:
-            /* equilibration scaling */
-            eq_scal(m, n, lp, mat, R, S, 0);
-            break;
-         case GLP_SCAL_GMEAN:
-            /* geometric mean scaling */
-            gm_scal(m, n, lp, mat, R, S, 0, 20, 0.01);
-            break;
-         default:
-            xassert(alg != alg);
-      }
-      /* store new scaling matrices R' and S' */
-      for (i = 1; i <= m; i++) lpx_set_rii(lp, i, R[i]);
-      for (j = 1; j <= n; j++) lpx_set_sjj(lp, j, S[j]);
-      xfree(R);
-      xfree(S);
-done: return;
-}
-
-#if 0
-void lpx_scale_prob(LPX *lp)
-{     /* scale LP/MIP problem data */
-      int m = lpx_get_num_rows(lp);
-      int n = lpx_get_num_cols(lp);
-      int sc_ord = 0, sc_max = 20;
-      double sc_eps = 0.01;
-      int i, j;
-      double *R, *S;
-      /* initialize R := I and S := I */
-      R = xcalloc(1+m, sizeof(double));
-      S = xcalloc(1+n, sizeof(double));
-      for (i = 1; i <= m; i++) R[i] = 1.0;
-      for (j = 1; j <= n; j++) S[j] = 1.0;
-      /* if the problem has no rows/columns, skip computations */
-      if (m == 0 || n == 0) goto skip;
-      /* compute the scaling matrices R and S */
-      switch (lpx_get_int_parm(lp, LPX_K_SCALE))
-      {  case 0:
-            /* no scaling */
-            break;
-         case 1:
-            /* equilibration scaling */
-            eq_scal(m, n, lp, mat, R, S, sc_ord);
-            break;
-         case 2:
-            /* geometric mean scaling */
-            gm_scal(m, n, lp, mat, R, S, sc_ord, sc_max, sc_eps);
-            break;
-         case 3:
-            /* geometric mean scaling, then equilibration scaling */
-            gm_scal(m, n, lp, mat, R, S, sc_ord, sc_max, sc_eps);
-            eq_scal(m, n, lp, mat, R, S, sc_ord);
-            break;
-         default:
-            xassert(lp != lp);
-      }
-skip: /* enter the scaling matrices R and S into the problem object and
-         thereby perform implicit scaling */
-      for (i = 1; i <= m; i++) lpx_set_rii(lp, i, R[i]);
-      for (j = 1; j <= n; j++) lpx_set_sjj(lp, j, S[j]);
-      xfree(R);
-      xfree(S);
-      return;
-}
+#if 0 /* 21/XII-2003 */
+      int *typx = lp->typx;
+      double *lb = lp->lb;
+      double *ub = lp->ub;
+      double *rs = lp->rs;
 #else
-void lpx_scale_prob(LPX *lp)
-{     /* scale LP/MIP problem data */
-      glp_unscale_prob(lp);
-      switch (lpx_get_int_parm(lp, LPX_K_SCALE))
-      {  case 0:
-            /* no scaling */
-            break;
-         case 1:
-            /* equilibration scaling */
-            glp_scale_prob(lp, GLP_SCAL_EQ, NULL);
-            break;
-         case 2:
-            /* geometric mean scaling */
-            glp_scale_prob(lp, GLP_SCAL_GMEAN, NULL);
-            break;
-         case 3:
-            /* geometric mean scaling, then equilibration scaling */
-            glp_scale_prob(lp, GLP_SCAL_GMEAN, NULL);
-            glp_scale_prob(lp, GLP_SCAL_EQ, NULL);
-            break;
-         default:
-            xassert(lp != lp);
+      int typx, tagx;
+      double lb, ub;
+#endif
+      int dir = lpx_get_obj_dir(lp);
+#if 0 /* 21/XII-2003 */
+      double *coef = lp->coef;
+#endif
+#if 0 /* 22/XII-2003 */
+      int *A_ptr = lp->A->ptr;
+      int *A_len = lp->A->len;
+      int *A_ndx = lp->A->ndx;
+      double *A_val = lp->A->val;
+#endif
+      int *A_ndx;
+      double *A_val;
+#if 0 /* 21/XII-2003 */
+      int *tagx = lp->tagx;
+      int *posx = lp->posx;
+      int *indx = lp->indx;
+      double *bbar = lp->bbar;
+      double *cbar = lp->cbar;
+#endif
+      int beg, end, i, j, k, t;
+      double cR_i, cS_j, c_k, xR_i, xS_j, x_k, dR_i, dS_j, d_k;
+      double g_i, h_k, u_j, v_k, temp, rii, sjj;
+      if (lpx_get_prim_stat(lp) == LPX_P_UNDEF)
+         xfault("lpx_check_kkt: primal basic solution is undefined\n");
+      if (lpx_get_dual_stat(lp) == LPX_D_UNDEF)
+         xfault("lpx_check_kkt: dual basic solution is undefined\n");
+      /*--------------------------------------------------------------*/
+      /* compute largest absolute and relative errors and corresponding
+         row indices for the condition (KKT.PE) */
+      kkt->pe_ae_max = 0.0, kkt->pe_ae_row = 0;
+      kkt->pe_re_max = 0.0, kkt->pe_re_row = 0;
+      A_ndx = xcalloc(1+n, sizeof(int));
+      A_val = xcalloc(1+n, sizeof(double));
+      for (i = 1; i <= m; i++)
+      {  /* determine xR[i] */
+#if 0 /* 21/XII-2003 */
+         if (tagx[i] == LPX_BS)
+            xR_i = bbar[posx[i]];
+         else
+            xR_i = spx_eval_xn_j(lp, posx[i] - m);
+#else
+         lpx_get_row_info(lp, i, NULL, &xR_i, NULL);
+         xR_i *= lpx_get_rii(lp, i);
+#endif
+         /* g[i] := xR[i] */
+         g_i = xR_i;
+         /* g[i] := g[i] - (i-th row of A) * xS */
+         beg = 1;
+         end = lpx_get_mat_row(lp, i, A_ndx, A_val);
+         for (t = beg; t <= end; t++)
+         {  j = m + A_ndx[t]; /* a[i,j] != 0 */
+            /* determine xS[j] */
+#if 0 /* 21/XII-2003 */
+            if (tagx[j] == LPX_BS)
+               xS_j = bbar[posx[j]];
+            else
+               xS_j = spx_eval_xn_j(lp, posx[j] - m);
+#else
+            lpx_get_col_info(lp, j-m, NULL, &xS_j, NULL);
+            xS_j /= lpx_get_sjj(lp, j-m);
+#endif
+            /* g[i] := g[i] - a[i,j] * xS[j] */
+            rii = lpx_get_rii(lp, i);
+            sjj = lpx_get_sjj(lp, j-m);
+            g_i -= (rii * A_val[t] * sjj) * xS_j;
+         }
+         /* unscale xR[i] and g[i] (if required) */
+         if (!scaled)
+         {  rii = lpx_get_rii(lp, i);
+            xR_i /= rii, g_i /= rii;
+         }
+         /* determine absolute error */
+         temp = fabs(g_i);
+         if (kkt->pe_ae_max < temp)
+            kkt->pe_ae_max = temp, kkt->pe_ae_row = i;
+         /* determine relative error */
+         temp /= (1.0 + fabs(xR_i));
+         if (kkt->pe_re_max < temp)
+            kkt->pe_re_max = temp, kkt->pe_re_row = i;
       }
+      xfree(A_ndx);
+      xfree(A_val);
+      /* estimate the solution quality */
+      if (kkt->pe_re_max <= 1e-9)
+         kkt->pe_quality = 'H';
+      else if (kkt->pe_re_max <= 1e-6)
+         kkt->pe_quality = 'M';
+      else if (kkt->pe_re_max <= 1e-3)
+         kkt->pe_quality = 'L';
+      else
+         kkt->pe_quality = '?';
+      /*--------------------------------------------------------------*/
+      /* compute largest absolute and relative errors and corresponding
+         variable indices for the condition (KKT.PB) */
+      kkt->pb_ae_max = 0.0, kkt->pb_ae_ind = 0;
+      kkt->pb_re_max = 0.0, kkt->pb_re_ind = 0;
+      for (k = 1; k <= m+n; k++)
+      {  /* determine x[k] */
+         if (k <= m)
+         {  lpx_get_row_bnds(lp, k, &typx, &lb, &ub);
+            rii = lpx_get_rii(lp, k);
+            lb *= rii;
+            ub *= rii;
+            lpx_get_row_info(lp, k, &tagx, &x_k, NULL);
+            x_k *= rii;
+         }
+         else
+         {  lpx_get_col_bnds(lp, k-m, &typx, &lb, &ub);
+            sjj = lpx_get_sjj(lp, k-m);
+            lb /= sjj;
+            ub /= sjj;
+            lpx_get_col_info(lp, k-m, &tagx, &x_k, NULL);
+            x_k /= sjj;
+         }
+         /* skip non-basic variable */
+         if (tagx != LPX_BS) continue;
+         /* compute h[k] */
+         h_k = 0.0;
+         switch (typx)
+         {  case LPX_FR:
+               break;
+            case LPX_LO:
+               if (x_k < lb) h_k = x_k - lb;
+               break;
+            case LPX_UP:
+               if (x_k > ub) h_k = x_k - ub;
+               break;
+            case LPX_DB:
+            case LPX_FX:
+               if (x_k < lb) h_k = x_k - lb;
+               if (x_k > ub) h_k = x_k - ub;
+               break;
+            default:
+               xassert(typx != typx);
+         }
+         /* unscale x[k] and h[k] (if required) */
+         if (!scaled)
+         {  if (k <= m)
+            {  rii = lpx_get_rii(lp, k);
+               x_k /= rii, h_k /= rii;
+            }
+            else
+            {  sjj = lpx_get_sjj(lp, k-m);
+               x_k *= sjj, h_k *= sjj;
+            }
+         }
+         /* determine absolute error */
+         temp = fabs(h_k);
+         if (kkt->pb_ae_max < temp)
+            kkt->pb_ae_max = temp, kkt->pb_ae_ind = k;
+         /* determine relative error */
+         temp /= (1.0 + fabs(x_k));
+         if (kkt->pb_re_max < temp)
+            kkt->pb_re_max = temp, kkt->pb_re_ind = k;
+      }
+      /* estimate the solution quality */
+      if (kkt->pb_re_max <= 1e-9)
+         kkt->pb_quality = 'H';
+      else if (kkt->pb_re_max <= 1e-6)
+         kkt->pb_quality = 'M';
+      else if (kkt->pb_re_max <= 1e-3)
+         kkt->pb_quality = 'L';
+      else
+         kkt->pb_quality = '?';
+      /*--------------------------------------------------------------*/
+      /* compute largest absolute and relative errors and corresponding
+         column indices for the condition (KKT.DE) */
+      kkt->de_ae_max = 0.0, kkt->de_ae_col = 0;
+      kkt->de_re_max = 0.0, kkt->de_re_col = 0;
+      A_ndx = xcalloc(1+m, sizeof(int));
+      A_val = xcalloc(1+m, sizeof(double));
+      for (j = m+1; j <= m+n; j++)
+      {  /* determine cS[j] */
+#if 0 /* 21/XII-2003 */
+         cS_j = coef[j];
+#else
+         sjj = lpx_get_sjj(lp, j-m);
+         cS_j = lpx_get_obj_coef(lp, j-m) * sjj;
+#endif
+         /* determine dS[j] */
+#if 0 /* 21/XII-2003 */
+         if (tagx[j] == LPX_BS)
+            dS_j = 0.0;
+         else
+            dS_j = cbar[posx[j] - m];
+#else
+         lpx_get_col_info(lp, j-m, NULL, NULL, &dS_j);
+         dS_j *= sjj;
+#endif
+         /* u[j] := dS[j] - cS[j] */
+         u_j = dS_j - cS_j;
+         /* u[j] := u[j] + (j-th column of A) * (dR - cR) */
+         beg = 1;
+         end = lpx_get_mat_col(lp, j-m, A_ndx, A_val);
+         for (t = beg; t <= end; t++)
+         {  i = A_ndx[t]; /* a[i,j] != 0 */
+            /* determine cR[i] */
+#if 0 /* 21/XII-2003 */
+            cR_i = coef[i];
+#else
+            cR_i = 0.0;
+#endif
+            /* determine dR[i] */
+#if 0 /* 21/XII-2003 */
+            if (tagx[i] == LPX_BS)
+               dR_i = 0.0;
+            else
+               dR_i = cbar[posx[i] - m];
+#else
+            lpx_get_row_info(lp, i, NULL, NULL, &dR_i);
+            rii = lpx_get_rii(lp, i);
+            dR_i /= rii;
+#endif
+            /* u[j] := u[j] + a[i,j] * (dR[i] - cR[i]) */
+            rii = lpx_get_rii(lp, i);
+            sjj = lpx_get_sjj(lp, j-m);
+            u_j += (rii * A_val[t] * sjj) * (dR_i - cR_i);
+         }
+         /* unscale cS[j], dS[j], and u[j] (if required) */
+         if (!scaled)
+         {  sjj = lpx_get_sjj(lp, j-m);
+            cS_j /= sjj, dS_j /= sjj, u_j /= sjj;
+         }
+         /* determine absolute error */
+         temp = fabs(u_j);
+         if (kkt->de_ae_max < temp)
+            kkt->de_ae_max = temp, kkt->de_ae_col = j - m;
+         /* determine relative error */
+         temp /= (1.0 + fabs(dS_j - cS_j));
+         if (kkt->de_re_max < temp)
+            kkt->de_re_max = temp, kkt->de_re_col = j - m;
+      }
+      xfree(A_ndx);
+      xfree(A_val);
+      /* estimate the solution quality */
+      if (kkt->de_re_max <= 1e-9)
+         kkt->de_quality = 'H';
+      else if (kkt->de_re_max <= 1e-6)
+         kkt->de_quality = 'M';
+      else if (kkt->de_re_max <= 1e-3)
+         kkt->de_quality = 'L';
+      else
+         kkt->de_quality = '?';
+      /*--------------------------------------------------------------*/
+      /* compute largest absolute and relative errors and corresponding
+         variable indices for the condition (KKT.DB) */
+      kkt->db_ae_max = 0.0, kkt->db_ae_ind = 0;
+      kkt->db_re_max = 0.0, kkt->db_re_ind = 0;
+      for (k = 1; k <= m+n; k++)
+      {  /* determine c[k] */
+#if 0 /* 21/XII-2003 */
+         c_k = coef[k];
+#else
+         if (k <= m)
+            c_k = 0.0;
+         else
+         {  sjj = lpx_get_sjj(lp, k-m);
+            c_k = lpx_get_obj_coef(lp, k-m) / sjj;
+         }
+#endif
+         /* determine d[k] */
+#if 0 /* 21/XII-2003 */
+         d_k = cbar[j-m];
+#else
+         if (k <= m)
+         {  lpx_get_row_info(lp, k, &tagx, NULL, &d_k);
+            rii = lpx_get_rii(lp, k);
+            d_k /= rii;
+         }
+         else
+         {  lpx_get_col_info(lp, k-m, &tagx, NULL, &d_k);
+            sjj = lpx_get_sjj(lp, k-m);
+            d_k *= sjj;
+         }
+#endif
+         /* skip basic variable */
+         if (tagx == LPX_BS) continue;
+         /* compute v[k] */
+         v_k = 0.0;
+         switch (tagx)
+         {  case LPX_NL:
+               switch (dir)
+               {  case LPX_MIN:
+                     if (d_k < 0.0) v_k = d_k;
+                     break;
+                  case LPX_MAX:
+                     if (d_k > 0.0) v_k = d_k;
+                     break;
+                  default:
+                     xassert(dir != dir);
+               }
+               break;
+            case LPX_NU:
+               switch (dir)
+               {  case LPX_MIN:
+                     if (d_k > 0.0) v_k = d_k;
+                     break;
+                  case LPX_MAX:
+                     if (d_k < 0.0) v_k = d_k;
+                     break;
+                  default:
+                     xassert(dir != dir);
+               }
+               break;
+            case LPX_NF:
+               v_k = d_k;
+               break;
+            case LPX_NS:
+               break;
+            default:
+               xassert(tagx != tagx);
+         }
+         /* unscale c[k], d[k], and v[k] (if required) */
+         if (!scaled)
+         {  if (k <= m)
+            {  rii = lpx_get_rii(lp, k);
+               c_k *= rii, d_k *= rii, v_k *= rii;
+            }
+            else
+            {  sjj = lpx_get_sjj(lp, k-m);
+               c_k /= sjj, d_k /= sjj, v_k /= sjj;
+            }
+         }
+         /* determine absolute error */
+         temp = fabs(v_k);
+         if (kkt->db_ae_max < temp)
+            kkt->db_ae_max = temp, kkt->db_ae_ind = k;
+         /* determine relative error */
+         temp /= (1.0 + fabs(d_k - c_k));
+         if (kkt->db_re_max < temp)
+            kkt->db_re_max = temp, kkt->db_re_ind = k;
+      }
+      /* estimate the solution quality */
+      if (kkt->db_re_max <= 1e-9)
+         kkt->db_quality = 'H';
+      else if (kkt->db_re_max <= 1e-6)
+         kkt->db_quality = 'M';
+      else if (kkt->db_re_max <= 1e-3)
+         kkt->db_quality = 'L';
+      else
+         kkt->db_quality = '?';
+      /* complementary slackness is always satisfied by definition for
+         any basic solution, so not checked */
+      kkt->cs_ae_max = 0.0, kkt->cs_ae_ind = 0;
+      kkt->cs_re_max = 0.0, kkt->cs_re_ind = 0;
+      kkt->cs_quality = 'H';
       return;
 }
-#endif
 
 /* eof */

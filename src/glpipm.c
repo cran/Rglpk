@@ -106,7 +106,7 @@
 -- 0 - optimal solution found;
 -- 1 - problem has no feasible (primal or dual) solution;
 -- 2 - no convergence;
--- 3 - iterations limit exceeded;
+-- 3 - iteration limit exceeded;
 -- 4 - numeric instability on solving Newtonian system.
 --
 -- In case of non-zero return code the routine returns the best point,
@@ -949,7 +949,7 @@ int ipm_main(int m, int n, int A_ptr[], int A_ind[], double A_val[],
          }
          /* check for maximal number of iterations */
          if (dsa->iter == ITER_MAX)
-         {  xprintf("ITERATIONS LIMIT EXCEEDED; SEARCH TERMINATED\n");
+         {  xprintf("ITERATION LIMIT EXCEEDED; SEARCH TERMINATED\n");
             status = 3;
             break;
          }

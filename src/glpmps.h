@@ -1,4 +1,4 @@
-/* glpcli.h (command-line interface) */
+/* glpmps.h (MPS format) */
 
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
@@ -21,32 +21,34 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
-#ifndef _GLPCLI_H
-#define _GLPCLI_H
+#ifndef _GLPMPS_H
+#define _GLPMPS_H
 
-#include "glplib.h"
+#include "glpapi.h"
 
-#ifndef _GLP_CLI
-#define _GLP_CLI
-typedef struct { double _cli; } CLI;
-/* command-line interface object */
-#endif
+#define read_mps _glp_read_mps
+int read_mps(LPX *lp, const char *fname);
+/* read problem data in fixed MPS format */
 
-/* return codes: */
-#define CLI_EXIT     1
-#define CLI_ERROR    2
+#define write_mps _glp_write_mps
+int write_mps(LPX *lp, const char *fname);
+/* write problem data in fixed MPS format */
 
-#define cli_create_it _glp_cli_create_it
-CLI *cli_create_it(void);
-/* create GLPK command-line interface */
+#define read_bas _glp_read_bas
+int read_bas(LPX *lp, const char *fname);
+/* read LP basis in fixed MPS format */
 
-#define cli_execute_cmd _glp_cli_execute_cmd
-int cli_execute_cmd(CLI *cli, int (*func)(void *info), void *info);
-/* execute GLPK command script (core routine) */
+#define write_bas _glp_write_bas
+int write_bas(LPX *lp, const char *fname);
+/* write LP basis in fixed MPS format */
 
-#define cli_delete_it _glp_cli_delete_it
-void cli_delete_it(CLI *cli);
-/* delete GLPK command-line interface */
+#define read_freemps _glp_read_freemps
+int read_freemps(LPX *lp, const char *fname);
+/* read problem data in free MPS format */
+
+#define write_freemps _glp_write_freemps
+int write_freemps(LPX *lp, const char *fname);
+/* write problem data in free MPS format */
 
 #endif
 

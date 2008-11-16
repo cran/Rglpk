@@ -97,45 +97,6 @@ static void show_progress(glp_tree *tree, int bingo)
 }
 
 /***********************************************************************
-*  set_local_bound - set local bound for current subproblem
-*
-*  This routine sets the local bound for integer optimal solution of
-*  the current subproblem, which is optimal solution to LP relaxation.
-*  If the latter is fractional while the objective function is known to
-*  be integral for any integer feasible point, the bound is strengthen
-*  by rounding up (minimization) or down (maximization). */
-
-static void set_local_bound(glp_tree *tree)
-{     double bound;
-      bound = tree->mip->obj_val;
-      if (fabs(bound) < 1e-8) bound = 0.0;
-#if 0
-      if (tree->int_obj)
-      {  /* the objective function is known to be integral */
-         double temp;
-         temp = floor(bound + 0.5);
-         if (temp - 1e-5 <= bound && bound <= temp + 1e-5)
-            bound = temp;
-         else
-         {  switch (tree->mip->dir)
-            {  case GLP_MIN:
-                  bound = ceil(bound); break;
-               case GLP_MAX:
-                  bound = floor(bound); break;
-               default:
-                  xassert(tree != tree);
-            }
-         }
-      }
-#endif
-      xassert(tree->curr != NULL);
-      tree->curr->bound = bound;
-      if (tree->parm->msg_lev >= GLP_MSG_DBG)
-         xprintf("Local bound is %.9e\n", bound);
-      return;
-}
-
-/***********************************************************************
 *  is_branch_hopeful - check if specified branch is hopeful
 *
 *  This routine checks if the specified subproblem can have an integer
@@ -150,55 +111,14 @@ static void set_local_bound(glp_tree *tree)
 *  the corresponding branch can pruned, zero is returned. */
 
 static int is_branch_hopeful(glp_tree *tree, int p)
-{     int ret = 1;
-      if (tree->mip->mip_stat == GLP_FEAS)
-      {  double bound, eps;
-         xassert(1 <= p && p <= tree->nslots);
-         xassert(tree->slot[p].node != NULL);
-         bound = tree->slot[p].node->bound;
-         eps = tree->parm->tol_obj * (1.0 + fabs(tree->mip->mip_obj));
-         switch (tree->mip->dir)
-         {  case GLP_MIN:
-               if (bound >= tree->mip->mip_obj - eps) ret = 0;
-               break;
-            case GLP_MAX:
-               if (bound <= tree->mip->mip_obj + eps) ret = 0;
-               break;
-            default:
-               xassert(tree != tree);
-         }
-      }
-      return ret;
+{     xassert(1 <= p && p <= tree->nslots);
+      xassert(tree->slot[p].node != NULL);
+      return ios_is_hopeful(tree, tree->slot[p].node->bound);
 }
 
 static int is_curr_node_hopeful(glp_tree *tree)
-{     int ret = 1;
-      xassert(tree->curr != NULL);
-      switch (tree->mip->dir)
-      {  case GLP_MIN:
-            if (tree->curr->bound == +DBL_MAX)
-               ret = 0;
-            else if (tree->mip->mip_stat == GLP_FEAS)
-            {  double eps = tree->parm->tol_obj * (1.0 +
-                  fabs(tree->mip->mip_obj));
-               if (tree->curr->bound >= tree->mip->mip_obj - eps)
-                  ret = 0;
-            }
-            break;
-         case GLP_MAX:
-            if (tree->curr->bound == -DBL_MAX)
-               ret = 0;
-            else if (tree->mip->mip_stat == GLP_FEAS)
-            {  double eps = tree->parm->tol_obj * (1.0 +
-                  fabs(tree->mip->mip_obj));
-               if (tree->curr->bound <= tree->mip->mip_obj + eps)
-                  ret = 0;
-            }
-            break;
-         default:
-            xassert(tree != tree);
-      }
-      return ret;
+{     return
+         ios_is_hopeful(tree, tree->curr->bound);
 }
 
 /***********************************************************************
@@ -253,8 +173,12 @@ static void check_integrality(glp_tree *tree)
          {  temp1 = lb - tree->parm->tol_int;
             temp2 = lb + tree->parm->tol_int;
             if (temp1 <= x && x <= temp2) continue;
+#if 0
             /* the lower bound must not be violated */
             xassert(x >= lb);
+#else
+            if (x < lb) continue;
+#endif
          }
          /* if the column's primal value is close to the upper bound,
             the column is integer feasible within given tolerance */
@@ -262,8 +186,12 @@ static void check_integrality(glp_tree *tree)
          {  temp1 = ub - tree->parm->tol_int;
             temp2 = ub + tree->parm->tol_int;
             if (temp1 <= x && x <= temp2) continue;
+#if 0
             /* the upper bound must not be violated */
             xassert(x <= ub);
+#else
+            if (x > ub) continue;
+#endif
          }
          /* if the column's primal value is close to nearest integer,
             the column is integer feasible within given tolerance */
@@ -414,114 +342,6 @@ static void fix_by_red_cost(glp_tree *tree)
 /**********************************************************************/
 /**********************************************************************/
 
-#define int_col(j) (lpx_get_col_kind(tree->mip, j) == LPX_IV)
-
-/*----------------------------------------------------------------------
--- branch_on - perform branching on specified column.
---
--- This routine performs branching on j-th column (structural variable)
--- of the current subproblem. The specified column must be of integer
--- kind and must have a fractional value in optimal basic solution of
--- LP relaxation of the current subproblem (i.e. only columns for which
--- the flag non_int[j] is set are valid candidates to branch on).
---
--- Let x be j-th structural variable, and beta be its primal fractional
--- value in the current basic solution. Branching on j-th variable is
--- dividing the current subproblem into two new subproblems, which are
--- identical to the current subproblem with the following exception: in
--- the first subproblem that begins the down-branch x has a new upper
--- bound x <= floor(beta), and in the second subproblem that begins the
--- up-branch x has a new lower bound x >= ceil(beta).
---
--- The parameter next specifies which subproblem should be solved next
--- to continue the search:
---
--- -1 means that one which begins the down-branch;
--- +1 means that one which begins the up-branch. */
-
-static void branch_on(glp_tree *tree, int j, int next)
-{     glp_prob *lp = tree->mip;
-      int p, type, clone[1+2];
-      double beta, lb, ub, new_lb, new_ub;
-      /* check input parameters for correctness */
-      xassert(1 <= j && j <= lp->n);
-      xassert(tree->non_int[j]);
-      xassert(next == -1 || next == +1 || next == 0);
-      /* obtain primal value of j-th column in basic solution */
-      beta = lpx_get_col_prim(lp, j);
-      if (tree->parm->msg_lev >= GLP_MSG_DBG)
-         xprintf("Branching on column %d, primal value is %.9e\n",
-            j, beta);
-      /* determine the reference number of the current subproblem */
-      xassert(tree->curr != NULL);
-      p = tree->curr->p;
-      /* freeze the current subproblem */
-      ios_freeze_node(tree);
-      /* create two clones of the current subproblem; the first clone
-         begins the down-branch, the second one begins the up-branch */
-      ios_clone_node(tree, p, 2, clone);
-      if (tree->parm->msg_lev >= GLP_MSG_DBG)
-         xprintf(
-            "Node %d begins down branch, node %d begins up branch\n",
-            clone[1], clone[2]);
-      /* set new upper bound of j-th column in the first subproblem */
-      ios_revive_node(tree, clone[1]);
-      type = lpx_get_col_type(lp, j);
-      lb = lpx_get_col_lb(lp, j);
-      ub = lpx_get_col_ub(lp, j);
-      new_ub = floor(beta);
-      switch (type)
-      {  case LPX_FR:
-            type = LPX_UP;
-            break;
-         case LPX_LO:
-            xassert(lb <= new_ub);
-            type = (lb < new_ub ? LPX_DB : LPX_FX);
-            break;
-         case LPX_UP:
-            xassert(new_ub <= ub - 1.0);
-            break;
-         case LPX_DB:
-            xassert(lb <= new_ub && new_ub <= ub - 1.0);
-            type = (lb < new_ub ? LPX_DB : LPX_FX);
-            break;
-         default:
-            xassert(type != type);
-      }
-      lpx_set_col_bnds(lp, j, type, lb, new_ub);
-      ios_freeze_node(tree);
-      /* set new lower bound of j-th column in the second subproblem */
-      ios_revive_node(tree, clone[2]);
-      type = lpx_get_col_type(lp, j);
-      lb = lpx_get_col_lb(lp, j);
-      ub = lpx_get_col_ub(lp, j);
-      new_lb = ceil(beta);
-      switch (type)
-      {  case LPX_FR:
-            type = LPX_LO;
-            break;
-         case LPX_LO:
-            xassert(lb + 1.0 <= new_lb);
-            break;
-         case LPX_UP:
-            xassert(new_lb <= ub);
-            type = (new_lb < ub ? LPX_DB : LPX_FX);
-            break;
-         case LPX_DB:
-            xassert(lb + 1.0 <= new_lb && new_lb <= ub);
-            type = (new_lb < ub ? LPX_DB : LPX_FX);
-            break;
-         default:
-            xassert(type != type);
-      }
-      lpx_set_col_bnds(lp, j, type, new_lb, ub);
-      ios_freeze_node(tree);
-      /* revive the subproblem to be solved next */
-      if (next != 0)
-         ios_revive_node(tree, clone[next < 0 ? 1 : 2]);
-      return;
-}
-
 /*----------------------------------------------------------------------
 -- branch_first - choose first branching variable.
 --
@@ -544,11 +364,11 @@ static void branch_first(glp_tree *tree)
       /* select the branch to be solved next */
       beta = lpx_get_col_prim(lp, j);
       if (beta - floor(beta) < ceil(beta) - beta)
-         next = -1; /* down branch */
+         next = GLP_DN_BRNCH;
       else
-         next = +1; /* up branch */
+         next = GLP_UP_BRNCH;
       /* perform branching */
-      branch_on(tree, j, next);
+      glp_ios_branch_upon(tree, j, next);
       return;
 }
 
@@ -574,11 +394,11 @@ static void branch_last(glp_tree *tree)
       /* select the branch to be solved next */
       beta = lpx_get_col_prim(lp, j);
       if (beta - floor(beta) < ceil(beta) - beta)
-         next = -1; /* down branch */
+         next = GLP_DN_BRNCH;
       else
-         next = +1; /* up branch */
+         next = GLP_UP_BRNCH;
       /* perform branching */
-      branch_on(tree, j, next);
+      glp_ios_branch_upon(tree, j, next);
       return;
 }
 
@@ -605,7 +425,9 @@ static void branch_last(glp_tree *tree)
 --
 -- Must note that this heuristic is time-expensive, because computing
 -- one-step degradation (see the routine below) requires one BTRAN for
--- every fractional-valued structural variable. */
+-- each fractional-valued structural variable. */
+
+#define int_col(j) (lpx_get_col_kind(tree->mip, j) == LPX_IV)
 
 #if 0
 struct col { int j; double f; };
@@ -796,12 +618,12 @@ skip:       /* new Z is never better than old Z, therefore the change
          {  jj = j;
             if (fabs(dz_dn) < fabs(dz_up))
             {  /* select down branch to be solved next */
-               next = -1;
+               next = GLP_DN_BRNCH;
                degrad = fabs(dz_up);
             }
             else
             {  /* select up branch to be solved next */
-               next = +1;
+               next = GLP_UP_BRNCH;
                degrad = fabs(dz_dn);
             }
             /* save the objective changes for printing */
@@ -834,7 +656,7 @@ skip:       /* new Z is never better than old Z, therefore the change
                lpx_get_obj_val(lp) + dd_up);
       }
       /* perform branching */
-      branch_on(tree, jj, next);
+      glp_ios_branch_upon(tree, jj, next);
       return;
 }
 
@@ -846,7 +668,9 @@ skip:       /* new Z is never better than old Z, therefore the change
 -- optimal solution of the current LP relaxation.
 --
 -- This routine also selects the branch to be solved next where integer
--- infeasibility of the chosen variable is less than in other one. */
+-- infeasibility of the chosen variable is less than in other one.
+*
+*  Martin notices that "...most infeasible is as good as random...". */
 
 static void branch_mostf(glp_tree *tree)
 {     glp_prob *lp = tree->mip;
@@ -862,15 +686,186 @@ static void branch_mostf(glp_tree *tree)
             if (most > fabs(beta - temp))
             {  jj = j, most = fabs(beta - temp);
                if (beta < temp)
-                  next = -1; /* down branch */
+                  next = GLP_DN_BRNCH;
                else
-                  next = +1; /* up branch */
+                  next = GLP_UP_BRNCH;
             }
          }
       }
       /* perform branching */
-      branch_on(tree, jj, next);
+      glp_ios_branch_upon(tree, jj, next);
       return;
+}
+
+/***********************************************************************
+*  branch_on - perform branching on specified variable
+*
+*  This routine performs branching on j-th column (structural variable)
+*  of the current subproblem. The specified column must be of integer
+*  kind and must have a fractional value in optimal basic solution of
+*  LP relaxation of the current subproblem (i.e. only columns for which
+*  the flag non_int[j] is set are valid candidates to branch on).
+*
+*  Let x be j-th structural variable, and beta be its primal fractional
+*  value in the current basic solution. Branching on j-th variable is
+*  dividing the current subproblem into two new subproblems, which are
+*  identical to the current subproblem with the following exception: in
+*  the first subproblem that begins the down-branch x has a new upper
+*  bound x <= floor(beta), and in the second subproblem that begins the
+*  up-branch x has a new lower bound x >= ceil(beta).
+*
+*  Depending on estimation of the local bound for down- and up-branches
+*  this routine returns one of the following:
+*
+*  0 - both branches have been created;
+*  1 - one branch has no feasible solution and has been pruned; other
+*      branch has became the current subproblem;
+*  2 - both branches have no feasible solution and have been pruned;
+*      subproblem selection is needed. */
+
+int branch_on(glp_tree *tree)
+{     glp_prob *mip = tree->mip;
+      int n = mip->n;
+      int j = tree->br_var;
+      int next = tree->br_sel;
+      int type, dn_type, up_type, dn_bad, up_bad, p, ret, clone[1+2];
+      double lb, ub, beta, new_ub, new_lb, dn_lp, up_lp, dn_bnd, up_bnd;
+      /* determine bounds and value of x[j] in optimal solution to LP
+         relaxation of the current subproblem */
+      xassert(1 <= j && j <= n);
+      type = mip->col[j]->type;
+      lb = mip->col[j]->lb;
+      ub = mip->col[j]->ub;
+      beta = mip->col[j]->prim;
+      /* determine new bounds of x[j] for down- and up-branches */
+      new_ub = floor(beta);
+      new_lb = ceil(beta);
+      switch (type)
+      {  case GLP_LO:
+            xassert(lb <= new_ub);
+            dn_type = (lb == new_ub ? GLP_FX : GLP_DB);
+            xassert(lb + 1.0 <= new_lb);
+            up_type = GLP_LO;
+            break;
+         case GLP_DB:
+            xassert(lb <= new_ub && new_ub <= ub - 1.0);
+            dn_type = (lb == new_ub ? GLP_FX : GLP_DB);
+            xassert(lb + 1.0 <= new_lb && new_lb <= ub);
+            up_type = (new_lb == ub ? GLP_FX : GLP_DB);
+            break;
+         default:
+            /* other cases are not tested yet */
+            xassert(type != type);
+      }
+      /* compute local bounds to LP relaxation for both branches */
+      ios_eval_degrad(tree, j, &dn_lp, &up_lp);
+      /* and improve them by rounding */
+      dn_bnd = ios_round_bound(tree, dn_lp);
+      up_bnd = ios_round_bound(tree, up_lp);
+      /* check local bounds for down- and up-branches */
+      dn_bad = !ios_is_hopeful(tree, dn_bnd);
+      up_bad = !ios_is_hopeful(tree, up_bnd);
+      if (dn_bad && up_bad)
+      {  if (tree->parm->msg_lev >= GLP_MSG_DBG)
+            xprintf("Both down- and up-branches are hopeless\n");
+         ret = 2;
+         goto done;
+      }
+      else if (up_bad)
+      {  if (tree->parm->msg_lev >= GLP_MSG_DBG)
+            xprintf("Up-branch is hopeless\n");
+         glp_set_col_bnds(mip, j, dn_type, lb, new_ub);
+         tree->curr->lp_obj = dn_lp;
+         if (mip->dir == GLP_MIN)
+         {  if (tree->curr->bound < dn_bnd)
+                tree->curr->bound = dn_bnd;
+         }
+         else if (mip->dir == GLP_MAX)
+         {  if (tree->curr->bound > dn_bnd)
+                tree->curr->bound = dn_bnd;
+         }
+         else
+            xassert(mip != mip);
+         ret = 1;
+         goto done;
+      }
+      else if (dn_bad)
+      {  if (tree->parm->msg_lev >= GLP_MSG_DBG)
+            xprintf("Down-branch is hopeless\n");
+         glp_set_col_bnds(mip, j, up_type, new_lb, ub);
+         tree->curr->lp_obj = up_lp;
+         if (mip->dir == GLP_MIN)
+         {  if (tree->curr->bound < up_bnd)
+                tree->curr->bound = up_bnd;
+         }
+         else if (mip->dir == GLP_MAX)
+         {  if (tree->curr->bound > up_bnd)
+                tree->curr->bound = up_bnd;
+         }
+         else
+            xassert(mip != mip);
+         ret = 1;
+         goto done;
+      }
+      /* both down- and up-branches seem to be hopeful */
+      /* branching */
+      if (tree->parm->msg_lev >= GLP_MSG_DBG)
+         xprintf("Branching on column %d, primal value is %.9e\n",
+            j, beta);
+      /* determine the reference number of the current subproblem */
+      xassert(tree->curr != NULL);
+      p = tree->curr->p;
+      tree->curr->br_var = j;
+      tree->curr->br_val = beta;
+      /* freeze the current subproblem */
+      ios_freeze_node(tree);
+      /* create two clones of the current subproblem; the first clone
+         begins the down-branch, the second one begins the up-branch */
+      ios_clone_node(tree, p, 2, clone);
+      if (tree->parm->msg_lev >= GLP_MSG_DBG)
+         xprintf("Node %d begins down branch, node %d begins up branch "
+            "\n", clone[1], clone[2]);
+      /* set new upper bound of j-th column in the down-branch */
+      ios_revive_node(tree, clone[1]);
+      glp_set_col_bnds(mip, j, dn_type, lb, new_ub);
+      tree->curr->lp_obj = dn_lp;
+      if (mip->dir == GLP_MIN)
+      {  if (tree->curr->bound < dn_bnd)
+             tree->curr->bound = dn_bnd;
+      }
+      else if (mip->dir == GLP_MAX)
+      {  if (tree->curr->bound > dn_bnd)
+             tree->curr->bound = dn_bnd;
+      }
+      else
+         xassert(mip != mip);
+      ios_freeze_node(tree);
+      /* set new lower bound of j-th column in the up-branch */
+      ios_revive_node(tree, clone[2]);
+      glp_set_col_bnds(mip, j, up_type, new_lb, ub);
+      tree->curr->lp_obj = up_lp;
+      if (mip->dir == GLP_MIN)
+      {  if (tree->curr->bound < up_bnd)
+             tree->curr->bound = up_bnd;
+      }
+      else if (mip->dir == GLP_MAX)
+      {  if (tree->curr->bound > up_bnd)
+             tree->curr->bound = up_bnd;
+      }
+      else
+         xassert(mip != mip);
+      ios_freeze_node(tree);
+      /* revive the subproblem to be solved next */
+      if (next == GLP_NO_BRNCH)
+         ;
+      else if (next == GLP_DN_BRNCH)
+         ios_revive_node(tree, clone[1]);
+      else if (next == GLP_UP_BRNCH)
+         ios_revive_node(tree, clone[2]);
+      else
+         xassert(next != next);
+      ret = 0;
+done: return ret;
 }
 
 /*----------------------------------------------------------------------
@@ -980,7 +975,11 @@ static void btrack_best_node(glp_tree *tree)
             {  if (node->bound <= bound + eps)
                {  xassert(node->up != NULL);
                   if (best == NULL ||
+#if 1
                   best->up->ii_sum > node->up->ii_sum) best = node;
+#else
+                  best->lp_obj > node->lp_obj) best = node;
+#endif
                }
             }
             break;
@@ -994,7 +993,11 @@ static void btrack_best_node(glp_tree *tree)
             {  if (node->bound >= bound - eps)
                {  xassert(node->up != NULL);
                   if (best == NULL ||
+#if 1
                   best->up->ii_sum > node->up->ii_sum) best = node;
+#else
+                  best->lp_obj < node->lp_obj) best = node;
+#endif
                }
             }
             break;
@@ -1019,6 +1022,38 @@ static void write_sol(glp_tree *tree)
       }
       if (tree->parm->msg_lev < GLP_MSG_ALL)
          glp_term_out(term_out);
+      return;
+}
+
+static void display_cut_info(glp_tree *tree)
+{     /* display number of cuts added to current subproblem */
+      glp_prob *mip = tree->mip;
+      int i, gmi = 0, mir = 0, cov = 0, clq = 0, app = 0;
+      for (i = mip->m; i > 0; i--)
+      {  GLPROW *row;
+         row = mip->row[i];
+         /* if (row->level < tree->curr->level) break; */
+         if (row->origin == GLP_RF_CUT)
+         {  if (row->klass == GLP_RF_GMI)
+               gmi++;
+            else if (row->klass == GLP_RF_MIR)
+               mir++;
+            else if (row->klass == GLP_RF_COV)
+               cov++;
+            else if (row->klass == GLP_RF_CLQ)
+               clq++;
+            else
+               app++;
+         }
+      }
+      if (gmi + mir + cov + clq + app > 0)
+      {  if (gmi > 0) xprintf(" gmi:%3d", gmi);
+         if (mir > 0) xprintf(" mir:%3d", mir);
+         if (cov > 0) xprintf(" cov:%3d", cov);
+         if (clq > 0) xprintf(" clq:%3d", clq);
+         if (app > 0) xprintf(" app:%3d", app);
+         xprintf("\n");
+      }
       return;
 }
 
@@ -1050,6 +1085,10 @@ static void write_sol(glp_tree *tree)
 *  GLP_EFAIL
 *     The search was prematurely terminated due to the solver failure.
 *
+*  GLP_EMIPGAP
+*     The search was prematurely terminated, because the relative mip
+*     gap tolerance has been reached.
+*
 *  GLP_ETMLIM
 *     The search was prematurely terminated, because the time limit has
 *     been exceeded.
@@ -1057,6 +1096,7 @@ static void write_sol(glp_tree *tree)
 *  GLP_ESTOP
 *     The search was prematurely terminated by application. */
 
+static void generate_cuts(glp_tree *tree);
 static void separation(glp_tree *tree);
 
 int ios_driver(glp_tree *tree)
@@ -1155,6 +1195,61 @@ loop: /* main loop starts here; at this point some subproblem has been
             "-------------------\n");
          xprintf("Processing node %d at level %d\n", p, level);
       }
+#if 1
+      /* if it is the root subproblem, initialize cut generators */
+      if (p == 1)
+      {  if (tree->parm->gmi_cuts == GLP_ON)
+         {  if (tree->parm->msg_lev >= GLP_MSG_ALL)
+               xprintf("Gomory's cuts enabled\n");
+         }
+         if (tree->parm->mir_cuts == GLP_ON)
+         {  if (tree->parm->msg_lev >= GLP_MSG_ALL)
+               xprintf("MIR cuts enabled\n");
+            xassert(tree->mir_gen == NULL);
+            tree->mir_gen = ios_mir_init(tree);
+         }
+         if (tree->parm->cov_cuts == GLP_ON)
+         {  if (tree->parm->msg_lev >= GLP_MSG_ALL)
+               xprintf("Cover cuts enabled\n");
+         }
+         if (tree->parm->clq_cuts == GLP_ON)
+         {  xassert(tree->clq_gen == NULL);
+            if (tree->parm->msg_lev >= GLP_MSG_ALL)
+               xprintf("Clique cuts enabled\n");
+            tree->clq_gen = ios_clq_init(tree);
+         }
+      }
+#endif
+#if 1 /* 09/X-2008 */
+more: /* minor loop starts here; at this point the current subproblem
+         is either to be solved for the first time or to be reoptimized
+         due to reformulation */
+      /* display current progress of the search */
+      if (tree->parm->msg_lev >= GLP_MSG_DBG ||
+          tree->parm->msg_lev >= GLP_MSG_ON &&
+        (double)(tree->parm->out_frq - 1) <=
+            1000.0 * xdifftime(xtime(), tree->tm_lag))
+         show_progress(tree, 0);
+      if (tree->parm->msg_lev >= GLP_MSG_ALL &&
+            xdifftime(xtime(), ttt) >= 60.0)
+      {  xlong_t total;
+         lib_mem_usage(NULL, NULL, &total, NULL);
+         xprintf("Time used: %.1f secs.  Memory used: %.1f Mb.\n",
+            xdifftime(xtime(), tree->tm_beg), xltod(total) / 1048576.0);
+         ttt = xtime();
+      }
+#endif
+#if 1
+      /* check mip gap */
+      if (tree->parm->mip_gap > 0.0 &&
+          ios_relative_gap(tree) <= tree->parm->mip_gap)
+      {  if (tree->parm->msg_lev >= GLP_MSG_DBG)
+            xprintf("Relative gap tolerance reached; search terminated "
+               "\n");
+         ret = GLP_EMIPGAP;
+         goto done;
+      }
+#endif
       /* check if the time limit has been exhausted */
       if (tree->parm->tm_lim < INT_MAX &&
          (double)(tree->parm->tm_lim - 1) <=
@@ -1193,13 +1288,14 @@ loop: /* main loop starts here; at this point some subproblem has been
          {  ret = GLP_ESTOP;
             goto done;
          }
-#if 1
-         if (!is_curr_node_hopeful(tree))
-         {  /*xprintf("fathomed by preprocessing\n");*/
-            goto fath;
-         }
-#endif
       }
+#if 1
+      if (!is_curr_node_hopeful(tree))
+      {  /*xprintf("fathomed by preprocessing\n");*/
+         goto fath;
+      }
+#endif
+#if 0 /* 09/X-2008 */
 more: /* minor loop starts here; at this point the current subproblem
          is either to be solved for the first time or to be reoptimized
          due to reformulation */
@@ -1217,6 +1313,7 @@ more: /* minor loop starts here; at this point the current subproblem
             xdifftime(xtime(), tree->tm_beg), xltod(total) / 1048576.0);
          ttt = xtime();
       }
+#endif
       /* solve LP relaxation of the current subproblem */
       if (tree->parm->msg_lev >= GLP_MSG_DBG)
          xprintf("Solving LP relaxation...\n");
@@ -1242,13 +1339,23 @@ more: /* minor loop starts here; at this point the current subproblem
          if (tree->parm->msg_lev >= GLP_MSG_DBG)
             xprintf("Found optimal solution to LP relaxation\n");
       }
+#if 0 /* 19/VIII-2008 */
       else if (p_stat == GLP_FEAS && d_stat == GLP_NOFEAS)
       {  /* LP relaxation has unbounded solution */
+#else
+      else if (d_stat == GLP_NOFEAS)
+      {  /* LP relaxation has no dual feasible solution */
+#endif
          /* since the current subproblem cannot have a larger feasible
             region than its parent, there is something wrong */
          if (tree->parm->msg_lev >= GLP_MSG_ERR)
+#if 0 /* 19/VIII-2008 */
             xprintf("ios_driver: current LP relaxation has unbounded so"
                "lution\n");
+#else
+            xprintf("ios_driver: current LP relaxation has no dual feas"
+               "ible solution\n");
+#endif
          ret = GLP_EFAIL;
          goto done;
       }
@@ -1276,9 +1383,33 @@ more: /* minor loop starts here; at this point the current subproblem
       /* at this point basic solution of LP relaxation of the current
          subproblem is optimal */
       xassert(p_stat == GLP_FEAS && d_stat == GLP_FEAS);
+#if 1 /* 04/X-2008 */
+      xassert(tree->curr != NULL);
+      tree->curr->lp_obj = tree->mip->obj_val;
+#endif
       /* thus, it defines a local bound for integer optimal solution of
          the current subproblem */
+#if 0 /* 12/X-2008 */
       set_local_bound(tree);
+#else
+      {  double bound = tree->mip->obj_val;
+         /* some local bound for the current subproblem might be set
+            before, so we should only improve it */
+         bound = ios_round_bound(tree, bound);
+         if (mip->dir == GLP_MIN)
+         {  if (tree->curr->bound < bound)
+               tree->curr->bound = bound;
+         }
+         else if (mip->dir == GLP_MAX)
+         {  if (tree->curr->bound > bound)
+               tree->curr->bound = bound;
+         }
+         else
+            xassert(mip != mip);
+         if (tree->parm->msg_lev >= GLP_MSG_DBG)
+            xprintf("Local bound is %.9e\n", bound);
+      }
+#endif
       /* if the local bound indicates that integer optimal solution of
          the current subproblem cannot be better than the global bound,
          prune the branch */
@@ -1329,6 +1460,11 @@ more: /* minor loop starts here; at this point the current subproblem
          if (tree->parm->msg_lev >= GLP_MSG_ON)
             show_progress(tree, 1);
          write_sol(tree);
+#if 0
+         display_cut_info(tree);
+#else
+         xassert(display_cut_info == display_cut_info);
+#endif
          /* call the user-defined callback routine to make it happy */
          if (tree->parm->cb_func != NULL)
          {  xassert(tree->reason == 0);
@@ -1340,16 +1476,6 @@ more: /* minor loop starts here; at this point the current subproblem
                goto done;
             }
          }
-#if 1
-         if (tree->parm->mip_gap > 0.0 &&
-             ios_relative_gap(tree) <= tree->parm->mip_gap)
-         {  if (tree->parm->msg_lev >= GLP_MSG_DBG)
-               xprintf("Relative gap tolerance reached; search terminat"
-                  "ed\n");
-            ret = GLP_ETMLIM;
-            goto done;
-         }
-#endif
          /* the current subproblem is fathomed; prune its branch */
          goto fath;
       }
@@ -1359,6 +1485,15 @@ more: /* minor loop starts here; at this point the current subproblem
          on their current bounds using reduced costs */
       if (mip->mip_stat == GLP_FEAS)
          fix_by_red_cost(tree);
+#if 0
+//      if (tree->just_selected && tree->solved == 1)
+      if (tree->curr->level % 10 == 0 && tree->solved == 1)
+      {  double *x = xcalloc(1+tree->mip->n, sizeof(double));
+         if (fpump(tree->mip, x) == 0)
+            glp_ios_heur_sol(tree, x);
+         xfree(x);
+      }
+#endif
       /* call the user-defined callback routine to find solution with
          primal heuristic */
       if (tree->parm->cb_func != NULL)
@@ -1379,23 +1514,19 @@ more: /* minor loop starts here; at this point the current subproblem
          }
       }
       tree->round++;
-#if 1
-      if (tree->parm->mir_cuts == GLP_ON ||
-          tree->parm->gmi_cuts == GLP_ON)
-      {  xassert(tree->reason == 0);
-         tree->reason = GLP_ICUTGEN;
-         separation(tree);
-         tree->reason = 0;
-         if (tree->reopt)
-         {  tree->reopt = 0;
-            goto more;
-         }
-      }
-#endif
-      /* call the user-defined callback routine to generate cuts */
+      /*** cut generation ***/
+      xassert(tree->local != NULL);
+      xassert(tree->local->size == 0);
+      /* try to generate generic cuts with built-in generators */
+      xassert(tree->reason == 0);
+      tree->reason = GLP_ICUTGEN;
+      generate_cuts(tree);
+      tree->reason = 0;
+      /* call the user-defined callback routine to generate cuts;
+         note that it can add cuts either to the local cut pool or
+         directly to the current subproblem */
       if (tree->parm->cb_func != NULL)
-      {  /*int old_m = mip->m;*/
-         xassert(tree->reason == 0);
+      {  xassert(tree->reason == 0);
          tree->reason = GLP_ICUTGEN;
          tree->parm->cb_func(tree, tree->parm->cb_info);
          tree->reason = 0;
@@ -1403,25 +1534,23 @@ more: /* minor loop starts here; at this point the current subproblem
          {  ret = GLP_ESTOP;
             goto done;
          }
-#if 0
-         if (mip->m != old_m)
-         {  int nrs = mip->m - old_m;
-            xassert(nrs > 0);
-            if (tree->parm->msg_lev >= GLP_MSG_DBG)
-            {  if (nrs == 1)
-                  xprintf("One cut has been generated\n");
-               else
-                  xprintf("%d cuts have been generated\n", nrs);
-            }
-            goto more;
-         }
-#else
-         if (tree->reopt)
-         {  tree->reopt = 0;
-            goto more;
-         }
-#endif
       }
+      /* if the local cut pool is not empty, select useful cuts and add
+         them to the current subproblem */
+      if (tree->local->size > 0)
+      {  xassert(tree->reason == 0);
+         tree->reason = GLP_ICUTGEN;
+         separation(tree);
+         tree->reason = 0;
+      }
+      /* clear the local cut pool */
+      ios_clear_pool(tree, tree->local);
+      /* perform reoptimization, if necessary */
+      if (tree->reopt)
+      {  tree->reopt = 0;
+         goto more;
+      }
+      /*** end of cut generation ***/
 #if 1
       tree->just_selected = 0;
 #endif
@@ -1438,47 +1567,58 @@ more: /* minor loop starts here; at this point the current subproblem
          {  ret = GLP_ESTOP;
             goto done;
          }
-         if (tree->br_var != 0)
-         {  switch (tree->br_sel)
-            {  case 'D':
-                  branch_on(tree, tree->br_var, -1); break;
-               case 'U':
-                  branch_on(tree, tree->br_var, +1); break;
-               case 'N':
-                  branch_on(tree, tree->br_var,  0); break;
-               default:
-                  xassert(tree != tree);
-            }
-            tree->br_var = 0;
-            tree->br_sel = 0;
-            if (tree->curr == NULL) goto back; else goto loop;
+      }
+      /* if no branching variable has been chosen, use the technique
+         specified by corresponding control parameter */
+      if (tree->br_var == 0)
+      {  switch (tree->parm->br_tech)
+         {  case GLP_BR_FFV:
+               /* branch on first fractional variable */
+               branch_first(tree);
+               break;
+            case GLP_BR_LFV:
+               /* branch on last fractional variable */
+               branch_last(tree);
+               break;
+            case GLP_BR_MFV:
+               /* branch on most fractional variable */
+               branch_mostf(tree);
+               break;
+            case GLP_BR_DTH:
+               /* branch using the heuristic by Dreebeck and Tomlin */
+               branch_drtom(tree);
+               break;
+            case GLP_BR_HPC:
+               /* hybrid pseudocost branching */
+               ios_pcost_branch(tree);
+               break;
+            default:
+               xassert(tree != tree);
          }
       }
-      /* perform branching */
-      switch (tree->parm->br_tech)
-      {  case GLP_BR_FFV:
-            /* branch on first fractional variable */
-            branch_first(tree);
-            break;
-         case GLP_BR_LFV:
-            /* branch on last fractional variable */
-            branch_last(tree);
-            break;
-         case GLP_BR_MFV:
-            /* branch on most fractional variable */
-            branch_mostf(tree);
-            break;
-         case GLP_BR_DTH:
-            /* branch using the heuristic by Dreebeck and Tomlin */
-            branch_drtom(tree);
-            break;
-         default:
-            xassert(tree != tree);
+      /* perform actual branching */
+      ret = branch_on(tree);
+      tree->br_var = 0;
+      tree->br_sel = 0;
+      if (ret == 0)
+      {  if (tree->curr == NULL)
+         {  /* next subproblem is not specified; use a general
+               selection technique */
+            goto back;
+         }
+         else
+         {  /* continue the search from the subproblem which begins
+               down- or up-branch (it has been revived by the branching
+               routine) */
+            goto loop;
+         }
       }
-      /* continue the search from the subproblem which begins down- or
-         up-branch (it has been revived by branching routine) */
-      xassert(tree->curr != NULL);
-      goto loop;
+      else if (ret == 1)
+         goto more;
+      else if (ret == 2)
+         goto fath;
+      else
+         xassert(ret != ret);
 fath: /* the current subproblem has been fathomed */
       if (tree->parm->msg_lev >= GLP_MSG_DBG)
          xprintf("Node %d fathomed\n", p);
@@ -1538,6 +1678,8 @@ done: /* display status of the search on exit from the solver */
 #if 1
       if (tree->mir_gen != NULL)
          ios_mir_term(tree->mir_gen), tree->mir_gen = NULL;
+      if (tree->clq_gen != NULL)
+         ios_clq_term(tree->clq_gen), tree->clq_gen = NULL;
 #endif
       /* return to the calling program */
       return ret;
@@ -1555,6 +1697,55 @@ done: /* display status of the search on exit from the solver */
 #define min_eff (tree->min_eff)
 #define miss (tree->miss)
 #define just_selected (tree->just_selected)
+
+static void generate_cuts(glp_tree *tree)
+{     /* generate generic cuts */
+      if (first_attempt)
+      {  first_attempt = 0;
+         max_added_cuts = tree->mip->n;
+#if 1
+         if (max_added_cuts < 1000) max_added_cuts = 1000;
+#endif
+      }
+      if (!(tree->parm->mir_cuts == GLP_ON ||
+            tree->parm->gmi_cuts == GLP_ON ||
+            tree->parm->cov_cuts == GLP_ON ||
+            tree->parm->clq_cuts == GLP_ON)) goto done;
+      if (tree->curr->level > 0 && !just_selected) goto done;
+      /* if added_cuts >= max_added_cuts then return */
+#if 1 /* 20/IX-2008 */
+      {  int i, added_cuts = 0;
+         for (i = tree->orig_m+1; i <= tree->mip->m; i++)
+         {  if (tree->mip->row[i]->origin == GLP_RF_CUT)
+               added_cuts++;
+         }
+         /* xprintf("added_cuts = %d\n", added_cuts); */
+         if (added_cuts >= max_added_cuts) goto done;
+      }
+#endif
+      /* add to POOL all cuts violated by x* */
+      if (tree->parm->gmi_cuts == GLP_ON)
+      {  if (tree->round <= 5)
+            ios_gmi_gen(tree);
+      }
+      if (tree->parm->mir_cuts == GLP_ON)
+      {  xassert(tree->mir_gen != NULL);
+         ios_mir_gen(tree, tree->mir_gen);
+      }
+      if (tree->parm->cov_cuts == GLP_ON)
+      {  /* cover cuts works well along with mir cuts */
+         /*if (tree->round <= 5)*/
+            ios_cov_gen(tree);
+      }
+      if (tree->parm->clq_cuts == GLP_ON)
+      {  if (tree->clq_gen != NULL)
+         {  if (tree->curr->level == 0 && tree->round <= 50 ||
+                tree->curr->level >  0 && tree->round <= 5)
+               ios_clq_gen(tree, tree->clq_gen);
+         }
+      }
+done: return;
+}
 
 static double efficacy(glp_tree *tree, IOSCUT *cut)
 {     glp_prob *mip = tree->mip;
@@ -1628,43 +1819,21 @@ static void sort_pool(glp_tree *tree, IOSPOOL *pool)
          pool->tail = cut;
       }
       xfree(cuts);
+      pool->ord = 0, pool->curr = NULL;
       return;
 }
 
 static void separation(glp_tree *tree)
-{     /* separation strategy */
-      IOSPOOL *pool = NULL;
-      if (first_attempt)
-         max_added_cuts = tree->mip->n;
-      if (tree->curr->level > 0 && !just_selected) goto done;
-      /* if added_cuts >= max_added_cuts then return */
-      if (tree->mip->m - tree->orig_m >= max_added_cuts) goto done;
-      /* add to POOL all the cuts violated by x* */
-      pool = ios_create_pool(tree);
-      if (tree->parm->gmi_cuts == GLP_ON)
-      {  if (tree->curr->level == 0 && tree->round == 1 &&
-             tree->parm->msg_lev >= GLP_MSG_ALL)
-            xprintf("Gomory's cuts enabled\n");
-         if (tree->round <= 6)
-            ios_gmi_gen(tree, pool);
-      }
-      if (tree->parm->mir_cuts == GLP_ON)
-      {  if (tree->curr->level == 0 && tree->mir_gen == NULL)
-            tree->mir_gen = ios_mir_init(tree);
-         xassert(tree->mir_gen != NULL);
-#ifndef _GLP_FOOBAR
-         ios_mir_gen(tree, tree->mir_gen, pool);
-#else
-         ios_cov_gen(tree, pool);
-#endif
-      }
-      if (pool->size == 0) goto done;
+{     /* simple separation strategy */
+      IOSPOOL *pool = tree->local;
+      xassert(pool != NULL);
+      xassert(pool->size > 0);
       /* sort POOL by decreasing efficacy; the first cut is the cut
          with largest efficacy */
       sort_pool(tree, pool);
       /* remove the last |POOL| - max_pool cuts from POOL */
       while (pool->size > max_pool)
-         ios_del_cut_row(tree, pool, pool->tail);
+         glp_ios_del_row(tree, pool->size);
       /* define the global variable min_eff */
       if (first_attempt)
       {  min_eff = 0.7 * efficacy(tree, pool->head);
@@ -1676,15 +1845,15 @@ static void separation(glp_tree *tree)
          if (miss == 20) miss = 0, min_eff -= 0.03;
          goto done;
       }
-      /* adding cuts */
-      {  IOSCUT *cut, *next, *ccc;
-         int j;
+      /* adding cuts to the current subproblem */
+      {  int j, num;
          double *work = xcalloc(1+tree->mip->n, sizeof(double));
          int *ind = xcalloc(1+tree->mip->n, sizeof(int));
          double *val = xcalloc(1+tree->mip->n, sizeof(double));
          for (j = 1; j <= tree->mip->n; j++) work[j] = 0.0;
-         for (cut = pool->head; cut != NULL; cut = next)
-         {  next = cut->next;
+         for (num = 1; num <= pool->size; num++)
+         {  IOSCUT *cut, *ccc;
+            cut = ios_find_row(pool, num);
             if (efficacy(tree, cut) < min_eff) break; /* stop adding */
             /* cut must not be parallel !!! */
             for (ccc = pool->head; ccc != cut; ccc = ccc->next)
@@ -1694,6 +1863,10 @@ static void separation(glp_tree *tree)
                IOSAIJ *aij;
                int len = 0, i;
                i = glp_add_rows(tree->mip, 1);
+               if (cut->name != NULL)
+                  glp_set_row_name(tree->mip, i, cut->name);
+               xassert(tree->mip->row[i]->origin == GLP_RF_CUT);
+               tree->mip->row[i]->klass = cut->klass;
                for (aij = cut->ptr; aij != NULL; aij = aij->next)
                   len++, ind[len] = aij->j, val[len] = aij->val;
                glp_set_mat_row(tree->mip, i, len, ind, val);
@@ -1703,16 +1876,15 @@ static void separation(glp_tree *tree)
             }
             else
             {  /* cut rejected */
-               ios_del_cut_row(tree, pool, cut);
+               glp_ios_del_row(tree, num), num--;
             }
          }
          xfree(work);
          xfree(ind);
          xfree(val);
       }
-done: if (pool != NULL) ios_delete_pool(tree, pool);
-      first_attempt = 0;
-      return;
+      /* display_cut_info(tree, ncuts); */
+done: return;
 }
 
 /* eof */

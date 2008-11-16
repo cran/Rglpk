@@ -1,4 +1,4 @@
-/* glplpx13.c */
+/* glpios08.c (clique cut generator) */
 
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
@@ -21,8 +21,7 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
-#include "glpapi.h"
-#include "glplib.h"
+#include "glpios.h"
 
 static double get_row_lb(LPX *lp, int i)
 {     /* this routine returns lower bound of row i or -DBL_MAX if the
@@ -361,7 +360,9 @@ struct COG
 #define MAX_NB 4000
 #define MAX_ROW_LEN 500
 
-void *lpx_create_cog(LPX *lp)
+static void lpx_add_cog_edge(void *_cog, int i, int j);
+
+static void *lpx_create_cog(LPX *lp)
 {     struct COG *cog = NULL;
       int m, n, nb, i, j, p, q, len, *ind, *vert, *orig;
       double L, U, lf_min, lf_max, *val;
@@ -494,7 +495,7 @@ done: xfree(ind);
 -- x[j] (if j > 0) or its complement (if j < 0), where i and j are
 -- original ordinal numbers of corresponding variables. */
 
-void lpx_add_cog_edge(void *_cog, int i, int j)
+static void lpx_add_cog_edge(void *_cog, int i, int j)
 {     struct COG *cog = _cog;
       int k;
       xassert(i != j);
@@ -751,7 +752,7 @@ static int wclique(int _n, int w[], unsigned char _a[], int sol[])
 -- returns 1 <= len <= n, which is the number of non-zero coefficients
 -- in the inequality constraint. Otherwise, the routine returns zero. */
 
-int lpx_clique_cut(LPX *lp, void *_cog, int ind[], double val[])
+static int lpx_clique_cut(LPX *lp, void *_cog, int ind[], double val[])
 {     struct COG *cog = _cog;
       int n = lpx_get_num_cols(lp);
       int j, t, v, card, temp, len = 0, *w, *sol;
@@ -843,12 +844,63 @@ int lpx_clique_cut(LPX *lp, void *_cog, int ind[], double val[])
 -- parameter cog points to, freeing all the memory allocated to this
 -- object. */
 
-void lpx_delete_cog(void *_cog)
+static void lpx_delete_cog(void *_cog)
 {     struct COG *cog = _cog;
       xfree(cog->vert);
       xfree(cog->orig);
       xfree(cog->a);
       xfree(cog);
+}
+
+/**********************************************************************/
+
+void *ios_clq_init(glp_tree *tree)
+{     /* initialize clique cut generator */
+      glp_prob *mip = tree->mip;
+      xassert(mip != NULL);
+      return lpx_create_cog(mip);
+}
+
+/***********************************************************************
+*  NAME
+*
+*  ios_clq_gen - generate clique cuts
+*
+*  SYNOPSIS
+*
+*  #include "glpios.h"
+*  void ios_clq_gen(glp_tree *tree, void *gen);
+*
+*  DESCRIPTION
+*
+*  The routine ios_clq_gen generates clique cuts for the current point
+*  and adds them to the clique pool. */
+
+void ios_clq_gen(glp_tree *tree, void *gen)
+{     int n = lpx_get_num_cols(tree->mip);
+      int len, *ind;
+      double *val;
+      xassert(gen != NULL);
+      ind = xcalloc(1+n, sizeof(int));
+      val = xcalloc(1+n, sizeof(double));
+      len = lpx_clique_cut(tree->mip, gen, ind, val);
+      if (len > 0)
+      {  /* xprintf("len = %d\n", len); */
+         glp_ios_add_row(tree, NULL, GLP_RF_CLQ, 0, len, ind, val,
+            GLP_UP, val[0]);
+      }
+      xfree(ind);
+      xfree(val);
+      return;
+}
+
+/**********************************************************************/
+
+void ios_clq_term(void *gen)
+{     /* terminate clique cut generator */
+      xassert(gen != NULL);
+      lpx_delete_cog(gen);
+      return;
 }
 
 /* eof */

@@ -30,44 +30,51 @@ extern "C" {
 
 /* library version numbers: */
 #define GLP_MAJOR_VERSION  4
-#define GLP_MINOR_VERSION  30
+#define GLP_MINOR_VERSION  33
 
 #ifndef _GLP_PROB
 #define _GLP_PROB
-typedef struct { double _prob; } glp_prob;
+typedef struct { double _opaque_prob; } glp_prob;
 /* LP/MIP problem object */
 #endif
 
 /* optimization direction flag: */
-#define GLP_MIN         1  /* minimization */
-#define GLP_MAX         2  /* maximization */
+#define GLP_MIN            1  /* minimization */
+#define GLP_MAX            2  /* maximization */
 
 /* kind of structural variable: */
-#define GLP_CV          1  /* continuous variable */
-#define GLP_IV          2  /* integer variable */
-#define GLP_BV          3  /* binary variable */
+#define GLP_CV             1  /* continuous variable */
+#define GLP_IV             2  /* integer variable */
+#define GLP_BV             3  /* binary variable */
 
 /* type of auxiliary/structural variable: */
-#define GLP_FR          1  /* free variable */
-#define GLP_LO          2  /* variable with lower bound */
-#define GLP_UP          3  /* variable with upper bound */
-#define GLP_DB          4  /* double-bounded variable */
-#define GLP_FX          5  /* fixed variable */
+#define GLP_FR             1  /* free variable */
+#define GLP_LO             2  /* variable with lower bound */
+#define GLP_UP             3  /* variable with upper bound */
+#define GLP_DB             4  /* double-bounded variable */
+#define GLP_FX             5  /* fixed variable */
 
 /* status of auxiliary/structural variable: */
-#define GLP_BS          1  /* basic variable */
-#define GLP_NL          2  /* non-basic variable on lower bound */
-#define GLP_NU          3  /* non-basic variable on upper bound */
-#define GLP_NF          4  /* non-basic free variable */
-#define GLP_NS          5  /* non-basic fixed variable */
+#define GLP_BS             1  /* basic variable */
+#define GLP_NL             2  /* non-basic variable on lower bound */
+#define GLP_NU             3  /* non-basic variable on upper bound */
+#define GLP_NF             4  /* non-basic free variable */
+#define GLP_NS             5  /* non-basic fixed variable */
+
+/* scaling options: */
+#define GLP_SF_GM       0x01  /* perform geometric mean scaling */
+#define GLP_SF_EQ       0x10  /* perform equilibration scaling */
+#define GLP_SF_2N       0x20  /* round scale factors to power of two */
+#define GLP_SF_SKIP     0x40  /* skip if problem is well scaled */
+#define GLP_SF_AUTO     0x80  /* choose scaling options automatically */
 
 /* solution status: */
-#define GLP_UNDEF       1  /* solution is undefined */
-#define GLP_FEAS        2  /* solution is feasible */
-#define GLP_INFEAS      3  /* solution is infeasible */
-#define GLP_NOFEAS      4  /* no feasible solution exists */
-#define GLP_OPT         5  /* solution is optimal */
-#define GLP_UNBND       6  /* solution is unbounded */
+#define GLP_UNDEF          1  /* solution is undefined */
+#define GLP_FEAS           2  /* solution is feasible */
+#define GLP_INFEAS         3  /* solution is infeasible */
+#define GLP_NOFEAS         4  /* no feasible solution exists */
+#define GLP_OPT            5  /* solution is optimal */
+#define GLP_UNBND          6  /* solution is unbounded */
 
 typedef struct { int lo, hi; } glp_long;
 /* long integer data type */
@@ -79,131 +86,176 @@ typedef struct glp_bfcp glp_bfcp;
 
 struct glp_bfcp
 {     /* basis factorization control parameters */
-      int msg_lev;         /* (reserved) */
-      int type;            /* factorization type: */
-#define GLP_BF_FT       1  /* LUF + Forrest-Tomlin */
-#define GLP_BF_BG       2  /* LUF + Schur compl. + Bartels-Golub */
-#define GLP_BF_GR       3  /* LUF + Schur compl. + Givens rotation */
-      int lu_size;         /* luf.sv_size */
-      double piv_tol;      /* luf.piv_tol */
-      int piv_lim;         /* luf.piv_lim */
-      int suhl;            /* luf.suhl */
-      double eps_tol;      /* luf.eps_tol */
-      double max_gro;      /* luf.max_gro */
-      int nfs_max;         /* fhv.hh_max */
-      double upd_tol;      /* fhv.upd_tol */
-      int nrs_max;         /* lpf.n_max */
-      int rs_size;         /* lpf.v_size */
-      double foo_bar[38];  /* (reserved) */
+      int msg_lev;            /* (reserved) */
+      int type;               /* factorization type: */
+#define GLP_BF_FT          1  /* LUF + Forrest-Tomlin */
+#define GLP_BF_BG          2  /* LUF + Schur compl. + Bartels-Golub */
+#define GLP_BF_GR          3  /* LUF + Schur compl. + Givens rotation */
+      int lu_size;            /* luf.sv_size */
+      double piv_tol;         /* luf.piv_tol */
+      int piv_lim;            /* luf.piv_lim */
+      int suhl;               /* luf.suhl */
+      double eps_tol;         /* luf.eps_tol */
+      double max_gro;         /* luf.max_gro */
+      int nfs_max;            /* fhv.hh_max */
+      double upd_tol;         /* fhv.upd_tol */
+      int nrs_max;            /* lpf.n_max */
+      int rs_size;            /* lpf.v_size */
+      double foo_bar[38];     /* (reserved) */
 };
 
 typedef struct
 {     /* simplex method control parameters */
-      int msg_lev;         /* message level: */
-#define GLP_MSG_OFF     0  /* no output */
-#define GLP_MSG_ERR     1  /* warning and error messages only */
-#define GLP_MSG_ON      2  /* normal output */
-#define GLP_MSG_ALL     3  /* full output */
-#define GLP_MSG_DBG     4  /* debug output */
-      int meth;            /* simplex method option: */
-#define GLP_PRIMAL      1  /* use primal simplex */
-#define GLP_DUALP       2  /* use dual simplex, if possible */
-      int pricing;         /* pricing technique: */
-#define GLP_PT_STD   0x11  /* standard (Dantzig rule) */
-#define GLP_PT_PSE   0x22  /* projected steepest edge */
-      int r_test;          /* ratio test technique: */
-#define GLP_RT_STD   0x11  /* standard (textbook) */
-#define GLP_RT_HAR   0x22  /* two-pass Harris' ratio test */
-      double tol_bnd;      /* spx.tol_bnd */
-      double tol_dj;       /* spx.tol_dj */
-      double tol_piv;      /* spx.tol_piv */
-      double obj_ll;       /* spx.obj_ll */
-      double obj_ul;       /* spx.obj_ul */
-      int it_lim;          /* spx.it_lim */
-      int tm_lim;          /* spx.tm_lim (milliseconds) */
-      int out_frq;         /* spx.out_frq */
-      int out_dly;         /* spx.out_dly (milliseconds) */
-      int presolve;        /* enable/disable using LP presolver */
-      double foo_bar[36];  /* (reserved) */
+      int msg_lev;            /* message level: */
+#define GLP_MSG_OFF        0  /* no output */
+#define GLP_MSG_ERR        1  /* warning and error messages only */
+#define GLP_MSG_ON         2  /* normal output */
+#define GLP_MSG_ALL        3  /* full output */
+#define GLP_MSG_DBG        4  /* debug output */
+      int meth;               /* simplex method option: */
+#define GLP_PRIMAL         1  /* use primal simplex */
+#define GLP_DUALP          2  /* use dual; if it fails, use primal */
+#define GLP_DUAL           3  /* use dual simplex */
+      int pricing;            /* pricing technique: */
+#define GLP_PT_STD      0x11  /* standard (Dantzig rule) */
+#define GLP_PT_PSE      0x22  /* projected steepest edge */
+      int r_test;             /* ratio test technique: */
+#define GLP_RT_STD      0x11  /* standard (textbook) */
+#define GLP_RT_HAR      0x22  /* two-pass Harris' ratio test */
+      double tol_bnd;         /* spx.tol_bnd */
+      double tol_dj;          /* spx.tol_dj */
+      double tol_piv;         /* spx.tol_piv */
+      double obj_ll;          /* spx.obj_ll */
+      double obj_ul;          /* spx.obj_ul */
+      int it_lim;             /* spx.it_lim */
+      int tm_lim;             /* spx.tm_lim (milliseconds) */
+      int out_frq;            /* spx.out_frq */
+      int out_dly;            /* spx.out_dly (milliseconds) */
+      int presolve;           /* enable/disable using LP presolver */
+      double foo_bar[36];     /* (reserved) */
 } glp_smcp;
 
 #ifndef _GLP_TREE
 #define _GLP_TREE
-typedef struct { double _tree; } glp_tree;
+typedef struct { double _opaque_tree; } glp_tree;
 /* branch-and-bound tree */
 #endif
 
 typedef struct
 {     /* integer optimizer control parameters */
-      int msg_lev;         /* message level: */
-#define GLP_MSG_OFF     0  /* no output */
-#define GLP_MSG_ERR     1  /* warning and error messages only */
-#define GLP_MSG_ON      2  /* normal output */
-#define GLP_MSG_ALL     3  /* full output */
-#define GLP_MSG_DBG     4  /* debug output */
-      int br_tech;         /* branching technique: */
-#define GLP_BR_FFV      1  /* first fractional variable */
-#define GLP_BR_LFV      2  /* last fractional variable */
-#define GLP_BR_MFV      3  /* most fractional variable */
-#define GLP_BR_DTH      4  /* heuristic by Driebeck and Tomlin */
-      int bt_tech;         /* backtracking technique: */
-#define GLP_BT_DFS      1  /* depth first search */
-#define GLP_BT_BFS      2  /* breadth first search */
-#define GLP_BT_BLB      3  /* best local bound */
-#define GLP_BT_BPH      4  /* best projection heuristic */
-      double tol_int;      /* mip.tol_int */
-      double tol_obj;      /* mip.tol_obj */
-      int tm_lim;          /* mip.tm_lim (milliseconds) */
-      int out_frq;         /* mip.out_frq (milliseconds) */
-      int out_dly;         /* mip.out_dly (milliseconds) */
+      int msg_lev;            /* message level: */
+#define GLP_MSG_OFF        0  /* no output */
+#define GLP_MSG_ERR        1  /* warning and error messages only */
+#define GLP_MSG_ON         2  /* normal output */
+#define GLP_MSG_ALL        3  /* full output */
+#define GLP_MSG_DBG        4  /* debug output */
+      int br_tech;            /* branching technique: */
+#define GLP_BR_FFV         1  /* first fractional variable */
+#define GLP_BR_LFV         2  /* last fractional variable */
+#define GLP_BR_MFV         3  /* most fractional variable */
+#define GLP_BR_DTH         4  /* heuristic by Driebeck and Tomlin */
+#define GLP_BR_HPC         5  /* hybrid pseudocost */
+      int bt_tech;            /* backtracking technique: */
+#define GLP_BT_DFS         1  /* depth first search */
+#define GLP_BT_BFS         2  /* breadth first search */
+#define GLP_BT_BLB         3  /* best local bound */
+#define GLP_BT_BPH         4  /* best projection heuristic */
+      double tol_int;         /* mip.tol_int */
+      double tol_obj;         /* mip.tol_obj */
+      int tm_lim;             /* mip.tm_lim (milliseconds) */
+      int out_frq;            /* mip.out_frq (milliseconds) */
+      int out_dly;            /* mip.out_dly (milliseconds) */
       void (*cb_func)(glp_tree *tree, void *info);
-                           /* mip.cb_func */
-      void *cb_info;       /* mip.cb_info */
-      int cb_size;         /* mip.cb_size */
-      int pp_tech;         /* preprocessing technique: */
-#define GLP_PP_NONE     0  /* disable preprocessing */
-#define GLP_PP_ROOT     1  /* preprocessing only on root level */
-#define GLP_PP_ALL      2  /* preprocessing on all levels */
-      double mip_gap;      /* relative MIP gap tolerance */
-      int mir_cuts;        /* MIR cuts (GLP_ON/GLP_OFF) */
-      int gmi_cuts;        /* Gomory's cuts (GLP_ON/GLP_OFF) */
-      double foo_bar[34];  /* (reserved) */
+                              /* mip.cb_func */
+      void *cb_info;          /* mip.cb_info */
+      int cb_size;            /* mip.cb_size */
+      int pp_tech;            /* preprocessing technique: */
+#define GLP_PP_NONE        0  /* disable preprocessing */
+#define GLP_PP_ROOT        1  /* preprocessing only on root level */
+#define GLP_PP_ALL         2  /* preprocessing on all levels */
+      double mip_gap;         /* relative MIP gap tolerance */
+      int mir_cuts;           /* MIR cuts       (GLP_ON/GLP_OFF) */
+      int gmi_cuts;           /* Gomory's cuts  (GLP_ON/GLP_OFF) */
+      int cov_cuts;           /* cover cuts     (GLP_ON/GLP_OFF) */
+      int clq_cuts;           /* clique cuts    (GLP_ON/GLP_OFF) */
+      int presolve;           /* enable/disable using MIP presolver */
+      int binarize;           /* try to binarize integer variables */
+      double foo_bar[30];     /* (reserved) */
 #if 1 /* not yet available */
-      char *fn_sol;        /* file name to write solution found */
+      char *fn_sol;           /* file name to write solution found */
 #endif
 } glp_iocp;
 
+typedef struct
+{     /* additional row attributes */
+      int level;
+      /* subproblem level at which the row was added */
+      int origin;
+      /* the row origin flag: */
+#define GLP_RF_REG         0  /* regular constraint */
+#define GLP_RF_LAZY        1  /* "lazy" constraint */
+#define GLP_RF_CUT         2  /* cutting plane constraint */
+      int klass;
+      /* the row class descriptor: */
+#define GLP_RF_GMI         1  /* Gomory's mixed integer cut */
+#define GLP_RF_MIR         2  /* mixed integer rounding cut */
+#define GLP_RF_COV         3  /* mixed cover cut */
+#define GLP_RF_CLQ         4  /* clique cut */
+      double foo_bar[7];
+      /* (reserved) */
+} glp_attr;
+
 /* enable/disable flag: */
-#define GLP_ON          1  /* enable something */
-#define GLP_OFF         0  /* disable something */
+#define GLP_ON             1  /* enable something */
+#define GLP_OFF            0  /* disable something */
 
 /* reason codes: */
-#define GLP_IROWGEN  0x01  /* request for row generation */
-#define GLP_IBINGO   0x02  /* better integer solution found */
-#define GLP_IHEUR    0x03  /* request for heuristic solution */
-#define GLP_ICUTGEN  0x04  /* request for cut generation */
-#define GLP_IBRANCH  0x05  /* request for branching */
-#define GLP_ISELECT  0x06  /* request for subproblem selection */
-#define GLP_IPREPRO  0x07  /* request for preprocessing */
+#define GLP_IROWGEN     0x01  /* request for row generation */
+#define GLP_IBINGO      0x02  /* better integer solution found */
+#define GLP_IHEUR       0x03  /* request for heuristic solution */
+#define GLP_ICUTGEN     0x04  /* request for cut generation */
+#define GLP_IBRANCH     0x05  /* request for branching */
+#define GLP_ISELECT     0x06  /* request for subproblem selection */
+#define GLP_IPREPRO     0x07  /* request for preprocessing */
+
+/* branch selection indicator: */
+#define GLP_NO_BRNCH       0  /* select no branch */
+#define GLP_DN_BRNCH       1  /* select down-branch */
+#define GLP_UP_BRNCH       2  /* select up-branch */
 
 /* return codes: */
-#define GLP_EBADB    0x01  /* invalid basis */
-#define GLP_ESING    0x02  /* singular matrix */
-#define GLP_ECOND    0x03  /* ill-conditioned matrix */
-#define GLP_EBOUND   0x04  /* invalid bounds */
-#define GLP_EFAIL    0x05  /* solver failed */
-#define GLP_EOBJLL   0x06  /* objective lower limit reached */
-#define GLP_EOBJUL   0x07  /* objective upper limit reached */
-#define GLP_EITLIM   0x08  /* iteration limit exceeded */
-#define GLP_ETMLIM   0x09  /* time limit exceeded */
-#define GLP_ENOPFS   0x0A  /* no primal feasible solution */
-#define GLP_ENODFS   0x0B  /* no dual feasible solution */
-#define GLP_EROOT    0x0C  /* root LP optimum not provided */
-#define GLP_ESTOP    0x0D  /* search terminated by application */
+#define GLP_EBADB       0x01  /* invalid basis */
+#define GLP_ESING       0x02  /* singular matrix */
+#define GLP_ECOND       0x03  /* ill-conditioned matrix */
+#define GLP_EBOUND      0x04  /* invalid bounds */
+#define GLP_EFAIL       0x05  /* solver failed */
+#define GLP_EOBJLL      0x06  /* objective lower limit reached */
+#define GLP_EOBJUL      0x07  /* objective upper limit reached */
+#define GLP_EITLIM      0x08  /* iteration limit exceeded */
+#define GLP_ETMLIM      0x09  /* time limit exceeded */
+#define GLP_ENOPFS      0x0A  /* no primal feasible solution */
+#define GLP_ENODFS      0x0B  /* no dual feasible solution */
+#define GLP_EROOT       0x0C  /* root LP optimum not provided */
+#define GLP_ESTOP       0x0D  /* search terminated by application */
+#define GLP_EMIPGAP     0x0E  /* relative mip gap tolerance reached */
+#define GLP_ENOFEAS     0x0F  /* no primal/dual feasible solution */
+#define GLP_ENOCVG      0x10  /* no convergence */
+#define GLP_EINSTAB     0x11  /* numerical instability */
 
 /* MPS file format: */
-#define GLP_MPS_DECK    1  /* fixed (ancient) */
-#define GLP_MPS_FILE    2  /* free (modern) */
+#define GLP_MPS_DECK       1  /* fixed (ancient) */
+#define GLP_MPS_FILE       2  /* free (modern) */
+
+#ifndef _GLP_TRAN
+#define _GLP_TRAN
+typedef struct { double _opaque_tran; } glp_tran;
+/* MathProg translator workspace */
+#endif
+
+/* MathProg solution indicator: */
+#define GLP_MPL_SOL        1  /* basic solution */
+#define GLP_MPL_IPT        2  /* interior-point solution */
+#define GLP_MPL_MIP        3  /* mixed integer solution */
 
 glp_prob *glp_create_prob(void);
 /* create problem object */
@@ -257,6 +309,9 @@ void glp_del_rows(glp_prob *lp, int nrs, const int num[]);
 
 void glp_del_cols(glp_prob *lp, int ncs, const int num[]);
 /* delete specified columns from problem object */
+
+void glp_copy_prob(glp_prob *dest, glp_prob *prob, int names);
+/* copy problem object content */
 
 void glp_erase_prob(glp_prob *lp);
 /* erase problem object content */
@@ -339,6 +394,9 @@ double glp_get_rii(glp_prob *lp, int i);
 double glp_get_sjj(glp_prob *lp, int j);
 /* retrieve column scale factor */
 
+void glp_scale_prob(glp_prob *lp, int flags);
+/* scale problem data */
+
 void glp_unscale_prob(glp_prob *lp);
 /* unscale problem data */
 
@@ -348,17 +406,23 @@ void glp_set_row_stat(glp_prob *lp, int i, int stat);
 void glp_set_col_stat(glp_prob *lp, int j, int stat);
 /* set (change) column status */
 
+void glp_std_basis(glp_prob *lp);
+/* construct standard initial LP basis */
+
+void glp_adv_basis(glp_prob *lp, int flags);
+/* construct advanced initial LP basis */
+
+void glp_cpx_basis(glp_prob *lp);
+/* construct Bixby's initial LP basis */
+
 int glp_simplex(glp_prob *lp, const glp_smcp *parm);
 /* solve LP problem with the simplex method */
 
+int glp_exact(glp_prob *lp, const glp_smcp *parm);
+/* solve LP problem in exact arithmetic */
+
 void glp_init_smcp(glp_smcp *parm);
 /* initialize simplex method control parameters */
-
-int glp_get_row_stat(glp_prob *lp, int i);
-/* retrieve row status */
-
-int glp_get_col_stat(glp_prob *lp, int j);
-/* retrieve column status */
 
 int glp_get_status(glp_prob *lp);
 /* retrieve generic status of basic solution */
@@ -372,17 +436,29 @@ int glp_get_dual_stat(glp_prob *lp);
 double glp_get_obj_val(glp_prob *lp);
 /* retrieve objective value (basic solution) */
 
+int glp_get_row_stat(glp_prob *lp, int i);
+/* retrieve row status */
+
 double glp_get_row_prim(glp_prob *lp, int i);
 /* retrieve row primal value (basic solution) */
 
 double glp_get_row_dual(glp_prob *lp, int i);
 /* retrieve row dual value (basic solution) */
 
+int glp_get_col_stat(glp_prob *lp, int j);
+/* retrieve column status */
+
 double glp_get_col_prim(glp_prob *lp, int j);
 /* retrieve column primal value (basic solution) */
 
 double glp_get_col_dual(glp_prob *lp, int j);
 /* retrieve column dual value (basic solution) */
+
+int glp_get_unbnd_ray(glp_prob *lp);
+/* determine variable causing unboundedness */
+
+int glp_interior(glp_prob *lp, const void *parm);
+/* solve LP problem with the interior-point method */
 
 int glp_ipt_status(glp_prob *lp);
 /* retrieve status of interior-point solution */
@@ -523,6 +599,23 @@ double glp_ios_mip_gap(glp_tree *tree);
 void *glp_ios_node_data(glp_tree *tree, int p);
 /* access subproblem application-specific data */
 
+void glp_ios_row_attr(glp_tree *tree, int i, glp_attr *attr);
+/* retrieve additional row attributes */
+
+int glp_ios_pool_size(glp_tree *tree);
+/* determine current size of the cut pool */
+
+int glp_ios_add_row(glp_tree *tree,
+      const char *name, int klass, int flags, int len, const int ind[],
+      const double val[], int type, double rhs);
+/* add row (constraint) to the cut pool */
+
+void glp_ios_del_row(glp_tree *tree, int i);
+/* remove row (constraint) from the cut pool */
+
+void glp_ios_clear_pool(glp_tree *tree);
+/* remove all rows (constraints) from the cut pool */
+
 int glp_ios_can_branch(glp_tree *tree, int j);
 /* check if can branch upon specified variable */
 
@@ -579,6 +672,27 @@ int glp_read_lp(glp_prob *lp, const void *parm, const char *fname);
 
 int glp_write_lp(glp_prob *lp, const void *parm, const char *fname);
 /* write problem data in CPLEX LP format */
+
+glp_tran *glp_mpl_alloc_wksp(void);
+/* allocate the MathProg translator workspace */
+
+int glp_mpl_read_model(glp_tran *tran, const char *fname, int skip);
+/* read and translate model section */
+
+int glp_mpl_read_data(glp_tran *tran, const char *fname);
+/* read and translate data section */
+
+int glp_mpl_generate(glp_tran *tran, const char *fname);
+/* generate the model */
+
+void glp_mpl_build_prob(glp_tran *tran, glp_prob *prob);
+/* build LP/MIP problem instance from the model */
+
+int glp_mpl_postsolve(glp_tran *tran, glp_prob *prob, int sol);
+/* postsolve the model */
+
+void glp_mpl_free_wksp(glp_tran *tran);
+/* free the MathProg translator workspace */
 
 int glp_main(int argc, const char *argv[]);
 /* stand-alone LP/MIP solver */
@@ -659,6 +773,7 @@ int glp_main(int argc, const char *argv[]);
 #define LPX_E_NOCONV    212   /* no convergence (interior) */
 #define LPX_E_NOPFS     213   /* no primal feas. sol. (LP presolver) */
 #define LPX_E_NODFS     214   /* no dual feas. sol. (LP presolver) */
+#define LPX_E_MIPGAP    215   /* relative mip gap tolerance reached */
 
 /* control parameter identifiers: */
 #define LPX_K_MSGLEV    300   /* lp->msg_lev */
@@ -959,6 +1074,14 @@ void lpx_scale_prob(LPX *lp);
 void lpx_unscale_prob(LPX *lp);
 /* unscale problem data */
 
+#define lpx_set_row_stat _glp_lpx_set_row_stat
+void lpx_set_row_stat(LPX *lp, int i, int stat);
+/* set (change) row status */
+
+#define lpx_set_col_stat _glp_lpx_set_col_stat
+void lpx_set_col_stat(LPX *lp, int j, int stat);
+/* set (change) column status */
+
 #define lpx_std_basis _glp_lpx_std_basis
 void lpx_std_basis(LPX *lp);
 /* construct standard initial LP basis */
@@ -970,14 +1093,6 @@ void lpx_adv_basis(LPX *lp);
 #define lpx_cpx_basis _glp_lpx_cpx_basis
 void lpx_cpx_basis(LPX *lp);
 /* construct Bixby's initial LP basis */
-
-#define lpx_set_row_stat _glp_lpx_set_row_stat
-void lpx_set_row_stat(LPX *lp, int i, int stat);
-/* set (change) row status */
-
-#define lpx_set_col_stat _glp_lpx_set_col_stat
-void lpx_set_col_stat(LPX *lp, int j, int stat);
-/* set (change) column status */
 
 #define lpx_simplex _glp_lpx_simplex
 int lpx_simplex(LPX *lp);
@@ -1132,7 +1247,7 @@ int lpx_integer(LPX *lp);
 /* easy-to-use driver to the branch-and-bound method */
 
 #define lpx_intopt _glp_lpx_intopt
-int lpx_intopt(LPX *mip);
+int lpx_intopt(LPX *lp);
 /* easy-to-use driver to the branch-and-bound method */
 
 #define lpx_mip_status _glp_lpx_mip_status
@@ -1237,7 +1352,8 @@ int lpx_is_b_avail(LPX *lp);
 /* check if LP basis is available */
 
 #define lpx_write_pb _glp_lpx_write_pb
-int lpx_write_pb(LPX *lp, const char *fname, int normalized);
+int lpx_write_pb(LPX *lp, const char *fname, int normalized,
+      int binarize);
 /* write problem data in (normalized) OPB format */
 
 #define lpx_main _glp_lpx_main

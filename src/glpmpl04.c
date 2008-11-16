@@ -699,7 +699,11 @@ done: /* return to the calling program */
 --     processing. */
 
 int mpl_read_data(MPL *mpl, char *file)
+#if 0 /* 02/X-2008 */
 {     if (mpl->phase != 1)
+#else
+{     if (!(mpl->phase == 1 || mpl->phase == 2))
+#endif
          xfault("mpl_read_data: invalid call sequence\n");
       if (file == NULL)
          xfault("mpl_read_data: no input filename specified\n");

@@ -4895,6 +4895,9 @@ void execute_table(MPL *mpl, TABLE *tab)
       for (arg = tab->arg; arg != NULL; arg = arg->next)
          dca->na++;
       dca->arg = xcalloc(1+dca->na, sizeof(char *));
+#if 1 /* 28/IX-2008 */
+      for (k = 1; k <= dca->na; k++) dca->arg[k] = NULL;
+#endif
       /* evaluate argument values */
       k = 0;
       for (arg = tab->arg; arg != NULL; arg = arg->next)
@@ -5088,6 +5091,9 @@ void free_dca(MPL *mpl)
             mpl_tab_drv_close(mpl);
          if (dca->arg != NULL)
          {  for (k = 1; k <= dca->na; k++)
+#if 1 /* 28/IX-2008 */
+               if (dca->arg[k] != NULL)
+#endif
                xfree(dca->arg[k]);
             xfree(dca->arg);
          }

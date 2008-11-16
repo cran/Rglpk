@@ -75,18 +75,18 @@ void lpx_order_matrix(glp_prob *lp)
 /***********************************************************************
 *  NAME
 *
-*  glp_put_solution - store basic solution components
+*  lpx_put_solution - store basic solution components
 *
 *  SYNOPSIS
 *
-*  void glp_put_solution(glp_prob *lp, int inval, const int *p_stat,
+*  void lpx_put_solution(glp_prob *lp, int inval, const int *p_stat,
 *     const int *d_stat, const double *obj_val, const int r_stat[],
 *     const double r_prim[], const double r_dual[], const int c_stat[],
 *     const double c_prim[], const double c_dual[])
 *
 *  DESCRIPTION
 *
-*  The routine glp_put_solution stores basic solution components to the
+*  The routine lpx_put_solution stores basic solution components to the
 *  specified problem object.
 *
 *  The parameter inval is the basis factorization invalidity flag.
@@ -166,7 +166,7 @@ void lpx_order_matrix(glp_prob *lp)
 *  of j-th structural variable. If the parameter c_dual is NULL, the
 *  current dual values of structural variables remain unchanged. */
 
-void glp_put_solution(glp_prob *lp, int inval, const int *p_stat,
+void lpx_put_solution(glp_prob *lp, int inval, const int *p_stat,
       const int *d_stat, const double *obj_val, const int r_stat[],
       const double r_prim[], const double r_dual[], const int c_stat[],
       const double c_prim[], const double c_dual[])
@@ -179,7 +179,7 @@ void glp_put_solution(glp_prob *lp, int inval, const int *p_stat,
       if (p_stat != NULL)
       {  if (!(*p_stat == GLP_UNDEF  || *p_stat == GLP_FEAS ||
                *p_stat == GLP_INFEAS || *p_stat == GLP_NOFEAS))
-            xfault("glp_put_solution: p_stat = %d; invalid primal statu"
+            xfault("lpx_put_solution: p_stat = %d; invalid primal statu"
                "s\n", *p_stat);
          lp->pbs_stat = *p_stat;
       }
@@ -187,7 +187,7 @@ void glp_put_solution(glp_prob *lp, int inval, const int *p_stat,
       if (d_stat != NULL)
       {  if (!(*d_stat == GLP_UNDEF  || *d_stat == GLP_FEAS ||
                *d_stat == GLP_INFEAS || *d_stat == GLP_NOFEAS))
-            xfault("glp_put_solution: d_stat = %d; invalid dual status "
+            xfault("lpx_put_solution: d_stat = %d; invalid dual status "
                "\n", *d_stat);
          lp->dbs_stat = *d_stat;
       }
@@ -204,7 +204,7 @@ void glp_put_solution(glp_prob *lp, int inval, const int *p_stat,
                   row->type == GLP_DB && r_stat[i] == GLP_NL ||
                   row->type == GLP_DB && r_stat[i] == GLP_NU ||
                   row->type == GLP_FX && r_stat[i] == GLP_NS))
-               xfault("glp_put_solution: r_stat[%d] = %d; invalid row s"
+               xfault("lpx_put_solution: r_stat[%d] = %d; invalid row s"
                   "tatus\n", i, r_stat[i]);
             row->stat = r_stat[i];
          }
@@ -222,97 +222,13 @@ void glp_put_solution(glp_prob *lp, int inval, const int *p_stat,
                   col->type == GLP_DB && c_stat[j] == GLP_NL ||
                   col->type == GLP_DB && c_stat[j] == GLP_NU ||
                   col->type == GLP_FX && c_stat[j] == GLP_NS))
-               xfault("glp_put_solution: c_stat[%d] = %d; invalid colum"
+               xfault("lpx_put_solution: c_stat[%d] = %d; invalid colum"
                   "n status\n", j, c_stat[j]);
             col->stat = c_stat[j];
          }
          if (c_prim != NULL) col->prim = c_prim[j];
          if (c_dual != NULL) col->dual = c_dual[j];
       }
-      return;
-}
-
-/*----------------------------------------------------------------------
--- lpx_put_lp_basis - store LP basis information.
---
--- *Synopsis*
---
--- #include "glplpx.h"
--- void lpx_put_lp_basis(glp_prob *lp, int b_stat, int basis[],
---    BFI *b_inv);
---
--- *Description*
---
--- The routine lpx_put_lp_basis stores an LP basis information into the
--- specified problem object.
---
--- NOTE: This routine is intended for internal use only. */
-
-void lpx_put_lp_basis(glp_prob *lp, int valid, int basis[], BFD *b_inv)
-{     GLPROW *row;
-      GLPCOL *col;
-      int i, k;
-      /* store basis status */
-      lp->valid = valid;
-      /* store basis header */
-      if (basis != NULL)
-         for (i = 1; i <= lp->m; i++) lp->head[i] = basis[i];
-      /* store factorization of the basis matrix */
-      xassert(lp->bfd == b_inv);
-      /* if the basis is claimed to be valid, check it */
-      if (valid)
-      {  for (k = 1; k <= lp->m; k++) lp->row[k]->bind = 0;
-         for (k = 1; k <= lp->n; k++) lp->col[k]->bind = 0;
-         for (i = 1; i <= lp->m; i++)
-         {  k = lp->head[i];
-            if (!(1 <= k && k <= lp->m+lp->n))
-               xfault("lpx_put_lp_basis: basis[%d] = %d; invalid refere"
-                  "nce to basic variable\n", i, k);
-            if (k <= lp->m)
-            {  row = lp->row[k];
-               if (row->stat != GLP_BS)
-                  xfault("lpx_put_lp_basis: basis[%d] = %d; invalid ref"
-                     "erence to non-basic row\n", i, k);
-               if (row->bind != 0)
-                  xfault("lpx_put_lp_basis: basis[%d] = %d; duplicate r"
-                     "eference to basic row\n", i, k);
-               row->bind = i;
-            }
-            else
-            {  col = lp->col[k-lp->m];
-               if (col->stat != GLP_BS)
-                  xfault("lpx_put_lp_basis: basis[%d] = %d; invalid ref"
-                     "erence to non-basic column\n", i, k);
-               if (col->bind != 0)
-                  xfault("lpx_put_lp_basis: basis[%d] = %d; duplicate r"
-                     "eference to basic column\n", i, k);
-               col->bind = i;
-            }
-         }
-      }
-      return;
-}
-
-/*----------------------------------------------------------------------
--- lpx_put_ray_info - store row/column which causes unboundness.
---
--- *Synopsis*
---
--- #include "glplpx.h"
--- void lpx_put_ray_info(glp_prob *lp, int k);
---
--- *Description*
---
--- The routine lpx_put_ray_info stores the number of row/column, which
--- causes primal unboundness.
---
--- NOTE: This routine is intended for internal use only. */
-
-void lpx_put_ray_info(glp_prob *lp, int k)
-{     if (!(0 <= k && k <= lp->m+lp->n))
-         xfault("lpx_put_ray_info: ray = %d; row/column number out of r"
-            "ange\n", k);
-      lp->some = k;
       return;
 }
 
@@ -440,31 +356,6 @@ void lpx_put_mip_soln(glp_prob *lp, int i_stat, double row_mipx[],
       }
       lp->mip_obj = sum;
       return;
-}
-
-/*----------------------------------------------------------------------
--- lpx_get_ray_info - retrieve row/column which causes unboundness.
---
--- *Synopsis*
---
--- #include "glplpx.h"
--- int lpx_get_ray_info(glp_prob *lp);
---
--- *Returns*
---
--- The routine lpx_get_ray_info returns the number k of some non-basic
--- variable x[k], which causes primal unboundness. If such a variable
--- cannot be identified, the routine returns zero.
---
--- If 1 <= k <= m, x[k] is the auxiliary variable associated with k-th
--- row, if m+1 <= k <= m+n, x[k] is the structural variable associated
--- with (k-m)-th column, where m is the number of rows, n is the number
--- of columns in the LP problem object. */
-
-int lpx_get_ray_info(glp_prob *lp)
-{     int k;
-      k = lp->some;
-      return k;
 }
 
 /* eof */

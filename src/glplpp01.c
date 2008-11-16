@@ -816,7 +816,7 @@ void lpp_unload_sol(LPP *lpp, LPX *orig)
       sum = lpx_get_obj_coef(orig, 0);
       for (j = 1; j <= n; j++)
          sum += lpx_get_obj_coef(orig, j) * lpp->col_prim[j];
-      glp_put_solution(orig, 1, &p_stat, &d_stat, &sum,
+      lpx_put_solution(orig, 1, &p_stat, &d_stat, &sum,
          lpp->row_stat, lpp->row_prim, lpp->row_dual,
          lpp->col_stat, lpp->col_prim, lpp->col_dual);
       for (i = 1; i <= m; i++)

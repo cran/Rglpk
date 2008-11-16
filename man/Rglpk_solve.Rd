@@ -52,7 +52,7 @@ Rglpk_solve_LP(obj, mat, dir, rhs, types = NULL, max = FALSE,
   (\url{http://www.gnu.org/software/glpk/glpk.html}).
   
   GLPK Interface to R 
-  (\url{http://cran.R-project.org/src/contrib/Descriptions/glpk.html}).
+  (\url{http://cran.R-project.org/package=Rglpk}).
 }
 \author{Stefan Theussl and Kurt Hornik}
 \seealso{

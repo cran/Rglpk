@@ -90,7 +90,7 @@
 --
 -- A_ind is an integer array of length [1+ne]. Location A_ind[0] is not
 -- used, and locations A_ind[1], ..., A_ind[ne] contain column indices
--- of non-zero elements in matrix A.
+-- of (non-zero) elements in matrix A.
 --
 -- A_val is a floating-point array of length [1+ne]. Location A_val[0]
 -- is not used, and locations A_val[1], ..., A_val[ne] contain numeric

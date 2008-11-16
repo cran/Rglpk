@@ -22,7 +22,6 @@
 ***********************************************************************/
 
 #include "glpapi.h"
-#define xfault xerror
 
 /***********************************************************************
 *  NAME
@@ -93,7 +92,7 @@ int glp_find_row(glp_prob *lp, const char *name)
 {     AVLNODE *node;
       int i = 0;
       if (lp->r_tree == NULL)
-         xfault("glp_find_row: row name index does not exist\n");
+         xerror("glp_find_row: row name index does not exist\n");
       if (!(name == NULL || name[0] == '\0' || strlen(name) > 255))
       {  node = avl_find_node(lp->r_tree, name);
          if (node != NULL)
@@ -121,7 +120,7 @@ int glp_find_col(glp_prob *lp, const char *name)
 {     AVLNODE *node;
       int j = 0;
       if (lp->c_tree == NULL)
-         xfault("glp_find_col: column name index does not exist\n");
+         xerror("glp_find_col: column name index does not exist\n");
       if (!(name == NULL || name[0] == '\0' || strlen(name) > 255))
       {  node = avl_find_node(lp->c_tree, name);
          if (node != NULL)

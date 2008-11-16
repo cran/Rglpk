@@ -42,13 +42,15 @@ struct glp_prob
       /* memory pool to store problem object components */
       void *cps; /* struct LPXCPS *cps; */
       /* reserved for downward compatibility */
-#if 0
-      char *str_buf; /* char str_buf[255+1]; */
-      /* working buffer to store null-terminated character strings */
-#endif
       void *tree; /* glp_tree *tree */
       /* pointer to the branch-and-bound tree; set by the MIP solver
          when this object is used in the tree as a core MIP object */
+#if 1 /* 19/X-2008 */
+      int lwa;
+      /* length of the working array (enlarged automatically) */
+      char *cwa; /* char cwa[1+lwa]; */
+      /* working array; normally it contains binary zeros */
+#endif
       /*--------------------------------------------------------------*/
       /* LP/MIP data */
       char *name;
@@ -149,6 +151,11 @@ struct GLPROW
       /* pointer to corresponding node in the row index; NULL means
          that either the row index does not exist or this row has no
          name assigned */
+#if 1 /* 20/IX-2008 */
+      int level;
+      unsigned char origin;
+      unsigned char klass;
+#endif
       int type;
       /* type of the auxiliary variable:
          GLP_FR - free variable
@@ -286,9 +293,8 @@ struct LPXCPS
          3 - geometric mean scaling, then equilibration scaling */
       int dual;
       /* dual simplex option:
-         0 - do not use the dual simplex
-         1 - if the initial basic solution being primal infeasible is
-             dual feasible, use the dual simplex */
+         0 - use primal simplex
+         1 - use dual simplex */
       int price;
       /* pricing option (for both primal and dual simplex):
          0 - textbook pricing
@@ -411,101 +417,34 @@ struct LPXCPS
       /* relative MIP gap tolerance */
 };
 
-#define lpx_order_matrix _glp_lpx_order_matrix
+#define lpx_order_matrix _glp_1px_order_matrix
 void lpx_order_matrix(LPX *lp);
 /* order rows and columns of the constraint matrix */
 
-void glp_put_solution(glp_prob *lp, int inval, const int *p_stat,
+#define lpx_put_solution _glp_1px_put_solution
+void lpx_put_solution(glp_prob *lp, int inval, const int *p_stat,
       const int *d_stat, const double *obj_val, const int r_stat[],
       const double r_prim[], const double r_dual[], const int c_stat[],
       const double c_prim[], const double c_dual[]);
 /* store basic solution components */
 
-#define lpx_put_lp_basis _glp_lpx_put_lp_basis
-void lpx_put_lp_basis(LPX *lp, int b_stat, int basis[], BFD *b_inv);
-/* store LP basis information */
-
-#define lpx_put_ray_info _glp_lpx_put_ray_info
-void lpx_put_ray_info(LPX *lp, int k);
-/* store row/column which causes unboundness */
-
-#define lpx_put_ipt_soln _glp_lpx_put_ipt_soln
+#define lpx_put_ipt_soln _glp_1px_put_ipt_soln
 void lpx_put_ipt_soln(LPX *lp, int t_stat, double row_pval[],
       double row_dval[], double col_pval[], double col_dval[]);
 /* store interior-point solution components */
 
-#define lpx_put_mip_soln _glp_lpx_put_mip_soln
+#define lpx_put_mip_soln _glp_1px_put_mip_soln
 void lpx_put_mip_soln(LPX *lp, int i_stat, double row_mipx[],
       double col_mipx[]);
 /* store mixed integer solution components */
 
-BFD *_glp_access_bfd(glp_prob *lp);
-/* access the basis factorization object */
-
-#define lpx_eval_b_prim _glp_lpx_eval_b_prim
+#define lpx_eval_b_prim _glp_1px_eval_b_prim
 void lpx_eval_b_prim(LPX *lp, double row_prim[], double col_prim[]);
 /* compute primal basic solution components */
 
-#define lpx_eval_b_dual _glp_lpx_eval_b_dual
+#define lpx_eval_b_dual _glp_1px_eval_b_dual
 void lpx_eval_b_dual(LPX *lp, double row_dual[], double col_dual[]);
 /* compute dual basic solution components */
-
-#define lpx_remove_tiny _glp_lpx_remove_tiny
-int lpx_remove_tiny(int ne, int ia[], int ja[], double ar[],
-      double eps);
-/* remove zero and tiny elements */
-
-#define lpx_reduce_form _glp_lpx_reduce_form
-int lpx_reduce_form(LPX *lp, int len, int ind[], double val[],
-      double work[]);
-/* reduce linear form */
-
-#define lpx_eval_row _glp_lpx_eval_row
-double lpx_eval_row(LPX *lp, int len, int ind[], double val[]);
-/* compute explicitly specified row */
-
-#define lpx_eval_degrad _glp_lpx_eval_degrad
-double lpx_eval_degrad(LPX *lp, int len, int ind[], double val[],
-      int type, double rhs);
-/* compute degradation of the objective function */
-
-#define lpx_gomory_cut _glp_lpx_gomory_cut
-int lpx_gomory_cut(LPX *lp, int len, int ind[], double val[],
-      double work[]);
-/* generate Gomory's mixed integer cut */
-
-#define lpx_cover_cut _glp_lpx_cover_cut
-int lpx_cover_cut(LPX *lp, int len, int ind[], double val[],
-      double work[]);
-/* generate mixed cover cut */
-
-#define lpx_create_cog _glp_lpx_create_cog
-void *lpx_create_cog(LPX *lp);
-/* create the conflict graph */
-
-#define lpx_add_cog_edge _glp_lpx_add_cog_edge
-void lpx_add_cog_edge(void *cog, int i, int j);
-/* add edge to the conflict graph */
-
-#define lpx_clique_cut _glp_lpx_clique_cut
-int lpx_clique_cut(LPX *lp, void *cog, int ind[], double val[]);
-/* generate clique cut */
-
-#define lpx_delete_cog _glp_lpx_delete_cog
-void lpx_delete_cog(void *cog);
-/* delete the conflict graph */
-
-#define lpx_extract_prob _glp_lpx_extract_prob
-LPX *lpx_extract_prob(void *mpl);
-/* extract problem instance from MathProg model */
-
-#define lpx_read_prob _glp_lpx_read_prob
-LPX *lpx_read_prob(char *fname);
-/* read problem data in GNU LP format */
-
-#define lpx_write_prob _glp_lpx_write_prob
-int lpx_write_prob(LPX *lp, char *fname);
-/* write problem data in GNU LP format */
 
 #endif
 

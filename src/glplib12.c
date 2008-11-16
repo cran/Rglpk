@@ -21,10 +21,6 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
 #include "glplib.h"
 
 /**********************************************************************/
@@ -102,7 +98,7 @@ void xdlclose(void *h)
 
 /**********************************************************************/
 
-#elif defined(__WOE32__)
+#elif defined(__WOE__)
 
 /* Windows version */
 

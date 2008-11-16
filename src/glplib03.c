@@ -23,6 +23,7 @@
 
 #define _GLPSTD_STDIO
 #include "glplib.h"
+#include "R.h"
 
 /***********************************************************************
 *  NAME
@@ -79,7 +80,7 @@ void lib_xerror2(const char *fmt, ...)
          env->err_file, env->err_line);
       fflush(stdout);
       fflush(stderr);
-      abort();
+      error("Execution aborted.");
       /* no return */
 }
 

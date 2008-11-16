@@ -24,6 +24,7 @@
 #define _GLPSTD_STDIO
 #include "glpapi.h"
 #include "glplib.h"
+#include "R.h"
 
 /***********************************************************************
 *  NAME
@@ -133,7 +134,7 @@ LIBENV *lib_link_env(void)
             fprintf(stderr, "GLPK library initialization failed.\n");
             fflush(stderr);
             /* and abnormally terminate the program */
-            abort();
+	    error("Execution aborted.");
          }
          /* initialization successful; obtain the pointer */
          env = lib_get_ptr();

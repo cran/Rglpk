@@ -22,7 +22,16 @@
 ***********************************************************************/
 
 #include "glplib.h"
-#define xfault xerror
+
+#if 1 /* 29/VIII-2008 */
+/* some processors need data to be properly aligned; the macro
+   align_datasize enlarges the specified size of a data item to provide
+   a proper alignment of immediately following data */
+
+#define align_datasize(size) ((((size) + 15) / 16) * 16)
+/* 16 bytes is sufficient in both 32- and 64-bit environments
+   (8 bytes is not sufficient in 64-bit environment due to jmp_buf) */
+#endif
 
 /***********************************************************************
 *  NAME
@@ -51,16 +60,16 @@ void *xmalloc(int size)
       LIBMEM *desc;
       int size_of_desc = align_datasize(sizeof(LIBMEM));
       if (size < 1 || size > INT_MAX - size_of_desc)
-         xfault("xmalloc: size = %d; invalid parameter\n", size);
+         xerror("xmalloc: size = %d; invalid parameter\n", size);
       size += size_of_desc;
       if (xlcmp(xlset(size),
           xlsub(env->mem_limit, env->mem_total)) > 0)
-         xfault("xmalloc: memory limit exceeded\n");
+         xerror("xmalloc: memory limit exceeded\n");
       if (env->mem_count == INT_MAX)
-         xfault("xmalloc: too many memory blocks allocated\n");
+         xerror("xmalloc: too many memory blocks allocated\n");
       desc = malloc(size);
       if (desc == NULL)
-         xfault("xmalloc: no memory available\n");
+         xerror("xmalloc: no memory available\n");
       memset(desc, '?', size);
       desc->flag = LIB_MEM_FLAG;
       desc->size = size;
@@ -101,11 +110,11 @@ void *xmalloc(int size)
 
 void *xcalloc(int n, int size)
 {     if (n < 1)
-         xfault("xcalloc: n = %d; invalid parameter\n", n);
+         xerror("xcalloc: n = %d; invalid parameter\n", n);
       if (size < 1)
-         xfault("xcalloc: size = %d; invalid parameter\n", size);
+         xerror("xcalloc: size = %d; invalid parameter\n", size);
       if (n > INT_MAX / size)
-         xfault("xcalloc: n = %d; size = %d; array too big\n", n, size);
+         xerror("xcalloc: n = %d; size = %d; array too big\n", n, size);
       return xmalloc(n * size);
 }
 
@@ -129,13 +138,13 @@ void xfree(void *ptr)
       LIBMEM *desc;
       int size_of_desc = align_datasize(sizeof(LIBMEM));
       if (ptr == NULL)
-         xfault("xfree: ptr = %p; null pointer\n", ptr);
+         xerror("xfree: ptr = %p; null pointer\n", ptr);
       desc = (void *)((char *)ptr - size_of_desc);
       if (desc->flag != LIB_MEM_FLAG)
-         xfault("xfree: ptr = %p; invalid pointer\n", ptr);
+         xerror("xfree: ptr = %p; invalid pointer\n", ptr);
       if (env->mem_count == 0 ||
           xlcmp(env->mem_total, xlset(desc->size)) < 0)
-         xfault("xfree: memory allocation error\n");
+         xerror("xfree: memory allocation error\n");
       if (desc->prev == NULL)
          env->mem_ptr = desc->next;
       else

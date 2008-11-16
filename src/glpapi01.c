@@ -22,7 +22,6 @@
 ***********************************************************************/
 
 #include "glpios.h"
-#define xfault xerror
 
 /* CAUTION: DO NOT CHANGE THE LIMITS BELOW */
 
@@ -59,6 +58,8 @@ static void create_prob(glp_prob *lp)
       lp->cps = xmalloc(sizeof(struct LPXCPS));
       lpx_reset_parms(lp);
       lp->tree = NULL;
+      lp->lwa = 0;
+      lp->cwa = NULL;
       /* LP/MIP data */
       lp->name = NULL;
       lp->obj = NULL;
@@ -115,13 +116,22 @@ glp_prob *glp_create_prob(void)
 *  existing symbolic name of the problem object. */
 
 void glp_set_prob_name(glp_prob *lp, const char *name)
-{     if (lp->name != NULL)
+{     glp_tree *tree = lp->tree;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_set_prob_name: operation not allowed\n");
+      if (lp->name != NULL)
       {  dmp_free_atom(lp->pool, lp->name, strlen(lp->name)+1);
          lp->name = NULL;
       }
       if (!(name == NULL || name[0] == '\0'))
-      {  if (strlen(name) > 255)
-            xfault("glp_set_prob_name: problem name too long\n");
+      {  int k;
+         for (k = 0; name[k] != '\0'; k++)
+         {  if (k == 256)
+               xerror("glp_set_prob_name: problem name too long\n");
+            if (iscntrl((unsigned char)name[k]))
+               xerror("glp_set_prob_name: problem name contains invalid"
+                  " character(s)\n");
+         }
          lp->name = dmp_get_atom(lp->pool, strlen(name)+1);
          strcpy(lp->name, name);
       }
@@ -147,13 +157,22 @@ void glp_set_prob_name(glp_prob *lp, const char *name)
 *  existing name of the objective function. */
 
 void glp_set_obj_name(glp_prob *lp, const char *name)
-{     if (lp->obj != NULL)
+{     glp_tree *tree = lp->tree;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_set_obj_name: operation not allowed\n");
+     if (lp->obj != NULL)
       {  dmp_free_atom(lp->pool, lp->obj, strlen(lp->obj)+1);
          lp->obj = NULL;
       }
       if (!(name == NULL || name[0] == '\0'))
-      {  if (strlen(name) > 255)
-            xfault("glp_set_obj_name: objective name too long\n");
+      {  int k;
+         for (k = 0; name[k] != '\0'; k++)
+         {  if (k == 256)
+               xerror("glp_set_obj_name: objective name too long\n");
+            if (iscntrl((unsigned char)name[k]))
+               xerror("glp_set_obj_name: objective name contains invali"
+                  "d character(s)\n");
+         }
          lp->obj = dmp_get_atom(lp->pool, strlen(name)+1);
          strcpy(lp->obj, name);
       }
@@ -179,8 +198,11 @@ void glp_set_obj_name(glp_prob *lp, const char *name)
 *  GLP_MAX - maximization. */
 
 void glp_set_obj_dir(glp_prob *lp, int dir)
-{     if (!(dir == GLP_MIN || dir == GLP_MAX))
-         xfault("glp_set_obj_dir: dir = %d; invalid direction flag\n",
+{     glp_tree *tree = lp->tree;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_set_obj_dir: operation not allowed\n");
+     if (!(dir == GLP_MIN || dir == GLP_MAX))
+         xerror("glp_set_obj_dir: dir = %d; invalid direction flag\n",
             dir);
       lp->dir = dir;
       return;
@@ -215,10 +237,10 @@ int glp_add_rows(glp_prob *lp, int nrs)
       int m_new, i;
       /* determine new number of rows */
       if (nrs < 1)
-         xfault("glp_add_rows: nrs = %d; invalid number of rows\n",
+         xerror("glp_add_rows: nrs = %d; invalid number of rows\n",
             nrs);
       if (nrs > M_MAX - lp->m)
-         xfault("glp_add_rows: nrs = %d; too many rows\n", nrs);
+         xerror("glp_add_rows: nrs = %d; too many rows\n", nrs);
       m_new = lp->m + nrs;
       /* increase the room, if necessary */
       if (lp->m_max < m_new)
@@ -241,6 +263,29 @@ int glp_add_rows(glp_prob *lp, int nrs)
          row->i = i;
          row->name = NULL;
          row->node = NULL;
+#if 1 /* 20/IX-2008 */
+         row->level = 0;
+         row->origin = 0;
+         row->klass = 0;
+         if (tree != NULL)
+         {  switch (tree->reason)
+            {  case 0:
+                  break;
+               case GLP_IROWGEN:
+                  xassert(tree->curr != NULL);
+                  row->level = tree->curr->level;
+                  row->origin = GLP_RF_LAZY;
+                  break;
+               case GLP_ICUTGEN:
+                  xassert(tree->curr != NULL);
+                  row->level = tree->curr->level;
+                  row->origin = GLP_RF_CUT;
+                  break;
+               default:
+                  xassert(tree != tree);
+            }
+         }
+#endif
          row->type = GLP_FR;
          row->lb = row->ub = 0.0;
          row->ptr = NULL;
@@ -291,14 +336,17 @@ int glp_add_rows(glp_prob *lp, int nrs)
 *  column added to the problem object. */
 
 int glp_add_cols(glp_prob *lp, int ncs)
-{     GLPCOL *col;
+{     glp_tree *tree = lp->tree;
+      GLPCOL *col;
       int n_new, j;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_add_cols: operation not allowed\n");
       /* determine new number of columns */
       if (ncs < 1)
-         xfault("glp_add_cols: ncs = %d; invalid number of columns\n",
+         xerror("glp_add_cols: ncs = %d; invalid number of columns\n",
             ncs);
       if (ncs > N_MAX - lp->n)
-         xfault("glp_add_cols: ncs = %d; too many columns\n", ncs);
+         xerror("glp_add_cols: ncs = %d; too many columns\n", ncs);
       n_new = lp->n + ncs;
       /* increase the room, if necessary */
       if (lp->n_max < n_new)
@@ -359,11 +407,16 @@ int glp_add_cols(glp_prob *lp, int ncs)
 *  existing name of i-th row. */
 
 void glp_set_row_name(glp_prob *lp, int i, const char *name)
-{     GLPROW *row;
+{     glp_tree *tree = lp->tree;
+      GLPROW *row;
       if (!(1 <= i && i <= lp->m))
-         xfault("glp_set_row_name: i = %d; row number out of range\n",
+         xerror("glp_set_row_name: i = %d; row number out of range\n",
             i);
       row = lp->row[i];
+      if (tree != NULL && tree->reason != 0)
+      {  xassert(tree->curr != NULL);
+         xassert(row->level == tree->curr->level);
+      }
       if (row->name != NULL)
       {  if (row->node != NULL)
          {  xassert(lp->r_tree != NULL);
@@ -374,8 +427,15 @@ void glp_set_row_name(glp_prob *lp, int i, const char *name)
          row->name = NULL;
       }
       if (!(name == NULL || name[0] == '\0'))
-      {  if (strlen(name) > 255)
-            xfault("glp_set_row_name: i = %d; row name too long\n", i);
+      {  int k;
+         for (k = 0; name[k] != '\0'; k++)
+         {  if (k == 256)
+               xerror("glp_set_row_name: i = %d; row name too long\n",
+                  i);
+            if (iscntrl((unsigned char)name[k]))
+               xerror("glp_set_row_name: i = %d: row name contains inva"
+                  "lid character(s)\n", i);
+         }
          row->name = dmp_get_atom(lp->pool, strlen(name)+1);
          strcpy(row->name, name);
          if (lp->r_tree != NULL)
@@ -406,9 +466,12 @@ void glp_set_row_name(glp_prob *lp, int i, const char *name)
 *  existing name of j-th column. */
 
 void glp_set_col_name(glp_prob *lp, int j, const char *name)
-{     GLPCOL *col;
+{     glp_tree *tree = lp->tree;
+      GLPCOL *col;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_set_col_name: operation not allowed\n");
       if (!(1 <= j && j <= lp->n))
-         xfault("glp_set_col_name: j = %d; column number out of range\n"
+         xerror("glp_set_col_name: j = %d; column number out of range\n"
             , j);
       col = lp->col[j];
       if (col->name != NULL)
@@ -421,9 +484,15 @@ void glp_set_col_name(glp_prob *lp, int j, const char *name)
          col->name = NULL;
       }
       if (!(name == NULL || name[0] == '\0'))
-      {  if (strlen(name) > 255)
-            xfault("glp_set_col_name: j = %d; column name too long\n",
-               j);
+      {  int k;
+         for (k = 0; name[k] != '\0'; k++)
+         {  if (k == 256)
+               xerror("glp_set_col_name: j = %d; column name too long\n"
+                  , j);
+            if (iscntrl((unsigned char)name[k]))
+               xerror("glp_set_col_name: j = %d: column name contains i"
+                  "nvalid character(s)\n", j);
+         }
          col->name = dmp_get_atom(lp->pool, strlen(name)+1);
          strcpy(col->name, name);
          if (lp->c_tree != NULL && col->name != NULL)
@@ -473,7 +542,7 @@ void glp_set_row_bnds(glp_prob *lp, int i, int type, double lb,
       double ub)
 {     GLPROW *row;
       if (!(1 <= i && i <= lp->m))
-         xfault("glp_set_row_bnds: i = %d; row number out of range\n",
+         xerror("glp_set_row_bnds: i = %d; row number out of range\n",
             i);
       row = lp->row[i];
       row->type = type;
@@ -501,7 +570,7 @@ void glp_set_row_bnds(glp_prob *lp, int i, int type, double lb,
             if (row->stat != GLP_BS) row->stat = GLP_NS;
             break;
          default:
-            xfault("glp_set_row_bnds: i = %d; type = %d; invalid row ty"
+            xerror("glp_set_row_bnds: i = %d; type = %d; invalid row ty"
                "pe\n", i, type);
       }
       return;
@@ -544,7 +613,7 @@ void glp_set_col_bnds(glp_prob *lp, int j, int type, double lb,
       double ub)
 {     GLPCOL *col;
       if (!(1 <= j && j <= lp->n))
-         xfault("glp_set_col_bnds: j = %d; column number out of range\n"
+         xerror("glp_set_col_bnds: j = %d; column number out of range\n"
             , j);
       col = lp->col[j];
       col->type = type;
@@ -572,7 +641,7 @@ void glp_set_col_bnds(glp_prob *lp, int j, int type, double lb,
             if (col->stat != GLP_BS) col->stat = GLP_NS;
             break;
          default:
-            xfault("glp_set_col_bnds: j = %d; type = %d; invalid column"
+            xerror("glp_set_col_bnds: j = %d; type = %d; invalid column"
                " type\n", j, type);
       }
       return;
@@ -596,8 +665,11 @@ void glp_set_col_bnds(glp_prob *lp, int j, int type, double lb,
 *  ("shift") of the objective function. */
 
 void glp_set_obj_coef(glp_prob *lp, int j, double coef)
-{     if (!(0 <= j && j <= lp->n))
-         xfault("glp_set_obj_coef: j = %d; column number out of range\n"
+{     glp_tree *tree = lp->tree;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_set_obj_coef: operation not allowed\n");
+      if (!(0 <= j && j <= lp->n))
+         xerror("glp_set_obj_coef: j = %d; column number out of range\n"
             , j);
       if (j == 0)
          lp->c0 = coef;
@@ -633,15 +705,20 @@ void glp_set_obj_coef(glp_prob *lp, int j, double coef)
 
 void glp_set_mat_row(glp_prob *lp, int i, int len, const int ind[],
       const double val[])
-{     GLPROW *row;
+{     glp_tree *tree = lp->tree;
+      GLPROW *row;
       GLPCOL *col;
       GLPAIJ *aij, *next;
       int j, k;
       /* obtain pointer to i-th row */
       if (!(1 <= i && i <= lp->m))
-         xfault("glp_set_mat_row: i = %d; row number out of range\n",
+         xerror("glp_set_mat_row: i = %d; row number out of range\n",
             i);
       row = lp->row[i];
+      if (tree != NULL && tree->reason != 0)
+      {  xassert(tree->curr != NULL);
+         xassert(row->level == tree->curr->level);
+      }
       /* remove all existing elements from i-th row */
       while (row->ptr != NULL)
       {  /* take next element in the row */
@@ -667,23 +744,23 @@ void glp_set_mat_row(glp_prob *lp, int i, int len, const int ind[],
       }
       /* store new contents of i-th row */
       if (!(0 <= len && len <= lp->n))
-         xfault("glp_set_mat_row: i = %d; len = %d; invalid row length "
+         xerror("glp_set_mat_row: i = %d; len = %d; invalid row length "
             "\n", i, len);
       if (len > NNZ_MAX - lp->nnz)
-         xfault("glp_set_mat_row: i = %d; len = %d; too many constraint"
+         xerror("glp_set_mat_row: i = %d; len = %d; too many constraint"
             " coefficients\n", i, len);
       for (k = 1; k <= len; k++)
       {  /* take number j of corresponding column */
          j = ind[k];
          /* obtain pointer to j-th column */
          if (!(1 <= j && j <= lp->n))
-            xfault("glp_set_mat_row: i = %d; ind[%d] = %d; column index"
+            xerror("glp_set_mat_row: i = %d; ind[%d] = %d; column index"
                " out of range\n", i, k, j);
          col = lp->col[j];
          /* if there is element with the same column index, it can only
             be found in the beginning of j-th column list */
          if (col->ptr != NULL && col->ptr->row->i == i)
-            xfault("glp_set_mat_row: i = %d; ind[%d] = %d; duplicate co"
+            xerror("glp_set_mat_row: i = %d; ind[%d] = %d; duplicate co"
                "lumn indices not allowed\n", i, k, j);
          /* create new element */
          aij = dmp_get_atom(lp->pool, sizeof(GLPAIJ)), lp->nnz++;
@@ -754,13 +831,16 @@ void glp_set_mat_row(glp_prob *lp, int i, int len, const int ind[],
 
 void glp_set_mat_col(glp_prob *lp, int j, int len, const int ind[],
       const double val[])
-{     GLPROW *row;
+{     glp_tree *tree = lp->tree;
+      GLPROW *row;
       GLPCOL *col;
       GLPAIJ *aij, *next;
       int i, k;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_set_mat_col: operation not allowed\n");
       /* obtain pointer to j-th column */
       if (!(1 <= j && j <= lp->n))
-         xfault("glp_set_mat_col: j = %d; column number out of range\n",
+         xerror("glp_set_mat_col: j = %d; column number out of range\n",
             j);
       col = lp->col[j];
       /* remove all existing elements from j-th column */
@@ -785,23 +865,23 @@ void glp_set_mat_col(glp_prob *lp, int j, int len, const int ind[],
       }
       /* store new contents of j-th column */
       if (!(0 <= len && len <= lp->m))
-         xfault("glp_set_mat_col: j = %d; len = %d; invalid column leng"
+         xerror("glp_set_mat_col: j = %d; len = %d; invalid column leng"
             "th\n", j, len);
       if (len > NNZ_MAX - lp->nnz)
-         xfault("glp_set_mat_col: j = %d; len = %d; too many constraint"
+         xerror("glp_set_mat_col: j = %d; len = %d; too many constraint"
             " coefficients\n", j, len);
       for (k = 1; k <= len; k++)
       {  /* take number i of corresponding row */
          i = ind[k];
          /* obtain pointer to i-th row */
          if (!(1 <= i && i <= lp->m))
-            xfault("glp_set_mat_col: j = %d; ind[%d] = %d; row index ou"
+            xerror("glp_set_mat_col: j = %d; ind[%d] = %d; row index ou"
                "t of range\n", j, k, i);
          row = lp->row[i];
          /* if there is element with the same row index, it can only be
             found in the beginning of i-th row list */
          if (row->ptr != NULL && row->ptr->col->j == j)
-            xfault("glp_set_mat_col: j = %d; ind[%d] = %d; duplicate ro"
+            xerror("glp_set_mat_col: j = %d; ind[%d] = %d; duplicate ro"
                "w indices not allowed\n", j, k, i);
          /* create new element */
          aij = dmp_get_atom(lp->pool, sizeof(GLPAIJ)), lp->nnz++;
@@ -874,10 +954,13 @@ void glp_set_mat_col(glp_prob *lp, int j, int len, const int ind[],
 
 void glp_load_matrix(glp_prob *lp, int ne, const int ia[],
       const int ja[], const double ar[])
-{     GLPROW *row;
+{     glp_tree *tree = lp->tree;
+      GLPROW *row;
       GLPCOL *col;
       GLPAIJ *aij, *next;
       int i, j, k;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_load_matrix: operation not allowed\n");
       /* clear the constraint matrix */
       for (i = 1; i <= lp->m; i++)
       {  row = lp->row[i];
@@ -892,22 +975,22 @@ void glp_load_matrix(glp_prob *lp, int ne, const int ia[],
       /* load the new contents of the constraint matrix and build its
          row lists */
       if (ne < 0)
-         xfault("glp_load_matrix: ne = %d; invalid number of constraint"
+         xerror("glp_load_matrix: ne = %d; invalid number of constraint"
             " coefficients\n", ne);
       if (ne > NNZ_MAX)
-         xfault("glp_load_matrix: ne = %d; too many constraint coeffici"
+         xerror("glp_load_matrix: ne = %d; too many constraint coeffici"
             "ents\n", ne);
       for (k = 1; k <= ne; k++)
       {  /* take indices of new element */
          i = ia[k], j = ja[k];
          /* obtain pointer to i-th row */
          if (!(1 <= i && i <= lp->m))
-            xfault("glp_load_matrix: ia[%d] = %d; row index out of rang"
+            xerror("glp_load_matrix: ia[%d] = %d; row index out of rang"
                "e\n", k, i);
          row = lp->row[i];
          /* obtain pointer to j-th column */
          if (!(1 <= j && j <= lp->n))
-            xfault("glp_load_matrix: ja[%d] = %d; column index out of r"
+            xerror("glp_load_matrix: ja[%d] = %d; column index out of r"
                "ange\n", k, j);
          col = lp->col[j];
          /* create new element */
@@ -933,7 +1016,7 @@ void glp_load_matrix(glp_prob *lp, int ne, const int ia[],
             if (col->ptr != NULL && col->ptr->row->i == i)
             {  for (k = 1; k <= ne; k++)
                   if (ia[k] == i && ja[k] == col->j) break;
-               xfault("lpx_load_mat: ia[%d] = %d; ja[%d] = %d; duplicat"
+               xerror("glp_load_mat: ia[%d] = %d; ja[%d] = %d; duplicat"
                   "e indices not allowed\n", k, i, k, col->j);
             }
             /* add the element to the beginning of j-th column list */
@@ -998,23 +1081,28 @@ void glp_load_matrix(glp_prob *lp, int ne, const int ia[],
 *  order of rows is not changed. */
 
 void glp_del_rows(glp_prob *lp, int nrs, const int num[])
-{     GLPROW *row;
+{     glp_tree *tree = lp->tree;
+      GLPROW *row;
       int i, k, m_new;
       /* mark rows to be deleted */
       if (!(1 <= nrs && nrs <= lp->m))
-         xfault("glp_del_rows: nrs = %d; invalid number of rows\n",
+         xerror("glp_del_rows: nrs = %d; invalid number of rows\n",
             nrs);
       for (k = 1; k <= nrs; k++)
       {  /* take the number of row to be deleted */
          i = num[k];
          /* obtain pointer to i-th row */
          if (!(1 <= i && i <= lp->m))
-            xfault("glp_del_rows: num[%d] = %d; row number out of range"
+            xerror("glp_del_rows: num[%d] = %d; row number out of range"
                "\n", k, i);
          row = lp->row[i];
+         if (tree != NULL && tree->reason != 0)
+         {  xassert(tree->curr != NULL);
+            xassert(row->level == tree->curr->level);
+         }
          /* check that the row is not marked yet */
          if (row->i == 0)
-            xfault("glp_del_rows: num[%d] = %d; duplicate row numbers n"
+            xerror("glp_del_rows: num[%d] = %d; duplicate row numbers n"
                "ot allowed\n", k, i);
          /* erase symbolic name assigned to the row */
          glp_set_row_name(lp, i, NULL);
@@ -1069,23 +1157,26 @@ void glp_del_rows(glp_prob *lp, int nrs, const int num[])
 *  original order of columns is not changed. */
 
 void glp_del_cols(glp_prob *lp, int ncs, const int num[])
-{     GLPCOL *col;
+{     glp_tree *tree = lp->tree;
+      GLPCOL *col;
       int j, k, n_new;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_del_cols: operation not allowed\n");
       /* mark columns to be deleted */
       if (!(1 <= ncs && ncs <= lp->n))
-         xfault("glp_del_cols: ncs = %d; invalid number of columns\n",
+         xerror("glp_del_cols: ncs = %d; invalid number of columns\n",
             ncs);
       for (k = 1; k <= ncs; k++)
       {  /* take the number of column to be deleted */
          j = num[k];
          /* obtain pointer to j-th column */
          if (!(1 <= j && j <= lp->n))
-            xfault("glp_del_cols: num[%d] = %d; column number out of ra"
+            xerror("glp_del_cols: num[%d] = %d; column number out of ra"
                "nge", k, j);
          col = lp->col[j];
          /* check that the column is not marked yet */
          if (col->j == 0)
-            xfault("glp_del_cols: num[%d] = %d; duplicate column number"
+            xerror("glp_del_cols: num[%d] = %d; duplicate column number"
                "s not allowed\n", k, j);
          /* erase symbolic name assigned to the column */
          glp_set_col_name(lp, j, NULL);
@@ -1134,6 +1225,101 @@ void glp_del_cols(glp_prob *lp, int ncs, const int num[])
 /***********************************************************************
 *  NAME
 *
+*  glp_copy_prob - copy problem object content
+*
+*  SYNOPSIS
+*
+*  void glp_copy_prob(glp_prob *dest, glp_prob *prob, int names);
+*
+*  DESCRIPTION
+*
+*  The routine glp_copy_prob copies the content of the problem object
+*  prob to the problem object dest.
+*
+*  The parameter names is a flag. If it is non-zero, the routine also
+*  copies all symbolic names; otherwise, if it is zero, symbolic names
+*  are not copied. */
+
+void glp_copy_prob(glp_prob *dest, glp_prob *prob, int names)
+{     glp_tree *tree = dest->tree;
+      glp_bfcp bfcp;
+      int i, j, len, *ind;
+      double *val;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_copy_prob: operation not allowed\n");
+      if (dest == prob)
+         xerror("glp_copy_prob: copying problem object to itself not al"
+            "lowed\n");
+      if (!(names == GLP_ON || names == GLP_OFF))
+         xerror("glp_copy_prob: names = %d; invalid parameter\n",
+            names);
+      glp_erase_prob(dest);
+      if (names && prob->name != NULL)
+         glp_set_prob_name(dest, prob->name);
+      if (names && prob->obj != NULL)
+         glp_set_obj_name(dest, prob->obj);
+      dest->dir = prob->dir;
+      dest->c0 = prob->c0;
+      if (prob->m > 0)
+         glp_add_rows(dest, prob->m);
+      if (prob->n > 0)
+         glp_add_cols(dest, prob->n);
+      glp_get_bfcp(prob, &bfcp);
+      glp_set_bfcp(dest, &bfcp);
+      dest->pbs_stat = prob->pbs_stat;
+      dest->dbs_stat = prob->dbs_stat;
+      dest->obj_val = prob->obj_val;
+      dest->some = prob->some;
+      dest->ipt_stat = prob->ipt_stat;
+      dest->ipt_obj = prob->ipt_obj;
+      dest->mip_stat = prob->mip_stat;
+      dest->mip_obj = prob->mip_obj;
+      for (i = 1; i <= prob->m; i++)
+      {  GLPROW *to = dest->row[i];
+         GLPROW *from = prob->row[i];
+         if (names && from->name != NULL)
+            glp_set_row_name(dest, i, from->name);
+         to->type = from->type;
+         to->lb = from->lb;
+         to->ub = from->ub;
+         to->rii = from->rii;
+         to->stat = from->stat;
+         to->prim = from->prim;
+         to->dual = from->dual;
+         to->pval = from->pval;
+         to->dval = from->dval;
+         to->mipx = from->mipx;
+      }
+      ind = xcalloc(1+prob->m, sizeof(int));
+      val = xcalloc(1+prob->m, sizeof(double));
+      for (j = 1; j <= prob->n; j++)
+      {  GLPCOL *to = dest->col[j];
+         GLPCOL *from = prob->col[j];
+         if (names && from->name != NULL)
+            glp_set_col_name(dest, j, from->name);
+         to->kind = from->kind;
+         to->type = from->type;
+         to->lb = from->lb;
+         to->ub = from->ub;
+         to->coef = from->coef;
+         len = glp_get_mat_col(prob, j, ind, val);
+         glp_set_mat_col(dest, j, len, ind, val);
+         to->sjj = from->sjj;
+         to->stat = from->stat;
+         to->prim = from->prim;
+         to->dual = from->dual;
+         to->pval = from->pval;
+         to->dval = from->dval;
+         to->mipx = from->mipx;
+      }
+      xfree(ind);
+      xfree(val);
+      return;
+}
+
+/***********************************************************************
+*  NAME
+*
 *  glp_erase_prob - erase problem object content
 *
 *  SYNOPSIS
@@ -1151,7 +1337,10 @@ void glp_del_cols(glp_prob *lp, int ncs, const int num[])
 static void delete_prob(glp_prob *lp);
 
 void glp_erase_prob(glp_prob *lp)
-{     delete_prob(lp);
+{     glp_tree *tree = lp->tree;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_erase_prob: operation not allowed\n");
+      delete_prob(lp);
       create_prob(lp);
       return;
 }
@@ -1174,6 +1363,7 @@ static void delete_prob(glp_prob *lp)
 {     dmp_delete_pool(lp->pool);
       xfree(lp->cps);
       xassert(lp->tree == NULL);
+      if (lp->cwa != NULL) xfree(lp->cwa);
       xfree(lp->row);
       xfree(lp->col);
       if (lp->r_tree != NULL) avl_delete_tree(lp->r_tree);
@@ -1185,7 +1375,10 @@ static void delete_prob(glp_prob *lp)
 }
 
 void glp_delete_prob(glp_prob *lp)
-{     delete_prob(lp);
+{     glp_tree *tree = lp->tree;
+      if (tree != NULL && tree->reason != 0)
+         xerror("glp_delete_prob: operation not allowed\n");
+      delete_prob(lp);
       xfree(lp);
       return;
 }

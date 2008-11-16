@@ -1798,6 +1798,29 @@ void close_scope(MPL *mpl, DOMAIN *domain)
 --
 -- Note that parsing "integrand" depends on the iterated operator. */
 
+#if 1 /* 07/IX-2008 */
+static void link_up(CODE *code)
+{     /* if we have something like sum{(i+1,j,k-1) in E} x[i,j,k],
+         where i and k are dummy indices defined out of the iterated
+         expression, we should link up pseudo-code for computing i+1
+         and k-1 to pseudo-code for computing the iterated expression;
+         this is needed to invalidate current value of the iterated
+         expression once i or k have been changed */
+      DOMAIN_BLOCK *block;
+      DOMAIN_SLOT *slot;
+      for (block = code->arg.loop.domain->list; block != NULL;
+         block = block->next)
+      {  for (slot = block->list; slot != NULL; slot = slot->next)
+         {  if (slot->code != NULL)
+            {  xassert(slot->code->up == NULL);
+               slot->code->up = code;
+            }
+         }
+      }
+      return;
+}
+#endif
+
 CODE *iterated_expression(MPL *mpl)
 {     CODE *code;
       OPERANDS arg;
@@ -1885,6 +1908,9 @@ err:           error(mpl, "integrand following %s{...} has invalid type"
       }
       /* close the scope of the indexing expression */
       close_scope(mpl, arg.loop.domain);
+#if 1 /* 07/IX-2008 */
+      link_up(code);
+#endif
       return code;
 }
 
@@ -1938,6 +1964,9 @@ CODE *set_expression(MPL *mpl)
          /* generate pseudo-code to build the resultant set */
          code = make_code(mpl, O_BUILD, &arg, A_ELEMSET,
             domain_arity(mpl, arg.loop.domain));
+#if 1 /* 07/IX-2008 */
+         link_up(code);
+#endif
       }
       return code;
 }

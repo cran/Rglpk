@@ -1,4 +1,4 @@
-/* glplpx07.c (interior-point solver routine) */
+/* glplpx07.c (additional utility routines) */
 
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
@@ -22,589 +22,850 @@
 ***********************************************************************/
 
 #include "glpapi.h"
-#include "glpipm.h"
-#include "glplib.h"
-#define lpx_get_rii glp_get_rii
-#define lpx_get_sjj glp_get_sjj
+#define xfault xerror
+#define strerror(errno) xerrmsg()
 
 /*----------------------------------------------------------------------
--- lpx_interior - easy-to-use driver to the interior-point method.
+-- lpx_print_prob - write problem data in plain text format.
 --
 -- *Synopsis*
 --
 -- #include "glplpx.h"
--- int lpx_interior(LPX *lp);
+-- int lpx_print_prob(LPX *lp, char *fname);
 --
 -- *Description*
 --
--- The routine lpx_interior is intended to find optimal solution of an
--- LP problem, which is specified by the parameter lp.
---
--- Currently this routine implements an easy variant of the primal-dual
--- interior-point method based on Mehrotra's technique.
---
--- This routine transforms the original LP problem to an equivalent LP
--- problem in the standard formulation (all constraints are equalities,
--- all variables are non-negative), calls the routine ipm1 for solving
--- the transformed problem, and then transforms an obtained solution to
--- the solution of the original problem.
+-- The routine lpx_print_prob writes data from a problem object, which
+-- the parameter lp points to, to an output text file, whose name is the
+-- character string fname, in plain text format.
 --
 -- *Returns*
 --
--- The routine lpx_interior returns one of the following exit codes:
---
--- LPX_E_OK       the problem has been successfully solved.
---
--- LPX_E_FAULT    the solver can't start the search because the problem
---                has no rows and/or columns.
---
--- LPX_E_NOFEAS   the problem has no feasible (primal/dual) solution.
---
--- LPX_E_NOCONV   very slow convergence or divergence.
---
--- LPX_E_ITLIM    iterations limit exceeded.
---
--- LPX_E_INSTAB   numerical instability on solving Newtonian system.
---
--- Should note that additional exit codes may appear in future versions
--- of this routine. */
+-- If the operation is successful, the routine returns zero. Otherwise
+-- the routine prints an error message and returns non-zero. */
 
-struct dsa
-{     /* working area used by lpx_interior routine */
-      LPX *lp;
-      /* original LP instance to be solved */
-      int orig_m;
-      /* number of rows in original LP */
-      int orig_n;
-      /* number of columns in original LP */
-      int *ref; /* int ref[1+orig_m+orig_n]; */
-      /* this array contains references from components of original LP
-         to components of transformed LP */
-      /*--------------------------------------------------------------*/
-      /* following components define transformed LP in standard form:
-         minimize    c * x + c[0]
-         subject to  A * x = b,   x >= 0 */
-      int m;
-      /* number of rows (constraints) in transformed LP */
-      int n;
-      /* number of columns (variables) in transformed LP */
-      int size;
-      /* size of arrays ia, ja, ar (enlarged automatically) */
-      int ne;
-      /* number of non-zeros in transformed constraint matrix */
-      int *ia; /* int ia[1+size]; */
-      int *ja; /* int ja[1+size]; */
-      double *ar; /* double ar[1+size]; */
-      /* transformed constraint matrix in storage-by-indices format
-         which has m rows and n columns */
-      double *b; /* double b[1+m]; */
-      /* right-hand sides; b[0] is not used */
-      double *c; /* double c[1+n]; */
-      /* objective coefficients; c[0] is constant term */
-      /*--------------------------------------------------------------*/
-      /* following arrays define solution of transformed LP computed by
-         interior-point solver */
-      double *x; /* double x[1+n]; */
-      /* values of primal variables */
-      double *y; /* double y[1+m]; */
-      /* values of dual variables for equality constraints */
-      double *z; /* double z[1+n]; */
-      /* values of dual variables for non-negativity constraints */
-};
+#define row_name row_name2
+#define col_name col_name2
 
-static void calc_mn(struct dsa *dsa)
-{     /* calculate the number of constraints (m) and variables (n) for
-         transformed LP */
-      LPX *lp = dsa->lp;
-      int orig_m = dsa->orig_m;
-      int orig_n = dsa->orig_n;
-      int i, j, m = 0, n = 0;
-      for (i = 1; i <= orig_m; i++)
-      {  switch (lpx_get_row_type(lp, i))
-         {  case LPX_FR:                  break;
-            case LPX_LO: m++; n++;        break;
-            case LPX_UP: m++; n++;        break;
-            case LPX_DB: m += 2; n += 2;  break;
-            case LPX_FX: m++;             break;
-            default: xassert(lp != lp);
-         }
-      }
-      for (j = 1; j <= orig_n; j++)
-      {  switch (lpx_get_col_type(lp, j))
-         {  case LPX_FR: n += 2;          break;
-            case LPX_LO: n++;             break;
-            case LPX_UP: n++;             break;
-            case LPX_DB: m++; n += 2;     break;
-            case LPX_FX:                  break;
-            default: xassert(lp != lp);
-         }
-      }
-      dsa->m = m;
-      dsa->n = n;
-      return;
+static char *row_name(LPX *lp, int i, char name[255+1])
+{     const char *str;
+      str = lpx_get_row_name(lp, i);
+      if (str == NULL)
+         sprintf(name, "R.%d", i);
+      else
+         strcpy(name, str);
+      return name;
 }
 
-static void new_coef(struct dsa *dsa, int i, int j, double aij)
-{     /* add new element to the transformed constraint matrix */
-      xassert(1 <= i && i <= dsa->m);
-      xassert(1 <= j && j <= dsa->n);
-      xassert(aij != 0.0);
-      if (dsa->ne == dsa->size)
-      {  int *ia = dsa->ia;
-         int *ja = dsa->ja;
-         double *ar = dsa->ar;
-         dsa->size += dsa->size;
-         dsa->ia = xcalloc(1+dsa->size, sizeof(int));
-         memcpy(&dsa->ia[1], &ia[1], dsa->ne * sizeof(int));
-         xfree(ia);
-         dsa->ja = xcalloc(1+dsa->size, sizeof(int));
-         memcpy(&dsa->ja[1], &ja[1], dsa->ne * sizeof(int));
-         xfree(ja);
-         dsa->ar = xcalloc(1+dsa->size, sizeof(double));
-         memcpy(&dsa->ar[1], &ar[1], dsa->ne * sizeof(double));
-         xfree(ar);
-      }
-      xassert(dsa->ne < dsa->size);
-      dsa->ne++;
-      dsa->ia[dsa->ne] = i;
-      dsa->ja[dsa->ne] = j;
-      dsa->ar[dsa->ne] = aij;
-      return;
+static char *col_name(LPX *lp, int j, char name[255+1])
+{     const char *str;
+      str = lpx_get_col_name(lp, j);
+      if (str == NULL)
+         sprintf(name, "C.%d", j);
+      else
+         strcpy(name, str);
+      return name;
 }
 
-static void transform(struct dsa *dsa)
-{     /* transform original LP to standard formulation */
-      LPX *lp = dsa->lp;
-      int orig_m = dsa->orig_m;
-      int orig_n = dsa->orig_n;
-      int *ref = dsa->ref;
-      int m = dsa->m;
-      int n = dsa->n;
-      double *b = dsa->b;
-      double *c = dsa->c;
-      int i, j, k, type, t, ii, len, *ind;
-      double lb, ub, coef, rii, sjj, *val;
-      /* initialize components of transformed LP */
-      dsa->ne = 0;
-      for (i = 1; i <= m; i++) b[i] = 0.0;
-      c[0] = lpx_get_obj_coef(lp, 0);
-      for (j = 1; j <= n; j++) c[j] = 0.0;
-      /* i and j are, respectively, ordinal number of current row and
-         ordinal number of current column in transformed LP */
-      i = j = 0;
-      /* transform rows (auxiliary variables) */
-      for (k = 1; k <= orig_m; k++)
-      {  type = lpx_get_row_type(lp, k);
-         rii = lpx_get_rii(lp, k);
-         lb = lpx_get_row_lb(lp, k) * rii;
-         ub = lpx_get_row_ub(lp, k) * rii;
-         switch (type)
-         {  case LPX_FR:
-               /* source: -inf < (L.F.) < +inf */
-               /* result: ignore free row */
-               ref[k] = 0;
-               break;
-            case LPX_LO:
-               /* source: lb <= (L.F.) < +inf */
-               /* result: (L.F.) - x' = lb, x' >= 0 */
-               i++; j++;
-               ref[k] = i;
-               new_coef(dsa, i, j, -1.0);
-               b[i] = lb;
-               break;
-            case LPX_UP:
-               /* source: -inf < (L.F.) <= ub */
-               /* result: (L.F.) + x' = ub, x' >= 0 */
-               i++; j++;
-               ref[k] = i;
-               new_coef(dsa, i, j, +1.0);
-               b[i] = ub;
-               break;
-            case LPX_DB:
-               /* source: lb <= (L.F.) <= ub */
-               /* result: (L.F.) - x' = lb, x' + x'' = ub - lb */
-               i++; j++;
-               ref[k] = i;
-               new_coef(dsa, i, j, -1.0);
-               b[i] = lb;
-               i++;
-               new_coef(dsa, i, j, +1.0);
-               j++;
-               new_coef(dsa, i, j, +1.0);
-               b[i] = ub - lb;
-               break;
-            case LPX_FX:
-               /* source: (L.F.) = lb */
-               /* result: (L.F.) = lb */
-               i++;
-               ref[k] = i;
-               b[i] = lb;
-               break;
-            default:
-               xassert(type != type);
-         }
+int lpx_print_prob(LPX *lp, const char *fname)
+{     XFILE *fp;
+      int m, n, mip, i, j, len, t, type, *ndx;
+      double coef, lb, ub, *val;
+      char *str, name[255+1];
+      xprintf("lpx_write_prob: writing problem data to `%s'...\n",
+         fname);
+      fp = xfopen(fname, "w");
+      if (fp == NULL)
+      {  xprintf("lpx_write_prob: unable to create `%s' - %s\n",
+            fname, strerror(errno));
+         goto fail;
       }
-      /* transform columns (structural variables) */
-      ind = xcalloc(1+orig_m, sizeof(int));
-      val = xcalloc(1+orig_m, sizeof(double));
-      for (k = 1; k <= orig_n; k++)
-      {  type = lpx_get_col_type(lp, k);
-         sjj = lpx_get_sjj(lp, k);
-         lb = lpx_get_col_lb(lp, k) / sjj;
-         ub = lpx_get_col_ub(lp, k) / sjj;
-         coef = lpx_get_obj_coef(lp, k) * sjj;
-         len = lpx_get_mat_col(lp, k, ind, val);
-         for (t = 1; t <= len; t++)
-            val[t] *= (lpx_get_rii(lp, ind[t]) * sjj);
-         switch (type)
-         {  case LPX_FR:
-               /* source: -inf < x < +inf */
-               /* result: x = x' - x'', x' >= 0, x'' >= 0 */
-               j++;
-               ref[orig_m+k] = j;
-               for (t = 1; t <= len; t++)
-               {  ii = ref[ind[t]];
-                  if (ii != 0) new_coef(dsa, ii, j, +val[t]);
-               }
-               c[j] = +coef;
-               j++;
-               for (t = 1; t <= len; t++)
-               {  ii = ref[ind[t]];
-                  if (ii != 0) new_coef(dsa, ii, j, -val[t]);
-               }
-               c[j] = -coef;
-               break;
-            case LPX_LO:
-               /* source: lb <= x < +inf */
-               /* result: x = lb + x', x' >= 0 */
-               j++;
-               ref[orig_m+k] = j;
-               for (t = 1; t <= len; t++)
-               {  ii = ref[ind[t]];
-                  if (ii != 0)
-                  {  new_coef(dsa, ii, j, val[t]);
-                     b[ii] -= val[t] * lb;
-                  }
-               }
-               c[j] = +coef;
-               c[0] += c[j] * lb;
-               break;
-            case LPX_UP:
-               /* source: -inf < x <= ub */
-               /* result: x = ub - x', x' >= 0 */
-               j++;
-               ref[orig_m+k] = j;
-               for (t = 1; t <= len; t++)
-               {  ii = ref[ind[t]];
-                  if (ii != 0)
-                  {  new_coef(dsa, ii, j, -val[t]);
-                     b[ii] -= val[t] * ub;
-                  }
-               }
-               c[j] = -coef;
-               c[0] -= c[j] * ub;
-               break;
-            case LPX_DB:
-               /* source: lb <= x <= ub */
-               /* result: x = lb + x', x' + x'' = ub - lb */
-               j++;
-               ref[orig_m+k] = j;
-               for (t = 1; t <= len; t++)
-               {  ii = ref[ind[t]];
-                  if (ii != 0)
-                  {  new_coef(dsa, ii, j, val[t]);
-                     b[ii] -= val[t] * lb;
-                  }
-               }
-               c[j] = +coef;
-               c[0] += c[j] * lb;
-               i++;
-               new_coef(dsa, i, j, +1.0);
-               j++;
-               new_coef(dsa, i, j, +1.0);
-               b[i] = ub - lb;
-               break;
-            case LPX_FX:
-               /* source: x = lb */
-               /* result: just substitute */
-               ref[orig_m+k] = 0;
-               for (t = 1; t <= len; t++)
-               {  ii = ref[ind[t]];
-                  if (ii != 0) b[ii] -= val[t] * lb;
-               }
-               c[0] += coef * lb;
-               break;
-            default:
-               xassert(type != type);
-         }
-      }
-      xfree(ind);
-      xfree(val);
-      /* end of transformation */
-      xassert(i == m && j == n);
-      /* change the objective sign in case of maximization */
-      if (lpx_get_obj_dir(lp) == LPX_MAX)
-         for (j = 0; j <= n; j++) c[j] = -c[j];
-      return;
-}
-
-static void restore(struct dsa *dsa, double row_pval[],
-      double row_dval[], double col_pval[], double col_dval[])
-{     /* restore solution of original LP */
-      LPX *lp = dsa->lp;
-      int orig_m = dsa->orig_m;
-      int orig_n = dsa->orig_n;
-      int *ref = dsa->ref;
-      int m = dsa->m;
-      double *x = dsa->x;
-      double *y = dsa->y;
-      int dir = lpx_get_obj_dir(lp);
-      int i, j, k, type, t, len, *ind;
-      double lb, ub, rii, sjj, temp, *val;
-      /* compute primal values of structural variables */
-      for (k = 1; k <= orig_n; k++)
-      {  j = ref[orig_m+k];
-         type = lpx_get_col_type(lp, k);
-         sjj = lpx_get_sjj(lp, k);
-         lb = lpx_get_col_lb(lp, k) / sjj;
-         ub = lpx_get_col_ub(lp, k) / sjj;
-         switch (type)
-         {  case LPX_FR:
-               /* source: -inf < x < +inf */
-               /* result: x = x' - x'', x' >= 0, x'' >= 0 */
-               col_pval[k] = x[j] - x[j+1];
-               break;
-            case LPX_LO:
-               /* source: lb <= x < +inf */
-               /* result: x = lb + x', x' >= 0 */
-               col_pval[k] = lb + x[j];
-               break;
-            case LPX_UP:
-               /* source: -inf < x <= ub */
-               /* result: x = ub - x', x' >= 0 */
-               col_pval[k] = ub - x[j];
-               break;
-            case LPX_DB:
-               /* source: lb <= x <= ub */
-               /* result: x = lb + x', x' + x'' = ub - lb */
-               col_pval[k] = lb + x[j];
-               break;
-            case LPX_FX:
-               /* source: x = lb */
-               /* result: just substitute */
-               col_pval[k] = lb;
-               break;
-            default:
-               xassert(type != type);
-         }
-      }
-      /* compute primal values of auxiliary variables */
-      /* xR = A * xS */
-      ind = xcalloc(1+orig_n, sizeof(int));
-      val = xcalloc(1+orig_n, sizeof(double));
-      for (k = 1; k <= orig_m; k++)
-      {  rii = lpx_get_rii(lp, k);
-         temp = 0.0;
-         len = lpx_get_mat_row(lp, k, ind, val);
-         for (t = 1; t <= len; t++)
-         {  sjj = lpx_get_sjj(lp, ind[t]);
-            temp += (rii * val[t] * sjj) * col_pval[ind[t]];
-         }
-         row_pval[k] = temp;
-      }
-      xfree(ind);
-      xfree(val);
-      /* compute dual values of auxiliary variables */
-      for (k = 1; k <= orig_m; k++)
-      {  type = lpx_get_row_type(lp, k);
-         i = ref[k];
-         switch (type)
-         {  case LPX_FR:
-               xassert(i == 0);
-               row_dval[k] = 0.0;
-               break;
-            case LPX_LO:
-            case LPX_UP:
-            case LPX_DB:
-            case LPX_FX:
-               xassert(1 <= i && i <= m);
-               row_dval[k] = (dir == LPX_MIN ? +1.0 : -1.0) * y[i];
-               break;
-            default:
-               xassert(type != type);
-         }
-      }
-      /* compute dual values of structural variables */
-      /* dS = cS - A' * (dR - cR) */
-      ind = xcalloc(1+orig_m, sizeof(int));
-      val = xcalloc(1+orig_m, sizeof(double));
-      for (k = 1; k <= orig_n; k++)
-      {  sjj = lpx_get_sjj(lp, k);
-         temp = lpx_get_obj_coef(lp, k) / sjj;
-         len = lpx_get_mat_col(lp, k, ind, val);
-         for (t = 1; t <= len; t++)
-         {  rii = lpx_get_rii(lp, ind[t]);
-            temp -= (rii * val[t] * sjj) * row_dval[ind[t]];
-         }
-         col_dval[k] = temp;
-      }
-      xfree(ind);
-      xfree(val);
-      /* unscale solution of original LP */
-      for (i = 1; i <= orig_m; i++)
-      {  rii = lpx_get_rii(lp, i);
-         row_pval[i] /= rii;
-         row_dval[i] *= rii;
-      }
-      for (j = 1; j <= orig_n; j++)
-      {  sjj = lpx_get_sjj(lp, j);
-         col_pval[j] *= sjj;
-         col_dval[j] /= sjj;
-      }
-      return;
-}
-
-int lpx_interior(LPX *_lp)
-{     /* easy-to-use driver to the interior-point method */
-      struct dsa _dsa, *dsa = &_dsa;
-      int ret, status;
-      double *row_pval, *row_dval, *col_pval, *col_dval;
-      /* initialize working area */
-      dsa->lp = _lp;
-      dsa->orig_m = lpx_get_num_rows(dsa->lp);
-      dsa->orig_n = lpx_get_num_cols(dsa->lp);
-      dsa->ref = NULL;
-      dsa->m = 0;
-      dsa->n = 0;
-      dsa->size = 0;
-      dsa->ne = 0;
-      dsa->ia = NULL;
-      dsa->ja = NULL;
-      dsa->ar = NULL;
-      dsa->b = NULL;
-      dsa->c = NULL;
-      dsa->x = NULL;
-      dsa->y = NULL;
-      dsa->z = NULL;
-      /* check if the problem is empty */
-      if (!(dsa->orig_m > 0 && dsa->orig_n > 0))
-      {  xprintf("lpx_interior: problem has no rows and/or columns\n");
-         ret = LPX_E_FAULT;
-         goto done;
-      }
-      /* issue warning about dense columns */
-      if (dsa->orig_m >= 200)
-      {  int j, len, ndc = 0;
-         for (j = 1; j <= dsa->orig_n; j++)
-         {  len = lpx_get_mat_col(dsa->lp, j, NULL, NULL);
-            if ((double)len > 0.30 * (double)dsa->orig_m) ndc++;
-         }
-         if (ndc == 1)
-            xprintf("lpx_interior: WARNING: PROBLEM HAS ONE DENSE COLUM"
-               "N\n");
-         else if (ndc > 0)
-            xprintf("lpx_interior: WARNING: PROBLEM HAS %d DENSE COLUMN"
-               "S\n", ndc);
-      }
-      /* determine dimension of transformed LP */
-      xprintf("lpx_interior: original LP problem has %d rows and %d col"
-         "umns\n", dsa->orig_m, dsa->orig_n);
-      calc_mn(dsa);
-      xprintf("lpx_interior: transformed LP problem has %d rows and %d "
-         "columns\n", dsa->m, dsa->n);
-      /* transform original LP to standard formulation */
-      dsa->ref = xcalloc(1+dsa->orig_m+dsa->orig_n, sizeof(int));
-      dsa->size = lpx_get_num_nz(dsa->lp);
-      if (dsa->size < dsa->m) dsa->size = dsa->m;
-      if (dsa->size < dsa->n) dsa->size = dsa->n;
-      dsa->ne = 0;
-      dsa->ia = xcalloc(1+dsa->size, sizeof(int));
-      dsa->ja = xcalloc(1+dsa->size, sizeof(int));
-      dsa->ar = xcalloc(1+dsa->size, sizeof(double));
-      dsa->b = xcalloc(1+dsa->m, sizeof(double));
-      dsa->c = xcalloc(1+dsa->n, sizeof(double));
-      transform(dsa);
-      /* solve the transformed LP problem */
-      {  int *A_ptr = xcalloc(1+dsa->m+1, sizeof(int));
-         int *A_ind = xcalloc(1+dsa->ne, sizeof(int));
-         double *A_val = xcalloc(1+dsa->ne, sizeof(double));
-         int i, k, pos, len;
-         /* determine row lengths */
-         for (i = 1; i <= dsa->m; i++)
-            A_ptr[i] = 0;
-         for (k = 1; k <= dsa->ne; k++)
-            A_ptr[dsa->ia[k]]++;
-         /* set up row pointers */
-         pos = 1;
-         for (i = 1; i <= dsa->m; i++)
-            len = A_ptr[i], pos += len, A_ptr[i] = pos;
-         A_ptr[dsa->m+1] = pos;
-         xassert(pos - 1 == dsa->ne);
-         /* build the matrix */
-         for (k = 1; k <= dsa->ne; k++)
-         {  pos = --A_ptr[dsa->ia[k]];
-            A_ind[pos] = dsa->ja[k];
-            A_val[pos] = dsa->ar[k];
-         }
-         xfree(dsa->ia), dsa->ia = NULL;
-         xfree(dsa->ja), dsa->ja = NULL;
-         xfree(dsa->ar), dsa->ar = NULL;
-         dsa->x = xcalloc(1+dsa->n, sizeof(double));
-         dsa->y = xcalloc(1+dsa->m, sizeof(double));
-         dsa->z = xcalloc(1+dsa->n, sizeof(double));
-         ret = ipm_main(dsa->m, dsa->n, A_ptr, A_ind, A_val, dsa->b,
-            dsa->c, dsa->x, dsa->y, dsa->z);
-         xfree(A_ptr);
-         xfree(A_ind);
-         xfree(A_val);
-         xfree(dsa->b), dsa->b = NULL;
-         xfree(dsa->c), dsa->c = NULL;
-      }
-      /* analyze return code reported by the solver */
-      switch (ret)
-      {  case 0:
-            /* optimal solution found */
-            ret = LPX_E_OK;
+      m = lpx_get_num_rows(lp);
+      n = lpx_get_num_cols(lp);
+      mip = (lpx_get_class(lp) == LPX_MIP);
+      str = (void *)lpx_get_prob_name(lp);
+      xfprintf(fp, "Problem:    %s\n", str == NULL ? "(unnamed)" : str);
+      xfprintf(fp, "Class:      %s\n", !mip ? "LP" : "MIP");
+      xfprintf(fp, "Rows:       %d\n", m);
+      if (!mip)
+         xfprintf(fp, "Columns:    %d\n", n);
+      else
+         xfprintf(fp, "Columns:    %d (%d integer, %d binary)\n",
+            n, lpx_get_num_int(lp), lpx_get_num_bin(lp));
+      xfprintf(fp, "Non-zeros:  %d\n", lpx_get_num_nz(lp));
+      xfprintf(fp, "\n");
+      xfprintf(fp, "*** OBJECTIVE FUNCTION ***\n");
+      xfprintf(fp, "\n");
+      switch (lpx_get_obj_dir(lp))
+      {  case LPX_MIN:
+            xfprintf(fp, "Minimize:");
             break;
-         case 1:
-            /* problem has no feasible (primal or dual) solution */
-            ret = LPX_E_NOFEAS;
-            break;
-         case 2:
-            /* no convergence */
-            ret = LPX_E_NOCONV;
-            break;
-         case 3:
-            /* iterations limit exceeded */
-            ret = LPX_E_ITLIM;
-            break;
-         case 4:
-            /* numerical instability on solving Newtonian system */
-            ret = LPX_E_INSTAB;
+         case LPX_MAX:
+            xfprintf(fp, "Maximize:");
             break;
          default:
-            xassert(ret != ret);
+            xassert(lp != lp);
       }
-      /* recover solution of original LP */
-      row_pval = xcalloc(1+dsa->orig_m, sizeof(double));
-      row_dval = xcalloc(1+dsa->orig_m, sizeof(double));
-      col_pval = xcalloc(1+dsa->orig_n, sizeof(double));
-      col_dval = xcalloc(1+dsa->orig_n, sizeof(double));
-      restore(dsa, row_pval, row_dval, col_pval, col_dval);
-      xfree(dsa->ref), dsa->ref = NULL;
-      xfree(dsa->x), dsa->x = NULL;
-      xfree(dsa->y), dsa->y = NULL;
-      xfree(dsa->z), dsa->z = NULL;
-      /* store solution components into the problem object */
-      status = (ret == LPX_E_OK ? LPX_T_OPT : LPX_T_UNDEF);
-      lpx_put_ipt_soln(dsa->lp, status, row_pval, row_dval, col_pval,
-         col_dval);
-      xfree(row_pval);
-      xfree(row_dval);
-      xfree(col_pval);
-      xfree(col_dval);
-done: /* return to the calling program */
-      return ret;
+      str = (void *)lpx_get_obj_name(lp);
+      xfprintf(fp, " %s\n", str == NULL ? "(unnamed)" : str);
+      coef = lpx_get_obj_coef(lp, 0);
+      if (coef != 0.0)
+         xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
+            "(constant term)");
+      for (i = 1; i <= m; i++)
+#if 0
+      {  coef = lpx_get_row_coef(lp, i);
+#else
+      {  coef = 0.0;
+#endif
+         if (coef != 0.0)
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
+               row_name(lp, i, name));
+      }
+      for (j = 1; j <= n; j++)
+      {  coef = lpx_get_obj_coef(lp, j);
+         if (coef != 0.0)
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
+               col_name(lp, j, name));
+      }
+      xfprintf(fp, "\n");
+      xfprintf(fp, "*** ROWS (CONSTRAINTS) ***\n");
+      ndx = xcalloc(1+n, sizeof(int));
+      val = xcalloc(1+n, sizeof(double));
+      for (i = 1; i <= m; i++)
+      {  xfprintf(fp, "\n");
+         xfprintf(fp, "Row %d: %s", i, row_name(lp, i, name));
+         lpx_get_row_bnds(lp, i, &type, &lb, &ub);
+         switch (type)
+         {  case LPX_FR:
+               xfprintf(fp, " free");
+               break;
+            case LPX_LO:
+               xfprintf(fp, " >= %.*g", DBL_DIG, lb);
+               break;
+            case LPX_UP:
+               xfprintf(fp, " <= %.*g", DBL_DIG, ub);
+               break;
+            case LPX_DB:
+               xfprintf(fp, " >= %.*g <= %.*g", DBL_DIG, lb, DBL_DIG,
+                  ub);
+               break;
+            case LPX_FX:
+               xfprintf(fp, " = %.*g", DBL_DIG, lb);
+               break;
+            default:
+               xassert(type != type);
+         }
+         xfprintf(fp, "\n");
+#if 0
+         coef = lpx_get_row_coef(lp, i);
+#else
+         coef = 0.0;
+#endif
+         if (coef != 0.0)
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
+               "(objective)");
+         len = lpx_get_mat_row(lp, i, ndx, val);
+         for (t = 1; t <= len; t++)
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, val[t],
+               col_name(lp, ndx[t], name));
+      }
+      xfree(ndx);
+      xfree(val);
+      xfprintf(fp, "\n");
+      xfprintf(fp, "*** COLUMNS (VARIABLES) ***\n");
+      ndx = xcalloc(1+m, sizeof(int));
+      val = xcalloc(1+m, sizeof(double));
+      for (j = 1; j <= n; j++)
+      {  xfprintf(fp, "\n");
+         xfprintf(fp, "Col %d: %s", j, col_name(lp, j, name));
+         if (mip)
+         {  switch (lpx_get_col_kind(lp, j))
+            {  case LPX_CV:
+                  break;
+               case LPX_IV:
+                  xfprintf(fp, " integer");
+                  break;
+               default:
+                  xassert(lp != lp);
+            }
+         }
+         lpx_get_col_bnds(lp, j, &type, &lb, &ub);
+         switch (type)
+         {  case LPX_FR:
+               xfprintf(fp, " free");
+               break;
+            case LPX_LO:
+               xfprintf(fp, " >= %.*g", DBL_DIG, lb);
+               break;
+            case LPX_UP:
+               xfprintf(fp, " <= %.*g", DBL_DIG, ub);
+               break;
+            case LPX_DB:
+               xfprintf(fp, " >= %.*g <= %.*g", DBL_DIG, lb, DBL_DIG,
+                  ub);
+               break;
+            case LPX_FX:
+               xfprintf(fp, " = %.*g", DBL_DIG, lb);
+               break;
+            default:
+               xassert(type != type);
+         }
+         xfprintf(fp, "\n");
+         coef = lpx_get_obj_coef(lp, j);
+         if (coef != 0.0)
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, coef,
+               "(objective)");
+         len = lpx_get_mat_col(lp, j, ndx, val);
+         for (t = 1; t <= len; t++)
+            xfprintf(fp, "%*.*g %s\n", DBL_DIG+7, DBL_DIG, val[t],
+               row_name(lp, ndx[t], name));
+      }
+      xfree(ndx);
+      xfree(val);
+      xfprintf(fp, "\n");
+      xfprintf(fp, "End of output\n");
+      xfflush(fp);
+      if (xferror(fp))
+      {  xprintf("lpx_write_prob: write error on `%s' - %s\n", fname,
+            strerror(errno));
+         goto fail;
+      }
+      xfclose(fp);
+      return 0;
+fail: if (fp != NULL) xfclose(fp);
+      return 1;
+}
+
+#undef row_name
+#undef col_name
+
+/*----------------------------------------------------------------------
+-- lpx_print_sol - write LP problem solution in printable format.
+--
+-- *Synopsis*
+--
+-- #include "glplpx.h"
+-- int lpx_print_sol(LPX *lp, char *fname);
+--
+-- *Description*
+--
+-- The routine lpx_print_sol writes the current basic solution of an LP
+-- problem, which is specified by the pointer lp, to a text file, whose
+-- name is the character string fname, in printable format.
+--
+-- Information reported by the routine lpx_print_sol is intended mainly
+-- for visual analysis.
+--
+-- *Returns*
+--
+-- If the operation was successful, the routine returns zero. Otherwise
+-- the routine prints an error message and returns non-zero. */
+
+int lpx_print_sol(LPX *lp, const char *fname)
+{     XFILE *fp;
+      int what, round;
+      xprintf(
+         "lpx_print_sol: writing LP problem solution to `%s'...\n",
+         fname);
+      fp = xfopen(fname, "w");
+      if (fp == NULL)
+      {  xprintf("lpx_print_sol: can't create `%s' - %s\n", fname,
+            strerror(errno));
+         goto fail;
+      }
+      /* problem name */
+      {  const char *name;
+         name = lpx_get_prob_name(lp);
+         if (name == NULL) name = "";
+         xfprintf(fp, "%-12s%s\n", "Problem:", name);
+      }
+      /* number of rows (auxiliary variables) */
+      {  int nr;
+         nr = lpx_get_num_rows(lp);
+         xfprintf(fp, "%-12s%d\n", "Rows:", nr);
+      }
+      /* number of columns (structural variables) */
+      {  int nc;
+         nc = lpx_get_num_cols(lp);
+         xfprintf(fp, "%-12s%d\n", "Columns:", nc);
+      }
+      /* number of non-zeros (constraint coefficients) */
+      {  int nz;
+         nz = lpx_get_num_nz(lp);
+         xfprintf(fp, "%-12s%d\n", "Non-zeros:", nz);
+      }
+      /* solution status */
+      {  int status;
+         status = lpx_get_status(lp);
+         xfprintf(fp, "%-12s%s\n", "Status:",
+            status == LPX_OPT    ? "OPTIMAL" :
+            status == LPX_FEAS   ? "FEASIBLE" :
+            status == LPX_INFEAS ? "INFEASIBLE (INTERMEDIATE)" :
+            status == LPX_NOFEAS ? "INFEASIBLE (FINAL)" :
+            status == LPX_UNBND  ? "UNBOUNDED" :
+            status == LPX_UNDEF  ? "UNDEFINED" : "???");
+      }
+      /* objective function */
+      {  char *name;
+         int dir;
+         double obj;
+         name = (void *)lpx_get_obj_name(lp);
+         dir = lpx_get_obj_dir(lp);
+         obj = lpx_get_obj_val(lp);
+         xfprintf(fp, "%-12s%s%s%.10g %s\n", "Objective:",
+            name == NULL ? "" : name,
+            name == NULL ? "" : " = ", obj,
+            dir == LPX_MIN ? "(MINimum)" :
+            dir == LPX_MAX ? "(MAXimum)" : "(" "???" ")");
+      }
+      /* main sheet */
+      for (what = 1; what <= 2; what++)
+      {  int mn, ij;
+         xfprintf(fp, "\n");
+         xfprintf(fp, "   No. %-12s St   Activity     Lower bound   Upp"
+            "er bound    Marginal\n",
+            what == 1 ? "  Row name" : "Column name");
+         xfprintf(fp, "------ ------------ -- ------------- -----------"
+            "-- ------------- -------------\n");
+         mn = (what == 1 ? lpx_get_num_rows(lp) : lpx_get_num_cols(lp));
+         for (ij = 1; ij <= mn; ij++)
+         {  const char *name;
+            int typx, tagx;
+            double lb, ub, vx, dx;
+            if (what == 1)
+            {  name = lpx_get_row_name(lp, ij);
+               if (name == NULL) name = "";
+               lpx_get_row_bnds(lp, ij, &typx, &lb, &ub);
+               round = lpx_get_int_parm(lp, LPX_K_ROUND);
+               lpx_set_int_parm(lp, LPX_K_ROUND, 1);
+               lpx_get_row_info(lp, ij, &tagx, &vx, &dx);
+               lpx_set_int_parm(lp, LPX_K_ROUND, round);
+            }
+            else
+            {  name = lpx_get_col_name(lp, ij);
+               if (name == NULL) name = "";
+               lpx_get_col_bnds(lp, ij, &typx, &lb, &ub);
+               round = lpx_get_int_parm(lp, LPX_K_ROUND);
+               lpx_set_int_parm(lp, LPX_K_ROUND, 1);
+               lpx_get_col_info(lp, ij, &tagx, &vx, &dx);
+               lpx_set_int_parm(lp, LPX_K_ROUND, round);
+            }
+            /* row/column ordinal number */
+            xfprintf(fp, "%6d ", ij);
+            /* row column/name */
+            if (strlen(name) <= 12)
+               xfprintf(fp, "%-12s ", name);
+            else
+               xfprintf(fp, "%s\n%20s", name, "");
+            /* row/column status */
+            xfprintf(fp, "%s ",
+               tagx == LPX_BS ? "B " :
+               tagx == LPX_NL ? "NL" :
+               tagx == LPX_NU ? "NU" :
+               tagx == LPX_NF ? "NF" :
+               tagx == LPX_NS ? "NS" : "??");
+            /* row/column primal activity */
+            xfprintf(fp, "%13.6g ", vx);
+            /* row/column lower bound */
+            if (typx == LPX_LO || typx == LPX_DB || typx == LPX_FX)
+               xfprintf(fp, "%13.6g ", lb);
+            else
+               xfprintf(fp, "%13s ", "");
+            /* row/column upper bound */
+            if (typx == LPX_UP || typx == LPX_DB)
+               xfprintf(fp, "%13.6g ", ub);
+            else if (typx == LPX_FX)
+               xfprintf(fp, "%13s ", "=");
+            else
+               xfprintf(fp, "%13s ", "");
+            /* row/column dual activity */
+            if (tagx != LPX_BS)
+            {  if (dx == 0.0)
+                  xfprintf(fp, "%13s", "< eps");
+               else
+                  xfprintf(fp, "%13.6g", dx);
+            }
+            /* end of line */
+            xfprintf(fp, "\n");
+         }
+      }
+      xfprintf(fp, "\n");
+#if 1
+      if (lpx_get_prim_stat(lp) != LPX_P_UNDEF &&
+          lpx_get_dual_stat(lp) != LPX_D_UNDEF)
+      {  int m = lpx_get_num_rows(lp);
+         LPXKKT kkt;
+         xfprintf(fp, "Karush-Kuhn-Tucker optimality conditions:\n\n");
+         lpx_check_kkt(lp, 1, &kkt);
+         xfprintf(fp, "KKT.PE: max.abs.err. = %.2e on row %d\n",
+            kkt.pe_ae_max, kkt.pe_ae_row);
+         xfprintf(fp, "        max.rel.err. = %.2e on row %d\n",
+            kkt.pe_re_max, kkt.pe_re_row);
+         switch (kkt.pe_quality)
+         {  case 'H':
+               xfprintf(fp, "        High quality\n");
+               break;
+            case 'M':
+               xfprintf(fp, "        Medium quality\n");
+               break;
+            case 'L':
+               xfprintf(fp, "        Low quality\n");
+               break;
+            default:
+               xfprintf(fp, "        PRIMAL SOLUTION IS WRONG\n");
+               break;
+         }
+         xfprintf(fp, "\n");
+         xfprintf(fp, "KKT.PB: max.abs.err. = %.2e on %s %d\n",
+            kkt.pb_ae_max, kkt.pb_ae_ind <= m ? "row" : "column",
+            kkt.pb_ae_ind <= m ? kkt.pb_ae_ind : kkt.pb_ae_ind - m);
+         xfprintf(fp, "        max.rel.err. = %.2e on %s %d\n",
+            kkt.pb_re_max, kkt.pb_re_ind <= m ? "row" : "column",
+            kkt.pb_re_ind <= m ? kkt.pb_re_ind : kkt.pb_re_ind - m);
+         switch (kkt.pb_quality)
+         {  case 'H':
+               xfprintf(fp, "        High quality\n");
+               break;
+            case 'M':
+               xfprintf(fp, "        Medium quality\n");
+               break;
+            case 'L':
+               xfprintf(fp, "        Low quality\n");
+               break;
+            default:
+               xfprintf(fp, "        PRIMAL SOLUTION IS INFEASIBLE\n");
+               break;
+         }
+         xfprintf(fp, "\n");
+         xfprintf(fp, "KKT.DE: max.abs.err. = %.2e on column %d\n",
+            kkt.de_ae_max, kkt.de_ae_col);
+         xfprintf(fp, "        max.rel.err. = %.2e on column %d\n",
+            kkt.de_re_max, kkt.de_re_col);
+         switch (kkt.de_quality)
+         {  case 'H':
+               xfprintf(fp, "        High quality\n");
+               break;
+            case 'M':
+               xfprintf(fp, "        Medium quality\n");
+               break;
+            case 'L':
+               xfprintf(fp, "        Low quality\n");
+               break;
+            default:
+               xfprintf(fp, "        DUAL SOLUTION IS WRONG\n");
+               break;
+         }
+         xfprintf(fp, "\n");
+         xfprintf(fp, "KKT.DB: max.abs.err. = %.2e on %s %d\n",
+            kkt.db_ae_max, kkt.db_ae_ind <= m ? "row" : "column",
+            kkt.db_ae_ind <= m ? kkt.db_ae_ind : kkt.db_ae_ind - m);
+         xfprintf(fp, "        max.rel.err. = %.2e on %s %d\n",
+            kkt.db_re_max, kkt.db_re_ind <= m ? "row" : "column",
+            kkt.db_re_ind <= m ? kkt.db_re_ind : kkt.db_re_ind - m);
+         switch (kkt.db_quality)
+         {  case 'H':
+               xfprintf(fp, "        High quality\n");
+               break;
+            case 'M':
+               xfprintf(fp, "        Medium quality\n");
+               break;
+            case 'L':
+               xfprintf(fp, "        Low quality\n");
+               break;
+            default:
+               xfprintf(fp, "        DUAL SOLUTION IS INFEASIBLE\n");
+               break;
+         }
+         xfprintf(fp, "\n");
+      }
+#endif
+#if 1
+      if (lpx_get_status(lp) == LPX_UNBND)
+      {  int m = lpx_get_num_rows(lp);
+         int k = lpx_get_ray_info(lp);
+         xfprintf(fp, "Unbounded ray: %s %d\n",
+            k <= m ? "row" : "column", k <= m ? k : k - m);
+         xfprintf(fp, "\n");
+      }
+#endif
+      xfprintf(fp, "End of output\n");
+      xfflush(fp);
+      if (xferror(fp))
+      {  xprintf("lpx_print_sol: can't write to `%s' - %s\n", fname,
+            strerror(errno));
+         goto fail;
+      }
+      xfclose(fp);
+      return 0;
+fail: if (fp != NULL) xfclose(fp);
+      return 1;
+}
+
+/*----------------------------------------------------------------------
+-- lpx_print_ips - write interior point solution in printable format.
+--
+-- *Synopsis*
+--
+-- #include "glplpx.h"
+-- int lpx_print_ips(LPX *lp, char *fname);
+--
+-- *Description*
+--
+-- The routine lpx_print_ips writes the current interior point solution
+-- of an LP problem, which the parameter lp points to, to a text file,
+-- whose name is the character string fname, in printable format.
+--
+-- Information reported by the routine lpx_print_ips is intended mainly
+-- for visual analysis.
+--
+-- *Returns*
+--
+-- If the operation was successful, the routine returns zero. Otherwise
+-- the routine prints an error message and returns non-zero. */
+
+int lpx_print_ips(LPX *lp, const char *fname)
+{     XFILE *fp;
+      int what, round;
+      xprintf("lpx_print_ips: writing LP problem solution to `%s'...\n",
+         fname);
+      fp = xfopen(fname, "w");
+      if (fp == NULL)
+      {  xprintf("lpx_print_ips: can't create `%s' - %s\n", fname,
+            strerror(errno));
+         goto fail;
+      }
+      /* problem name */
+      {  const char *name;
+         name = lpx_get_prob_name(lp);
+         if (name == NULL) name = "";
+         xfprintf(fp, "%-12s%s\n", "Problem:", name);
+      }
+      /* number of rows (auxiliary variables) */
+      {  int nr;
+         nr = lpx_get_num_rows(lp);
+         xfprintf(fp, "%-12s%d\n", "Rows:", nr);
+      }
+      /* number of columns (structural variables) */
+      {  int nc;
+         nc = lpx_get_num_cols(lp);
+         xfprintf(fp, "%-12s%d\n", "Columns:", nc);
+      }
+      /* number of non-zeros (constraint coefficients) */
+      {  int nz;
+         nz = lpx_get_num_nz(lp);
+         xfprintf(fp, "%-12s%d\n", "Non-zeros:", nz);
+      }
+      /* solution status */
+      {  int status;
+         status = lpx_ipt_status(lp);
+         xfprintf(fp, "%-12s%s\n", "Status:",
+            status == LPX_T_UNDEF  ? "INTERIOR UNDEFINED" :
+            status == LPX_T_OPT    ? "INTERIOR OPTIMAL" : "???");
+      }
+      /* objective function */
+      {  char *name;
+         int dir;
+         double obj;
+         name = (void *)lpx_get_obj_name(lp);
+         dir = lpx_get_obj_dir(lp);
+         obj = lpx_ipt_obj_val(lp);
+         xfprintf(fp, "%-12s%s%s%.10g %s\n", "Objective:",
+            name == NULL ? "" : name,
+            name == NULL ? "" : " = ", obj,
+            dir == LPX_MIN ? "(MINimum)" :
+            dir == LPX_MAX ? "(MAXimum)" : "(" "???" ")");
+      }
+      /* main sheet */
+      for (what = 1; what <= 2; what++)
+      {  int mn, ij;
+         xfprintf(fp, "\n");
+         xfprintf(fp, "   No. %-12s      Activity     Lower bound   Upp"
+            "er bound    Marginal\n",
+            what == 1 ? "  Row name" : "Column name");
+         xfprintf(fp, "------ ------------    ------------- -----------"
+            "-- ------------- -------------\n");
+         mn = (what == 1 ? lpx_get_num_rows(lp) : lpx_get_num_cols(lp));
+         for (ij = 1; ij <= mn; ij++)
+         {  const char *name;
+            int typx /*, tagx */;
+            double lb, ub, vx, dx;
+            if (what == 1)
+            {  name = lpx_get_row_name(lp, ij);
+               if (name == NULL) name = "";
+               lpx_get_row_bnds(lp, ij, &typx, &lb, &ub);
+               round = lpx_get_int_parm(lp, LPX_K_ROUND);
+               lpx_set_int_parm(lp, LPX_K_ROUND, 1);
+               vx = lpx_ipt_row_prim(lp, ij);
+               dx = lpx_ipt_row_dual(lp, ij);
+               lpx_set_int_parm(lp, LPX_K_ROUND, round);
+            }
+            else
+            {  name = lpx_get_col_name(lp, ij);
+               if (name == NULL) name = "";
+               lpx_get_col_bnds(lp, ij, &typx, &lb, &ub);
+               round = lpx_get_int_parm(lp, LPX_K_ROUND);
+               lpx_set_int_parm(lp, LPX_K_ROUND, 1);
+               vx = lpx_ipt_col_prim(lp, ij);
+               dx = lpx_ipt_col_dual(lp, ij);
+               lpx_set_int_parm(lp, LPX_K_ROUND, round);
+            }
+            /* row/column ordinal number */
+            xfprintf(fp, "%6d ", ij);
+            /* row column/name */
+            if (strlen(name) <= 12)
+               xfprintf(fp, "%-12s ", name);
+            else
+               xfprintf(fp, "%s\n%20s", name, "");
+            /* two positions are currently not used */
+            xfprintf(fp, "   ");
+            /* row/column primal activity */
+            xfprintf(fp, "%13.6g ", vx);
+            /* row/column lower bound */
+            if (typx == LPX_LO || typx == LPX_DB || typx == LPX_FX)
+               xfprintf(fp, "%13.6g ", lb);
+            else
+               xfprintf(fp, "%13s ", "");
+            /* row/column upper bound */
+            if (typx == LPX_UP || typx == LPX_DB)
+               xfprintf(fp, "%13.6g ", ub);
+            else if (typx == LPX_FX)
+               xfprintf(fp, "%13s ", "=");
+            else
+               xfprintf(fp, "%13s ", "");
+            /* row/column dual activity */
+            xfprintf(fp, "%13.6g", dx);
+            /* end of line */
+            xfprintf(fp, "\n");
+         }
+      }
+      xfprintf(fp, "\n");
+      xfprintf(fp, "End of output\n");
+      xfflush(fp);
+      if (xferror(fp))
+      {  xprintf("lpx_print_ips: can't write to `%s' - %s\n", fname,
+            strerror(errno));
+         goto fail;
+      }
+      xfclose(fp);
+      return 0;
+fail: if (fp != NULL) xfclose(fp);
+      return 1;
+}
+
+/*----------------------------------------------------------------------
+-- lpx_print_mip - write MIP problem solution in printable format.
+--
+-- *Synopsis*
+--
+-- #include "glplpx.h"
+-- int lpx_print_mip(LPX *lp, char *fname);
+--
+-- *Description*
+--
+-- The routine lpx_print_mip writes a best known integer solution of
+-- a MIP problem, which is specified by the pointer lp, to a text file,
+-- whose name is the character string fname, in printable format.
+--
+-- Information reported by the routine lpx_print_mip is intended mainly
+-- for visual analysis.
+--
+-- *Returns*
+--
+-- If the operation was successful, the routine returns zero. Otherwise
+-- the routine prints an error message and returns non-zero. */
+
+int lpx_print_mip(LPX *lp, const char *fname)
+{     XFILE *fp;
+      int what, round;
+#if 0
+      if (lpx_get_class(lp) != LPX_MIP)
+         fault("lpx_print_mip: error -- not a MIP problem");
+#endif
+      xprintf(
+         "lpx_print_mip: writing MIP problem solution to `%s'...\n",
+         fname);
+      fp = xfopen(fname, "w");
+      if (fp == NULL)
+      {  xprintf("lpx_print_mip: can't create `%s' - %s\n", fname,
+            strerror(errno));
+         goto fail;
+      }
+      /* problem name */
+      {  const char *name;
+         name = lpx_get_prob_name(lp);
+         if (name == NULL) name = "";
+         xfprintf(fp, "%-12s%s\n", "Problem:", name);
+      }
+      /* number of rows (auxiliary variables) */
+      {  int nr;
+         nr = lpx_get_num_rows(lp);
+         xfprintf(fp, "%-12s%d\n", "Rows:", nr);
+      }
+      /* number of columns (structural variables) */
+      {  int nc, nc_int, nc_bin;
+         nc = lpx_get_num_cols(lp);
+         nc_int = lpx_get_num_int(lp);
+         nc_bin = lpx_get_num_bin(lp);
+         xfprintf(fp, "%-12s%d (%d integer, %d binary)\n", "Columns:",
+            nc, nc_int, nc_bin);
+      }
+      /* number of non-zeros (constraint coefficients) */
+      {  int nz;
+         nz = lpx_get_num_nz(lp);
+         xfprintf(fp, "%-12s%d\n", "Non-zeros:", nz);
+      }
+      /* solution status */
+      {  int status;
+         status = lpx_mip_status(lp);
+         xfprintf(fp, "%-12s%s\n", "Status:",
+            status == LPX_I_UNDEF  ? "INTEGER UNDEFINED" :
+            status == LPX_I_OPT    ? "INTEGER OPTIMAL" :
+            status == LPX_I_FEAS   ? "INTEGER NON-OPTIMAL" :
+            status == LPX_I_NOFEAS ? "INTEGER EMPTY" : "???");
+      }
+      /* objective function */
+      {  char *name;
+         int dir;
+         double mip_obj;
+         name = (void *)lpx_get_obj_name(lp);
+         dir = lpx_get_obj_dir(lp);
+         mip_obj = lpx_mip_obj_val(lp);
+         xfprintf(fp, "%-12s%s%s%.10g %s\n", "Objective:",
+            name == NULL ? "" : name,
+            name == NULL ? "" : " = ", mip_obj,
+            dir == LPX_MIN ? "(MINimum)" :
+            dir == LPX_MAX ? "(MAXimum)" : "(" "???" ")");
+      }
+      /* main sheet */
+      for (what = 1; what <= 2; what++)
+      {  int mn, ij;
+         xfprintf(fp, "\n");
+         xfprintf(fp, "   No. %-12s      Activity     Lower bound   Upp"
+            "er bound\n",
+            what == 1 ? "  Row name" : "Column name");
+         xfprintf(fp, "------ ------------    ------------- -----------"
+            "-- -------------\n");
+         mn = (what == 1 ? lpx_get_num_rows(lp) : lpx_get_num_cols(lp));
+         for (ij = 1; ij <= mn; ij++)
+         {  const char *name;
+            int kind, typx;
+            double lb, ub, vx;
+            if (what == 1)
+            {  name = lpx_get_row_name(lp, ij);
+               if (name == NULL) name = "";
+               kind = LPX_CV;
+               lpx_get_row_bnds(lp, ij, &typx, &lb, &ub);
+               round = lpx_get_int_parm(lp, LPX_K_ROUND);
+               lpx_set_int_parm(lp, LPX_K_ROUND, 1);
+               vx = lpx_mip_row_val(lp, ij);
+               lpx_set_int_parm(lp, LPX_K_ROUND, round);
+            }
+            else
+            {  name = lpx_get_col_name(lp, ij);
+               if (name == NULL) name = "";
+               kind = lpx_get_col_kind(lp, ij);
+               lpx_get_col_bnds(lp, ij, &typx, &lb, &ub);
+               round = lpx_get_int_parm(lp, LPX_K_ROUND);
+               lpx_set_int_parm(lp, LPX_K_ROUND, 1);
+               vx = lpx_mip_col_val(lp, ij);
+               lpx_set_int_parm(lp, LPX_K_ROUND, round);
+            }
+            /* row/column ordinal number */
+            xfprintf(fp, "%6d ", ij);
+            /* row column/name */
+            if (strlen(name) <= 12)
+               xfprintf(fp, "%-12s ", name);
+            else
+               xfprintf(fp, "%s\n%20s", name, "");
+            /* row/column kind */
+            xfprintf(fp, "%s  ",
+               kind == LPX_CV ? " " : kind == LPX_IV ? "*" : "?");
+            /* row/column primal activity */
+            xfprintf(fp, "%13.6g", vx);
+            /* row/column lower and upper bounds */
+            switch (typx)
+            {  case LPX_FR:
+                  break;
+               case LPX_LO:
+                  xfprintf(fp, " %13.6g", lb);
+                  break;
+               case LPX_UP:
+                  xfprintf(fp, " %13s %13.6g", "", ub);
+                  break;
+               case LPX_DB:
+                  xfprintf(fp, " %13.6g %13.6g", lb, ub);
+                  break;
+               case LPX_FX:
+                  xfprintf(fp, " %13.6g %13s", lb, "=");
+                  break;
+               default:
+                  xassert(typx != typx);
+            }
+            /* end of line */
+            xfprintf(fp, "\n");
+         }
+      }
+      xfprintf(fp, "\n");
+#if 1
+      if (lpx_mip_status(lp) != LPX_I_UNDEF)
+      {  int m = lpx_get_num_rows(lp);
+         LPXKKT kkt;
+         xfprintf(fp, "Integer feasibility conditions:\n\n");
+         lpx_check_int(lp, &kkt);
+         xfprintf(fp, "INT.PE: max.abs.err. = %.2e on row %d\n",
+            kkt.pe_ae_max, kkt.pe_ae_row);
+         xfprintf(fp, "        max.rel.err. = %.2e on row %d\n",
+            kkt.pe_re_max, kkt.pe_re_row);
+         switch (kkt.pe_quality)
+         {  case 'H':
+               xfprintf(fp, "        High quality\n");
+               break;
+            case 'M':
+               xfprintf(fp, "        Medium quality\n");
+               break;
+            case 'L':
+               xfprintf(fp, "        Low quality\n");
+               break;
+            default:
+               xfprintf(fp, "        SOLUTION IS WRONG\n");
+               break;
+         }
+         xfprintf(fp, "\n");
+         xfprintf(fp, "INT.PB: max.abs.err. = %.2e on %s %d\n",
+            kkt.pb_ae_max, kkt.pb_ae_ind <= m ? "row" : "column",
+            kkt.pb_ae_ind <= m ? kkt.pb_ae_ind : kkt.pb_ae_ind - m);
+         xfprintf(fp, "        max.rel.err. = %.2e on %s %d\n",
+            kkt.pb_re_max, kkt.pb_re_ind <= m ? "row" : "column",
+            kkt.pb_re_ind <= m ? kkt.pb_re_ind : kkt.pb_re_ind - m);
+         switch (kkt.pb_quality)
+         {  case 'H':
+               xfprintf(fp, "        High quality\n");
+               break;
+            case 'M':
+               xfprintf(fp, "        Medium quality\n");
+               break;
+            case 'L':
+               xfprintf(fp, "        Low quality\n");
+               break;
+            default:
+               xfprintf(fp, "        SOLUTION IS INFEASIBLE\n");
+               break;
+         }
+         xfprintf(fp, "\n");
+      }
+#endif
+      xfprintf(fp, "End of output\n");
+      xfflush(fp);
+      if (xferror(fp))
+      {  xprintf("lpx_print_mip: can't write to `%s' - %s\n", fname,
+            strerror(errno));
+         goto fail;
+      }
+      xfclose(fp);
+      return 0;
+fail: if (fp != NULL) xfclose(fp);
+      return 1;
 }
 
 /* eof */
