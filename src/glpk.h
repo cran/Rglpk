@@ -30,7 +30,7 @@ extern "C" {
 
 /* library version numbers: */
 #define GLP_MAJOR_VERSION  4
-#define GLP_MINOR_VERSION  33
+#define GLP_MINOR_VERSION  34
 
 #ifndef _GLP_PROB
 #define _GLP_PROB
@@ -67,6 +67,11 @@ typedef struct { double _opaque_prob; } glp_prob;
 #define GLP_SF_2N       0x20  /* round scale factors to power of two */
 #define GLP_SF_SKIP     0x40  /* skip if problem is well scaled */
 #define GLP_SF_AUTO     0x80  /* choose scaling options automatically */
+
+/* solution indicator: */
+#define GLP_SOL            1  /* basic solution */
+#define GLP_IPT            2  /* interior-point solution */
+#define GLP_MIP            3  /* mixed integer solution */
 
 /* solution status: */
 #define GLP_UNDEF          1  /* solution is undefined */
@@ -251,11 +256,6 @@ typedef struct
 typedef struct { double _opaque_tran; } glp_tran;
 /* MathProg translator workspace */
 #endif
-
-/* MathProg solution indicator: */
-#define GLP_MPL_SOL        1  /* basic solution */
-#define GLP_MPL_IPT        2  /* interior-point solution */
-#define GLP_MPL_MIP        3  /* mixed integer solution */
 
 glp_prob *glp_create_prob(void);
 /* create problem object */

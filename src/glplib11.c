@@ -523,7 +523,8 @@ int fp2rat(double x, double eps, double *p, double *q)
 *
 *  RETURNS
 *
-*  The routine jday returns the Julian day number.
+*  The routine jday returns the Julian day number, or negative value if
+*  the specified date is incorrect.
 *
 *  REFERENCES
 *
@@ -535,23 +536,17 @@ int jday(int d, int m, int y)
 {     int c, ya, j, dd;
       if (!(1 <= d && d <= 31 && 1 <= m && m <= 12 && 1 <= y &&
             y <= 4000))
-#if 0
-err:  xerror("jday: d = %d, m = %d, y = %d; invalid date\n", d, m, y);
-#else
-         return -1;
-#endif
-      if (m > 2) m -= 3; else m += 9, y--;
+      {  j = -1;
+         goto done;
+      }
+      if (m >= 3) m -= 3; else m += 9, y--;
       c = y / 100;
       ya = y - 100 * c;
       j = (146097 * c) / 4 + (1461 * ya) / 4 + (153 * m + 2) / 5 + d +
          1721119;
       jdate(j, &dd, NULL, NULL);
-#if 0
-      if (d != dd) goto err;
-#else
-      if (d != dd) return -1;
-#endif
-      return j;
+      if (d != dd) j = -1;
+done: return j;
 }
 
 /***********************************************************************
@@ -574,32 +569,39 @@ err:  xerror("jday: d = %d, m = %d, y = %d; invalid date\n", d, m, y);
 *
 *  The routine is valid for 1721426 <= j <= 3182395.
 *
+*  RETURNS
+*
+*  If the conversion is successful, the routine returns zero, otherwise
+*  non-zero.
+*
 *  REFERENCES
 *
 *  R. G. Tantzen, Algorithm 199: conversions between calendar date and
 *  Julian day number, Communications of the ACM, vol. 6, no. 8, p. 444,
 *  Aug. 1963. */
 
-void jdate(int j, int *_d, int *_m, int *_y)
-{     int d, m, y;
+int jdate(int j, int *_d, int *_m, int *_y)
+{     int d, m, y, ret = 0;
       if (!(1721426 <= j && j <= 3182395))
-         xerror("jdate: j = %d; Julian day number out of range\n", j);
+      {  ret = 1;
+         goto done;
+      }
       j -= 1721119;
       y = (4 * j - 1) / 146097;
-      j = 4 * j - 1 - 146097 * y;
+      j = (4 * j - 1) % 146097;
       d = j / 4;
       j = (4 * d + 3) / 1461;
-      d = 4 * d + 3 - 1461 * j;
+      d = (4 * d + 3) % 1461;
       d = (d + 4) / 4;
       m = (5 * d - 3) / 153;
-      d = 5 * d - 3 - 153 * m;
+      d = (5 * d - 3) % 153;
       d = (d + 5) / 5;
       y = 100 * y + j;
-      if (m < 10) m += 3; else m -= 9, y++;
+      if (m <= 9) m += 3; else m -= 9, y++;
       if (_d != NULL) *_d = d;
       if (_m != NULL) *_m = m;
       if (_y != NULL) *_y = y;
-      return;
+done: return ret;
 }
 
 #if 0
@@ -608,7 +610,7 @@ int main(void)
       jbeg = jday(1, 1, 1);
       jend = jday(31, 12, 4000);
       for (j = jbeg; j <= jend; j++)
-      {  jdate(j, &d, &m, &y);
+      {  xassert(jdate(j, &d, &m, &y) == 0);
          xassert(jday(d, m, y) == j);
       }
       xprintf("Routines jday and jdate work correctly.\n");

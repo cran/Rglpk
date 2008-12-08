@@ -883,11 +883,11 @@ err2:    {  xprintf("MathProg model processing error\n");
 skip: /* postsolve the model, if necessary */
       if (csa->tran != NULL)
       {  if (csa->solution == SOL_BASIC)
-            ret = glp_mpl_postsolve(csa->tran, csa->prob, GLP_MPL_SOL);
+            ret = glp_mpl_postsolve(csa->tran, csa->prob, GLP_SOL);
          else if (csa->solution == SOL_INTERIOR)
-            ret = glp_mpl_postsolve(csa->tran, csa->prob, GLP_MPL_IPT);
+            ret = glp_mpl_postsolve(csa->tran, csa->prob, GLP_IPT);
          else if (csa->solution == SOL_INTEGER)
-            ret = glp_mpl_postsolve(csa->tran, csa->prob, GLP_MPL_MIP);
+            ret = glp_mpl_postsolve(csa->tran, csa->prob, GLP_MIP);
          else
             xassert(csa != csa);
          if (ret != 0)

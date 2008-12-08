@@ -23,72 +23,6 @@
 
 #include "glplib.h"
 
-#if defined(__WOE__) && defined(VC6_MT_DLL)
-
-/**********************************************************************/
-/*                   Multi-threaded DLL for VC 6.0                    */
-/**********************************************************************/
-
-#include <windows.h>
-
-static DWORD dwTlsIndex;
-
-BOOL APIENTRY DllMain
-(     HINSTANCE hinstDLL,  /* DLL module handle */
-      DWORD fdwReason,     /* reason called */
-      LPVOID lpvReserved   /* reserved */
-)
-{     switch (fdwReason)
-      {  /* the DLL is loading due to process initialization or a call
-            to LoadLibrary */
-         case DLL_PROCESS_ATTACH:
-            /* allocate a TLS index */
-            dwTlsIndex = TlsAlloc();
-            if (dwTlsIndex == 0xFFFFFFFF) return FALSE;
-            /* initialize the index for first thread */
-            TlsSetValue(dwTlsIndex, NULL);
-            /* initialize GLPK library environment */
-            lib_init_env();
-            break;
-         /* the attached process creates a new thread */
-         case DLL_THREAD_ATTACH:
-            /* initialize the TLS index for this thread */
-            TlsSetValue(dwTlsIndex, NULL);
-            /* initialize GLPK library environment */
-            lib_init_env();
-            break;
-         /* the thread of the attached process terminates */
-         case DLL_THREAD_DETACH:
-            /* free GLPK library environment */
-            lib_free_env();
-            break;
-         /* the DLL is unloading due to process termination or call to
-            FreeLibrary */
-         case DLL_PROCESS_DETACH:
-            /* free GLPK library environment */
-            lib_free_env();
-            /* release the TLS index */
-            TlsFree(dwTlsIndex);
-            break;
-         default:
-            break;
-      }
-      return TRUE;
-}
-
-void lib_set_ptr(void *ptr)
-{     TlsSetValue(dwTlsIndex, ptr);
-      return;
-}
-
-void *lib_get_ptr(void)
-{     void *ptr;
-      ptr = TlsGetValue(dwTlsIndex);
-      return ptr;
-}
-
-#else
-
 /**********************************************************************/
 /*                 Platform-independent ISO C version                 */
 /**********************************************************************/
@@ -138,7 +72,5 @@ void *lib_get_ptr(void)
       ptr = tls;
       return ptr;
 }
-
-#endif
 
 /* eof */

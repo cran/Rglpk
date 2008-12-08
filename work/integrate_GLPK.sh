@@ -5,7 +5,7 @@
 ## latest glpk tarball (Austrian mirror out of date)
 #URL="http://gd.tuwien.ac.at/gnu/gnusrc/glpk/"
 URL="ftp://ftp.gnu.org/gnu/glpk/"
-latest="glpk-4.33.tar.gz"
+latest="glpk-4.34.tar.gz"
 ## where to put source files and headers
 DESTINATION=../src
 

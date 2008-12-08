@@ -1,3 +1,8 @@
+2008-12-08  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+
+	* UPDATED: Rglpk now includes GLPK version 4.34
+	* RELEASE: Rglpk 0.2-7 on CRAN
+
 2008-11-16  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
 
 	* UPDATED: Rglpk now includes GLPK version 4.33

@@ -362,7 +362,7 @@ int jday(int d, int m, int y);
 /* convert calendar date to Julian day number */
 
 #define jdate _glp_lib_jdate
-void jdate(int j, int *d, int *m, int *y);
+int jdate(int j, int *d, int *m, int *y);
 /* convert Julian day number to calendar date */
 
 #define xdlopen _glp_xdlopen

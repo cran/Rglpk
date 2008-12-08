@@ -191,8 +191,7 @@ int glp_mpl_postsolve(glp_tran *tran, glp_prob *prob, int sol)
       double x;
       if (!(tran->phase == 3 && !tran->flag_p))
          xerror("glp_mpl_postsolve: invalid call sequence\n");
-      if (!(sol == GLP_MPL_SOL || sol == GLP_MPL_IPT ||
-            sol == GLP_MPL_MIP))
+      if (!(sol == GLP_SOL || sol == GLP_IPT || sol == GLP_MIP))
          xerror("glp_mpl_postsolve: sol = %d; invalid parameter\n",
             sol);
       m = mpl_get_num_rows(tran);
@@ -205,11 +204,11 @@ int glp_mpl_postsolve(glp_tran *tran, glp_prob *prob, int sol)
          goto done;
       }
       for (j = 1; j <= n; j++)
-      {  if (sol == GLP_MPL_SOL)
+      {  if (sol == GLP_SOL)
             x = glp_get_col_prim(prob, j);
-         else if (sol == GLP_MPL_IPT)
+         else if (sol == GLP_IPT)
             x = glp_ipt_col_prim(prob, j);
-         else if (sol == GLP_MPL_MIP)
+         else if (sol == GLP_MIP)
             x = glp_mip_col_val(prob, j);
          else
             xassert(sol != sol);

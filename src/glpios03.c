@@ -741,11 +741,21 @@ int branch_on(glp_tree *tree)
       new_ub = floor(beta);
       new_lb = ceil(beta);
       switch (type)
-      {  case GLP_LO:
+      {  case GLP_FR:
+            dn_type = GLP_UP;
+            up_type = GLP_LO;
+            break;
+         case GLP_LO:
             xassert(lb <= new_ub);
             dn_type = (lb == new_ub ? GLP_FX : GLP_DB);
             xassert(lb + 1.0 <= new_lb);
             up_type = GLP_LO;
+            break;
+         case GLP_UP:
+            xassert(new_ub <= ub - 1.0);
+            dn_type = GLP_UP;
+            xassert(new_lb <= ub);
+            up_type = (new_lb == ub ? GLP_FX : GLP_DB);
             break;
          case GLP_DB:
             xassert(lb <= new_ub && new_ub <= ub - 1.0);
@@ -754,7 +764,6 @@ int branch_on(glp_tree *tree)
             up_type = (new_lb == ub ? GLP_FX : GLP_DB);
             break;
          default:
-            /* other cases are not tested yet */
             xassert(type != type);
       }
       /* compute local bounds to LP relaxation for both branches */

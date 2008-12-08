@@ -133,8 +133,8 @@ LIBENV *lib_link_env(void)
          {  /* initialization failed; display an error message */
             fprintf(stderr, "GLPK library initialization failed.\n");
             fflush(stderr);
-            /* and abnormally terminate the program */
-	    error("Execution aborted.");
+            /* modified by theussl print error */
+            error("Execution aborted."); 
          }
          /* initialization successful; obtain the pointer */
          env = lib_get_ptr();

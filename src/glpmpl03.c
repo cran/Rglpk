@@ -3465,14 +3465,28 @@ double eval_numeric(MPL *mpl, CODE *code)
             /* gaussian random, mu = 0, sigma = 1 */
             value = fp_normal01(mpl);
             break;
+         case O_GMTIME:
+            /* current calendar time */
+            value = fn_gmtime(mpl);
+            break;
          case O_CVTNUM:
             /* conversion to numeric */
             {  SYMBOL *sym;
                sym = eval_symbolic(mpl, code->arg.arg.x);
+#if 0 /* 23/XI-2008 */
                if (sym->str != NULL)
                   error(mpl, "cannot convert %s to floating-point numbe"
                      "r", format_symbol(mpl, sym));
                value = sym->num;
+#else
+               if (sym->str == NULL)
+                  value = sym->num;
+               else
+               {  if (str2num(sym->str, &value))
+                     error(mpl, "cannot convert %s to floating-point nu"
+                        "mber", format_symbol(mpl, sym));
+               }
+#endif
                delete_symbol(mpl, sym);
             }
             break;
@@ -3612,7 +3626,6 @@ double eval_numeric(MPL *mpl, CODE *code)
                eval_numeric(mpl, code->arg.arg.x),
                eval_numeric(mpl, code->arg.arg.y));
             break;
-#if 1 /* 15/VII-2006 */
          case O_CARD:
             {  ELEMSET *set;
                set = eval_elemset(mpl, code->arg.arg.x);
@@ -3632,7 +3645,24 @@ double eval_numeric(MPL *mpl, CODE *code)
                value = strlen(str);
             }
             break;
-#endif
+         case O_STR2TIME:
+            {  SYMBOL *sym;
+               char str[MAX_LENGTH+1], fmt[MAX_LENGTH+1];
+               sym = eval_symbolic(mpl, code->arg.arg.x);
+               if (sym->str == NULL)
+                  sprintf(str, "%.*g", DBL_DIG, sym->num);
+               else
+                  fetch_string(mpl, sym->str, str);
+               delete_symbol(mpl, sym);
+               sym = eval_symbolic(mpl, code->arg.arg.y);
+               if (sym->str == NULL)
+                  sprintf(fmt, "%.*g", DBL_DIG, sym->num);
+               else
+                  fetch_string(mpl, sym->str, fmt);
+               delete_symbol(mpl, sym);
+               value = fn_str2time(mpl, str, fmt);
+            }
+            break;
          case O_FORK:
             /* if-then-else */
             if (eval_logical(mpl, code->arg.arg.x))
@@ -3784,7 +3814,6 @@ SYMBOL *eval_symbolic(MPL *mpl, CODE *code)
             else
                value = eval_symbolic(mpl, code->arg.arg.z);
             break;
-#if 1 /* 15/VII-2006 */
          case O_SUBSTR:
          case O_SUBSTR3:
             {  double pos, len;
@@ -3820,7 +3849,21 @@ SYMBOL *eval_symbolic(MPL *mpl, CODE *code)
                   (int)pos - 1));
             }
             break;
-#endif
+         case O_TIME2STR:
+            {  double num;
+               SYMBOL *sym;
+               char str[MAX_LENGTH+1], fmt[MAX_LENGTH+1];
+               num = eval_numeric(mpl, code->arg.arg.x);
+               sym = eval_symbolic(mpl, code->arg.arg.y);
+               if (sym->str == NULL)
+                  sprintf(fmt, "%.*g", DBL_DIG, sym->num);
+               else
+                  fetch_string(mpl, sym->str, fmt);
+               delete_symbol(mpl, sym);
+               fn_time2str(mpl, str, num, fmt);
+               value = create_symbol_str(mpl, create_string(mpl, str));
+            }
+            break;
          default:
             xassert(code != code);
       }
@@ -4658,6 +4701,7 @@ void clean_code(MPL *mpl, CODE *code)
          case O_IRAND224:
          case O_UNIFORM01:
          case O_NORMAL01:
+         case O_GMTIME:
             break;
          case O_CVTNUM:
          case O_CVTSYM:
@@ -4679,10 +4723,8 @@ void clean_code(MPL *mpl, CODE *code)
          case O_ATAN:
          case O_ROUND:
          case O_TRUNC:
-#if 1 /* 15/VII-2006 */
          case O_CARD:
          case O_LENGTH:
-#endif
             /* unary operation */
             clean_code(mpl, code->arg.arg.x);
             break;
@@ -4717,18 +4759,16 @@ void clean_code(MPL *mpl, CODE *code)
          case O_NOTIN:
          case O_WITHIN:
          case O_NOTWITHIN:
-#if 1 /* 15/VII-2006 */
          case O_SUBSTR:
-#endif
+         case O_STR2TIME:
+         case O_TIME2STR:
             /* binary operation */
             clean_code(mpl, code->arg.arg.x);
             clean_code(mpl, code->arg.arg.y);
             break;
          case O_DOTS:
          case O_FORK:
-#if 1 /* 15/VII-2006 */
          case O_SUBSTR3:
-#endif
             /* ternary operation */
             clean_code(mpl, code->arg.arg.x);
             clean_code(mpl, code->arg.arg.y);
@@ -5799,7 +5839,6 @@ void execute_statement(MPL *mpl, STATEMENT *stmt)
             xprintf("Generating %s...\n", stmt->u.con->name);
             eval_whole_con(mpl, stmt->u.con);
             break;
-#if 1 /* 11/II-2008 */
          case A_TABLE:
             switch (stmt->u.tab->type)
             {  case A_INPUT:
@@ -5813,10 +5852,10 @@ void execute_statement(MPL *mpl, STATEMENT *stmt)
             }
             execute_table(mpl, stmt->u.tab);
             break;
-#endif
          case A_SOLVE:
             break;
          case A_CHECK:
+            xprintf("Checking (line %d)...\n", stmt->line);
             execute_check(mpl, stmt->u.chk);
             break;
          case A_DISPLAY:

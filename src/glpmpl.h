@@ -863,6 +863,22 @@ double fp_normal(MPL *mpl, double mu, double sigma);
 /* Gaussian random variate with specified mu and sigma */
 
 /**********************************************************************/
+/* * *                         DATE/TIME                          * * */
+/**********************************************************************/
+
+#define fn_gmtime _glp_mpl_fn_gmtime
+double fn_gmtime(MPL *mpl);
+/* obtain the current calendar time (UTC) */
+
+#define fn_str2time _glp_mpl_fn_str2time
+double fn_str2time(MPL *mpl, const char *str, const char *fmt);
+/* convert character string to the calendar time */
+
+#define fn_time2str _glp_mpl_fn_time2str
+void fn_time2str(MPL *mpl, char *str, double t, const char *fmt);
+/* convert the calendar time to character string */
+
+/**********************************************************************/
 /* * *                     CHARACTER STRINGS                      * * */
 /**********************************************************************/
 
@@ -2027,78 +2043,81 @@ struct CODE
 #define O_IRAND224      311   /* pseudo-random in [0, 2^24-1] */
 #define O_UNIFORM01     312   /* pseudo-random in [0, 1) */
 #define O_NORMAL01      313   /* gaussian random, mu = 0, sigma = 1 */
+#define O_GMTIME        314   /* current calendar time (UTC) */
                               /* unary operations --------------------*/
-#define O_CVTNUM        314   /* conversion to numeric */
-#define O_CVTSYM        315   /* conversion to symbolic */
-#define O_CVTLOG        316   /* conversion to logical */
-#define O_CVTTUP        317   /* conversion to 1-tuple */
-#define O_CVTLFM        318   /* conversion to linear form */
-#define O_PLUS          319   /* unary plus */
-#define O_MINUS         320   /* unary minus */
-#define O_NOT           321   /* negation (logical "not") */
-#define O_ABS           322   /* absolute value */
-#define O_CEIL          323   /* round upward ("ceiling of x") */
-#define O_FLOOR         324   /* round downward ("floor of x") */
-#define O_EXP           325   /* base-e exponential */
-#define O_LOG           326   /* natural logarithm */
-#define O_LOG10         327   /* common (decimal) logarithm */
-#define O_SQRT          328   /* square root */
-#define O_SIN           329   /* trigonometric sine */
-#define O_COS           330   /* trigonometric cosine */
-#define O_ATAN          331   /* trigonometric arctangent */
-#define O_ROUND         332   /* round to nearest integer */
-#define O_TRUNC         333   /* truncate to nearest integer */
-#define O_CARD          334   /* cardinality of set */
-#define O_LENGTH        335   /* length of symbolic value */
+#define O_CVTNUM        315   /* conversion to numeric */
+#define O_CVTSYM        316   /* conversion to symbolic */
+#define O_CVTLOG        317   /* conversion to logical */
+#define O_CVTTUP        318   /* conversion to 1-tuple */
+#define O_CVTLFM        319   /* conversion to linear form */
+#define O_PLUS          320   /* unary plus */
+#define O_MINUS         321   /* unary minus */
+#define O_NOT           322   /* negation (logical "not") */
+#define O_ABS           323   /* absolute value */
+#define O_CEIL          324   /* round upward ("ceiling of x") */
+#define O_FLOOR         325   /* round downward ("floor of x") */
+#define O_EXP           326   /* base-e exponential */
+#define O_LOG           327   /* natural logarithm */
+#define O_LOG10         328   /* common (decimal) logarithm */
+#define O_SQRT          329   /* square root */
+#define O_SIN           330   /* trigonometric sine */
+#define O_COS           331   /* trigonometric cosine */
+#define O_ATAN          332   /* trigonometric arctangent */
+#define O_ROUND         333   /* round to nearest integer */
+#define O_TRUNC         334   /* truncate to nearest integer */
+#define O_CARD          335   /* cardinality of set */
+#define O_LENGTH        336   /* length of symbolic value */
                               /* binary operations -------------------*/
-#define O_ADD           336   /* addition */
-#define O_SUB           337   /* subtraction */
-#define O_LESS          338   /* non-negative subtraction */
-#define O_MUL           339   /* multiplication */
-#define O_DIV           340   /* division */
-#define O_IDIV          341   /* quotient of exact division */
-#define O_MOD           342   /* remainder of exact division */
-#define O_POWER         343   /* exponentiation (raise to power) */
-#define O_ATAN2         344   /* trigonometric arctangent */
-#define O_ROUND2        345   /* round to n fractional digits */
-#define O_TRUNC2        346   /* truncate to n fractional digits */
-#define O_UNIFORM       347   /* pseudo-random in [a, b) */
-#define O_NORMAL        348   /* gaussian random, given mu and sigma */
-#define O_CONCAT        349   /* concatenation */
-#define O_LT            350   /* comparison on 'less than' */
-#define O_LE            351   /* comparison on 'not greater than' */
-#define O_EQ            352   /* comparison on 'equal to' */
-#define O_GE            353   /* comparison on 'not less than' */
-#define O_GT            354   /* comparison on 'greater than' */
-#define O_NE            355   /* comparison on 'not equal to' */
-#define O_AND           356   /* conjunction (logical "and") */
-#define O_OR            357   /* disjunction (logical "or") */
-#define O_UNION         358   /* union */
-#define O_DIFF          359   /* difference */
-#define O_SYMDIFF       360   /* symmetric difference */
-#define O_INTER         361   /* intersection */
-#define O_CROSS         362   /* cross (Cartesian) product */
-#define O_IN            363   /* test on 'x in Y' */
-#define O_NOTIN         364   /* test on 'x not in Y' */
-#define O_WITHIN        365   /* test on 'X within Y' */
-#define O_NOTWITHIN     366   /* test on 'X not within Y' */
-#define O_SUBSTR        367   /* substring */
+#define O_ADD           337   /* addition */
+#define O_SUB           338   /* subtraction */
+#define O_LESS          339   /* non-negative subtraction */
+#define O_MUL           340   /* multiplication */
+#define O_DIV           341   /* division */
+#define O_IDIV          342   /* quotient of exact division */
+#define O_MOD           343   /* remainder of exact division */
+#define O_POWER         344   /* exponentiation (raise to power) */
+#define O_ATAN2         345   /* trigonometric arctangent */
+#define O_ROUND2        346   /* round to n fractional digits */
+#define O_TRUNC2        347   /* truncate to n fractional digits */
+#define O_UNIFORM       348   /* pseudo-random in [a, b) */
+#define O_NORMAL        349   /* gaussian random, given mu and sigma */
+#define O_CONCAT        350   /* concatenation */
+#define O_LT            351   /* comparison on 'less than' */
+#define O_LE            352   /* comparison on 'not greater than' */
+#define O_EQ            353   /* comparison on 'equal to' */
+#define O_GE            354   /* comparison on 'not less than' */
+#define O_GT            355   /* comparison on 'greater than' */
+#define O_NE            356   /* comparison on 'not equal to' */
+#define O_AND           357   /* conjunction (logical "and") */
+#define O_OR            358   /* disjunction (logical "or") */
+#define O_UNION         359   /* union */
+#define O_DIFF          360   /* difference */
+#define O_SYMDIFF       361   /* symmetric difference */
+#define O_INTER         362   /* intersection */
+#define O_CROSS         363   /* cross (Cartesian) product */
+#define O_IN            364   /* test on 'x in Y' */
+#define O_NOTIN         365   /* test on 'x not in Y' */
+#define O_WITHIN        366   /* test on 'X within Y' */
+#define O_NOTWITHIN     367   /* test on 'X not within Y' */
+#define O_SUBSTR        368   /* substring */
+#define O_STR2TIME      369   /* convert string to time */
+#define O_TIME2STR      370   /* convert time to string */
                               /* ternary operations ------------------*/
-#define O_DOTS          368   /* build "arithmetic" set */
-#define O_FORK          369   /* if-then-else */
-#define O_SUBSTR3       370   /* substring */
+#define O_DOTS          371   /* build "arithmetic" set */
+#define O_FORK          372   /* if-then-else */
+#define O_SUBSTR3       373   /* substring */
                               /* n-ary operations --------------------*/
-#define O_MIN           371   /* minimal value (n-ary) */
-#define O_MAX           372   /* maximal value (n-ary) */
+#define O_MIN           374   /* minimal value (n-ary) */
+#define O_MAX           375   /* maximal value (n-ary) */
                               /* iterated operations -----------------*/
-#define O_SUM           373   /* summation */
-#define O_PROD          374   /* multiplication */
-#define O_MINIMUM       375   /* minimum */
-#define O_MAXIMUM       376   /* maximum */
-#define O_FORALL        377   /* conjunction (A-quantification) */
-#define O_EXISTS        378   /* disjunction (E-quantification) */
-#define O_SETOF         379   /* compute elemental set */
-#define O_BUILD         380   /* build elemental set */
+#define O_SUM           376   /* summation */
+#define O_PROD          377   /* multiplication */
+#define O_MINIMUM       378   /* minimum */
+#define O_MAXIMUM       379   /* maximum */
+#define O_FORALL        380   /* conjunction (A-quantification) */
+#define O_EXISTS        381   /* disjunction (E-quantification) */
+#define O_SETOF         382   /* compute elemental set */
+#define O_BUILD         383   /* build elemental set */
       OPERANDS arg;
       /* operands that participate in the operation */
       int type;

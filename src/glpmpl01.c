@@ -565,6 +565,7 @@ CODE *make_code(MPL *mpl, int op, OPERANDS *arg, int type, int dim)
          case O_IRAND224:
          case O_UNIFORM01:
          case O_NORMAL01:
+         case O_GMTIME:
             code->vflag = 1;
             break;
          case O_CVTNUM:
@@ -630,6 +631,8 @@ CODE *make_code(MPL *mpl, int op, OPERANDS *arg, int type, int dim)
          case O_WITHIN:
          case O_NOTWITHIN:
          case O_SUBSTR:
+         case O_STR2TIME:
+         case O_TIME2STR:
             /* binary operation */
             xassert(arg->arg.x != NULL);
             xassert(arg->arg.x->up == NULL);
@@ -1101,6 +1104,9 @@ CODE *elemset_argument(MPL *mpl, char *func)
 -- <primary expression> ::= length ( <arg> )
 -- <primary expression> ::= substr ( <arg> , <arg> )
 -- <primary expression> ::= substr ( <arg> , <arg> , <arg> )
+-- <primary expression> ::= str2time ( <arg> , <arg> )
+-- <primary expression> ::= time2str ( <arg> , <arg> )
+-- <primary expression> ::= gmtime ( )
 -- <arg list> ::= <arg>
 -- <arg list> ::= <arg list> , <arg> */
 
@@ -1155,6 +1161,12 @@ CODE *function_reference(MPL *mpl)
          op = O_LENGTH;
       else if (strcmp(mpl->image, "substr") == 0)
          op = O_SUBSTR;
+      else if (strcmp(mpl->image, "str2time") == 0)
+         op = O_STR2TIME;
+      else if (strcmp(mpl->image, "time2str") == 0)
+         op = O_TIME2STR;
+      else if (strcmp(mpl->image, "gmtime") == 0)
+         op = O_GMTIME;
       else
          error(mpl, "function %s unknown", mpl->image);
       /* save symbolic name of the function */
@@ -1183,8 +1195,8 @@ CODE *function_reference(MPL *mpl)
          }
       }
       else if (op == O_IRAND224 || op == O_UNIFORM01 || op ==
-         O_NORMAL01)
-      {  /* Irand224, Uniform01, and Normal01 need no arguments */
+         O_NORMAL01 || op == O_GMTIME)
+      {  /* Irand224, Uniform01, Normal01, gmtime need no arguments */
          if (mpl->token != T_RIGHT)
             error(mpl, "%s needs no arguments", func);
       }
@@ -1261,6 +1273,50 @@ CODE *function_reference(MPL *mpl)
          else
             error(mpl, "syntax error in argument for %s", func);
       }
+      else if (op == O_STR2TIME)
+      {  /* str2time needs two arguments, both symbolic */
+         /* parse the first argument */
+         arg.arg.x = symbolic_argument(mpl, func);
+         /* check a token that follows the first argument */
+         if (mpl->token == T_COMMA)
+            ;
+         else if (mpl->token == T_RIGHT)
+            error(mpl, "%s needs two arguments", func);
+         else
+            error(mpl, "syntax error in argument for %s", func);
+         get_token(mpl /* , */);
+         /* parse the second argument */
+         arg.arg.y = symbolic_argument(mpl, func);
+         /* check a token that follows the second argument */
+         if (mpl->token == T_COMMA)
+            error(mpl, "%s needs two argument", func);
+         else if (mpl->token == T_RIGHT)
+            ;
+         else
+            error(mpl, "syntax error in argument for %s", func);
+      }
+      else if (op == O_TIME2STR)
+      {  /* time2str needs two arguments, numeric and symbolic */
+         /* parse the first argument */
+         arg.arg.x = numeric_argument(mpl, func);
+         /* check a token that follows the first argument */
+         if (mpl->token == T_COMMA)
+            ;
+         else if (mpl->token == T_RIGHT)
+            error(mpl, "%s needs two arguments", func);
+         else
+            error(mpl, "syntax error in argument for %s", func);
+         get_token(mpl /* , */);
+         /* parse the second argument */
+         arg.arg.y = symbolic_argument(mpl, func);
+         /* check a token that follows the second argument */
+         if (mpl->token == T_COMMA)
+            error(mpl, "%s needs two argument", func);
+         else if (mpl->token == T_RIGHT)
+            ;
+         else
+            error(mpl, "syntax error in argument for %s", func);
+      }
       else
       {  /* other functions need one argument */
          if (op == O_CARD)
@@ -1278,7 +1334,7 @@ CODE *function_reference(MPL *mpl)
             error(mpl, "syntax error in argument for %s", func);
       }
       /* make pseudo-code to call the built-in function */
-      if (op == O_SUBSTR || op == O_SUBSTR3)
+      if (op == O_SUBSTR || op == O_SUBSTR3 || op == O_TIME2STR)
          code = make_code(mpl, op, &arg, A_SYMBOLIC, 0);
       else
          code = make_code(mpl, op, &arg, A_NUMERIC, 0);
