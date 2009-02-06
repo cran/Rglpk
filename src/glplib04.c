@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
+*  Copyright (C) 2000,01,02,03,04,05,06,07,08,2009 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -61,6 +61,9 @@ void xputc(int c)
       }
       /* write the character to the terminal */
       fputc(c, stdout);
+#if 1 /* 10/XII-2008 */
+      if (c == '\n') fflush(stdout);
+#endif
       /* write the character to the log file */
       if (env->log_file != NULL) fputc(c, env->log_file);
 skip: return;

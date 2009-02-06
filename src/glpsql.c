@@ -5,7 +5,7 @@
 *
 *  Author: Heinrich Schuchardt <xypron.glpk@gmx.de>.
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
+*  Copyright (C) 2000,01,02,03,04,05,06,07,08,2009 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -609,7 +609,7 @@ void *db_iodbc_open(TABDCA *dca, int mode)
    }
    /* set AUTOCOMMIT on*/
    ret = dl_SQLSetConnectAttr(sql->hdbc, SQL_ATTR_AUTOCOMMIT,
-      (SQLPOINTER)SQL_AUTOCOMMIT_ON, SQL_NTS);
+      (SQLPOINTER)SQL_AUTOCOMMIT_ON, 0);
    /* allocate a statement handle */
    ret = dl_SQLAllocHandle(SQL_HANDLE_STMT, sql->hdbc, &(sql->hstmt));
 

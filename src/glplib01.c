@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
+*  Copyright (C) 2000,01,02,03,04,05,06,07,08,2009 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -133,8 +133,8 @@ LIBENV *lib_link_env(void)
          {  /* initialization failed; display an error message */
             fprintf(stderr, "GLPK library initialization failed.\n");
             fflush(stderr);
-            /* modified by theussl print error */
-            error("Execution aborted."); 
+            /* and abnormally terminate the program */
+            error("Execution aborted.");
          }
          /* initialization successful; obtain the pointer */
          env = lib_get_ptr();

@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
+*  Copyright (C) 2000,01,02,03,04,05,06,07,08,2009 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -48,6 +48,7 @@ typedef struct DOMAIN_BLOCK DOMAIN_BLOCK;
 typedef struct DOMAIN_SLOT DOMAIN_SLOT;
 typedef struct SET SET;
 typedef struct WITHIN WITHIN;
+typedef struct GADGET GADGET;
 typedef struct PARAMETER PARAMETER;
 typedef struct CONDITION CONDITION;
 typedef struct VARIABLE VARIABLE;
@@ -1532,6 +1533,8 @@ struct SET
       /* pseudo-code for computing assigned value; can be NULL */
       CODE *option;
       /* pseudo-code for computing default value; can be NULL */
+      GADGET *gadget;
+      /* plain set used to initialize the array of sets; can be NULL */
       int data;
       /* data status flag:
          0 - no data are provided in the data section
@@ -1547,6 +1550,14 @@ struct WITHIN
       /* pseudo-code for computing the superset; cannot be NULL */
       WITHIN *next;
       /* the next entry for the same set or parameter */
+};
+
+struct GADGET
+{     /* plain set used to initialize the array of sets with data */
+      SET *set;
+      /* pointer to plain set; cannot be NULL */
+      int ind[20]; /* ind[dim+dimen]; */
+      /* permutation of integers 1, 2, ..., dim+dimen */
 };
 
 #define check_elem_set _glp_mpl_check_elem_set

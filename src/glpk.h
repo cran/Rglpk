@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
+*  Copyright (C) 2000,01,02,03,04,05,06,07,08,2009 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -30,7 +30,7 @@ extern "C" {
 
 /* library version numbers: */
 #define GLP_MAJOR_VERSION  4
-#define GLP_MINOR_VERSION  34
+#define GLP_MINOR_VERSION  36
 
 #ifndef _GLP_PROB
 #define _GLP_PROB
@@ -148,12 +148,7 @@ typedef struct { double _opaque_tree; } glp_tree;
 
 typedef struct
 {     /* integer optimizer control parameters */
-      int msg_lev;            /* message level: */
-#define GLP_MSG_OFF        0  /* no output */
-#define GLP_MSG_ERR        1  /* warning and error messages only */
-#define GLP_MSG_ON         2  /* normal output */
-#define GLP_MSG_ALL        3  /* full output */
-#define GLP_MSG_DBG        4  /* debug output */
+      int msg_lev;            /* message level (see glp_smcp) */
       int br_tech;            /* branching technique: */
 #define GLP_BR_FFV         1  /* first fractional variable */
 #define GLP_BR_LFV         2  /* last fractional variable */
@@ -246,6 +241,8 @@ typedef struct
 #define GLP_ENOFEAS     0x0F  /* no primal/dual feasible solution */
 #define GLP_ENOCVG      0x10  /* no convergence */
 #define GLP_EINSTAB     0x11  /* numerical instability */
+#define GLP_EDATA       0x12  /* invalid data */
+#define GLP_ERANGE      0x13  /* result out of range */
 
 /* MPS file format: */
 #define GLP_MPS_DECK       1  /* fixed (ancient) */
@@ -696,6 +693,142 @@ void glp_mpl_free_wksp(glp_tran *tran);
 
 int glp_main(int argc, const char *argv[]);
 /* stand-alone LP/MIP solver */
+
+/**********************************************************************/
+
+typedef struct _glp_graph glp_graph;
+typedef struct _glp_vertex glp_vertex;
+typedef struct _glp_arc glp_arc;
+
+struct _glp_graph
+{     /* graph descriptor */
+      void *pool; /* DMP *pool; */
+      /* memory pool to store graph components */
+      char *name;
+      /* graph name (1 to 255 chars); NULL means no name is assigned
+         to the graph */
+      int nv_max;
+      /* length of the vertex list (enlarged automatically) */
+      int nv;
+      /* number of vertices in the graph, 0 <= nv <= nv_max */
+      int na;
+      /* number of arcs in the graph, na >= 0 */
+      glp_vertex **v; /* glp_vertex *v[1+nv_max]; */
+      /* v[i], 1 <= i <= nv, is a pointer to i-th vertex */
+      void *index; /* AVL *index; */
+      /* vertex index to find vertices by their names; NULL means the
+         index does not exist */
+      int v_size;
+      /* size of data associated with each vertex (0 to 256 bytes) */
+      int a_size;
+      /* size of data associated with each arc (0 to 256 bytes) */
+};
+
+struct _glp_vertex
+{     /* vertex descriptor */
+      int i;
+      /* vertex ordinal number, 1 <= i <= nv */
+      char *name;
+      /* vertex name (1 to 255 chars); NULL means no name is assigned
+         to the vertex */
+      void *entry; /* AVLNODE *entry; */
+      /* pointer to corresponding entry in the vertex index; NULL means
+         that either the index does not exist or the vertex has no name
+         assigned */
+      void *data;
+      /* pointer to data associated with the vertex */
+      void *temp;
+      /* working pointer */
+      glp_arc *in;
+      /* pointer to the (unordered) list of incoming arcs */
+      glp_arc *out;
+      /* pointer to the (unordered) list of outgoing arcs */
+};
+
+struct _glp_arc
+{     /* arc descriptor */
+      glp_vertex *tail;
+      /* pointer to the tail endpoint */
+      glp_vertex *head;
+      /* pointer to the head endpoint */
+      void *data;
+      /* pointer to data associated with the arc */
+      void *temp;
+      /* working pointer */
+      glp_arc *t_prev;
+      /* pointer to previous arc having the same tail endpoint */
+      glp_arc *t_next;
+      /* pointer to next arc having the same tail endpoint */
+      glp_arc *h_prev;
+      /* pointer to previous arc having the same head endpoint */
+      glp_arc *h_next;
+      /* pointer to next arc having the same head endpoint */
+};
+
+glp_graph *glp_create_graph(int v_size, int a_size);
+/* create graph */
+
+void glp_set_graph_name(glp_graph *G, const char *name);
+/* assign (change) graph name */
+
+int glp_add_vertices(glp_graph *G, int nadd);
+/* add new vertices to graph */
+
+glp_arc *glp_add_arc(glp_graph *G, int i, int j);
+/* add new arc to graph */
+
+void glp_erase_graph(glp_graph *G, int v_size, int a_size);
+/* erase graph content */
+
+void glp_delete_graph(glp_graph *G);
+/* delete graph */
+
+void glp_mincost_lp(glp_prob *lp, glp_graph *G, int names, int v_rhs,
+      int a_low, int a_cap, int a_cost);
+/* convert minimum cost flow problem to LP */
+
+int glp_mincost_okalg(glp_graph *G, int v_rhs, int a_low, int a_cap,
+      int a_cost, double *sol, int a_x, int v_pi);
+/* find minimum-cost flow with out-of-kilter algorithm */
+
+void glp_maxflow_lp(glp_prob *lp, glp_graph *G, int names, int s,
+      int t, int a_cap);
+/* convert maximum flow problem to LP */
+
+int glp_maxflow_ffalg(glp_graph *G, int s, int t, int a_cap,
+      double *sol, int a_x, int v_cut);
+/* find maximal flow with Ford-Fulkerson algorithm */
+
+int glp_read_mincost(glp_graph *G, int v_rhs, int a_low, int a_cap,
+      int a_cost, const char *fname);
+/* read min-cost flow problem data in DIMACS format */
+
+int glp_write_mincost(glp_graph *G, int v_rhs, int a_low, int a_cap,
+      int a_cost, const char *fname);
+/* write min-cost flow problem data in DIMACS format */
+
+int glp_read_maxflow(glp_graph *G, int *s, int *t, int a_cap,
+      const char *fname);
+/* read maximum flow problem data in DIMACS format */
+
+int glp_write_maxflow(glp_graph *G, int s, int t, int a_cap,
+      const char *fname);
+/* write maximum flow problem data in DIMACS format */
+
+int glp_netgen(glp_graph *G, int v_rhs, int a_cap, int a_cost,
+      const int parm[1+15]);
+/* Klingman's network problem generator */
+
+int glp_gridgen(glp_graph *G, int v_rhs, int a_cap, int a_cost,
+      const int parm[1+14]);
+/* grid-like network problem generator */
+
+int glp_rmfgen(glp_graph *G, int *s, int *t, int a_cap,
+      const int parm[1+5]);
+/* Goldfarb's maximum flow problem generator */
+
+int glp_weak_comp(glp_graph *G, int v_num);
+/* find all weakly connected components of graph */
 
 /**********************************************************************/
 

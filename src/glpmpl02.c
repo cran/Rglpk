@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
+*  Copyright (C) 2000,01,02,03,04,05,06,07,08,2009 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -301,7 +301,7 @@ SET *select_set
       if (node == NULL || avl_get_node_type(node) != A_SET)
          error(mpl, "%s not a set", name);
       set = (SET *)avl_get_node_link(node);
-      if (set->assign != NULL)
+      if (set->assign != NULL || set->gadget != NULL)
          error(mpl, "%s needs no data", name);
       set->data = 1;
       return set;

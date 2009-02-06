@@ -6,7 +6,7 @@
 *  Authors: Andrew Makhorin <mao@mai2.rcnet.ru>, <mao@gnu.org>
 *           Heinrich Schuchardt <xypron.glpk@gmx.de>
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
+*  Copyright (C) 2000,01,02,03,04,05,06,07,08,2009 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -484,6 +484,10 @@ void fn_time2str(MPL *mpl, char *str, double t, const char *fmt)
                   Sunday as the first day of the first week; days
                   preceding the first Sunday in the year are considered
                   to be in week 00 */
+#if 1 /* 09/I-2009 */
+#undef sun
+/* causes compilation error in SunOS */
+#endif
                int sun;
                /* sun = the first Sunday of the year */
                sun = jday(1, 1, year) - jday(1, 1, 1970);

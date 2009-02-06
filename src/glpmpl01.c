@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
+*  Copyright (C) 2000,01,02,03,04,05,06,07,08,2009 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -2916,6 +2916,7 @@ SET *set_statement(MPL *mpl)
       set->within = NULL;
       set->assign = NULL;
       set->option = NULL;
+      set->gadget = NULL;
       set->data = 0;
       set->array = NULL;
       get_token(mpl /* <symbolic name> */);
@@ -2995,8 +2996,9 @@ SET *set_statement(MPL *mpl)
          }
          else if (mpl->token == T_ASSIGN)
          {  /* assignment expression */
-            if (!(set->assign == NULL && set->option == NULL))
-err:           error(mpl, "at most one := or default allowed");
+            if (!(set->assign == NULL && set->option == NULL &&
+                  set->gadget == NULL))
+err:           error(mpl, "at most one := or default/data allowed");
             get_token(mpl /* := */);
             /* parse an expression that follows ':=' */
             set->assign = expression_9(mpl);
@@ -3027,6 +3029,76 @@ err:           error(mpl, "at most one := or default allowed");
                   "imension %d rather than %d",
                   set->dimen, set->option->dim);
          }
+#if 1 /* 12/XII-2008 */
+         else if (is_keyword(mpl, "data"))
+         {  /* gadget to initialize the set by data from plain set */
+            GADGET *gadget;
+            AVLNODE *node;
+            int i, k, fff[20];
+            if (!(set->assign == NULL && set->gadget == NULL)) goto err;
+            get_token(mpl /* data */);
+            set->gadget = gadget = alloc(GADGET);
+            /* set name must follow the keyword 'data' */
+            if (mpl->token == T_NAME)
+               ;
+            else if (is_reserved(mpl))
+               error(mpl, "invalid use of reserved keyword %s",
+                  mpl->image);
+            else
+               error(mpl, "set name missing where expected");
+            /* find the set in the symbolic name table */
+            node = avl_find_node(mpl->tree, mpl->image);
+            if (node == NULL)
+               error(mpl, "%s not defined", mpl->image);
+            if (avl_get_node_type(node) != A_SET)
+err1:          error(mpl, "%s not a plain set", mpl->image);
+            gadget->set = avl_get_node_link(node);
+            if (gadget->set->dim != 0) goto err1;
+            if (gadget->set == set)
+               error(mpl, "set cannot be initialized by itself");
+            /* check and set dimensions */
+            if (set->dim >= gadget->set->dimen)
+err2:          error(mpl, "dimension of %s too small", mpl->image);
+            if (set->dimen == 0)
+               set->dimen = gadget->set->dimen - set->dim;
+            if (set->dim + set->dimen > gadget->set->dimen)
+               goto err2;
+            else if (set->dim + set->dimen < gadget->set->dimen)
+               error(mpl, "dimension of %s too big", mpl->image);
+            get_token(mpl /* set name */);
+            /* left parenthesis must follow the set name */
+            if (mpl->token == T_LEFT)
+               get_token(mpl /* ( */);
+            else
+               error(mpl, "left parenthesis missing where expected");
+            /* parse permutation of component numbers */
+            for (k = 0; k < gadget->set->dimen; k++) fff[k] = 0;
+            k = 0;
+            for (;;)
+            {  if (mpl->token != T_NUMBER)
+                  error(mpl, "component number missing where expected");
+               if (str2int(mpl->image, &i) != 0)
+err3:             error(mpl, "component number must be integer between "
+                     "1 and %d", gadget->set->dimen);
+               if (!(1 <= i && i <= gadget->set->dimen)) goto err3;
+               if (fff[i-1] != 0)
+                  error(mpl, "component %d multiply specified", i);
+               gadget->ind[k++] = i, fff[i-1] = 1;
+               xassert(k <= gadget->set->dimen);
+               get_token(mpl /* number */);
+               if (mpl->token == T_COMMA)
+                  get_token(mpl /* , */);
+               else if (mpl->token == T_RIGHT)
+                  break;
+               else
+                  error(mpl, "syntax error in data attribute");
+            }
+            if (k < gadget->set->dimen)
+               error(mpl, "there are must be %d components rather than "
+                  "%d", gadget->set->dimen, k);
+            get_token(mpl /* ) */);
+         }
+#endif
          else
             error(mpl, "syntax error in set statement");
       }

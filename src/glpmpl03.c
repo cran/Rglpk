@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
+*  Copyright (C) 2000,01,02,03,04,05,06,07,08,2009 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -2424,6 +2424,67 @@ static void eval_set_func(MPL *mpl, void *_info)
       return;
 }
 
+#if 1 /* 12/XII-2008 */
+static void saturate_set(MPL *mpl, SET *set)
+{     GADGET *gadget = set->gadget;
+      ELEMSET *data;
+      MEMBER *elem, *memb;
+      TUPLE *tuple, *work[20];
+      int i;
+      xprintf("Generating %s...\n", set->name);
+      eval_whole_set(mpl, gadget->set);
+      /* gadget set must have exactly one member */
+      xassert(gadget->set->array != NULL);
+      xassert(gadget->set->array->head != NULL);
+      xassert(gadget->set->array->head == gadget->set->array->tail);
+      data = gadget->set->array->head->value.set;
+      xassert(data->type == A_NONE);
+      xassert(data->dim == gadget->set->dimen);
+      /* walk thru all elements of the plain set */
+      for (elem = data->head; elem != NULL; elem = elem->next)
+      {  /* create a copy of n-tuple */
+         tuple = copy_tuple(mpl, elem->tuple);
+         /* rearrange component of the n-tuple */
+         for (i = 0; i < gadget->set->dimen; i++)
+            work[i] = NULL;
+         for (i = 0; tuple != NULL; tuple = tuple->next)
+            work[gadget->ind[i++]-1] = tuple;
+         xassert(i == gadget->set->dimen);
+         for (i = 0; i < gadget->set->dimen; i++)
+         {  xassert(work[i] != NULL);
+            work[i]->next = work[i+1];
+         }
+         /* construct subscript list from first set->dim components */
+         if (set->dim == 0)
+            tuple = NULL;
+         else
+            tuple = work[0], work[set->dim-1]->next = NULL;
+         /* find corresponding member of the set to be initialized */
+         memb = find_member(mpl, set->array, tuple);
+         if (memb == NULL)
+         {  /* not found; add new member to the set and assign it empty
+               elemental set */
+            memb = add_member(mpl, set->array, tuple);
+            memb->value.set = create_elemset(mpl, set->dimen);
+         }
+         else
+         {  /* found; free subscript list */
+            delete_tuple(mpl, tuple);
+         }
+         /* construct new n-tuple from rest set->dimen components */
+         tuple = work[set->dim];
+         xassert(set->dim + set->dimen == gadget->set->dimen);
+         work[gadget->set->dimen-1]->next = NULL;
+         /* and add it to the elemental set assigned to the member
+            (no check for duplicates is needed) */
+         add_tuple(mpl, memb->value.set, tuple);
+      }
+      /* the set has been saturated with data */
+      set->data = 1;
+      return;
+}
+#endif
+
 ELEMSET *eval_member_set      /* returns reference, not value */
 (     MPL *mpl,
       SET *set,               /* not changed */
@@ -2434,6 +2495,12 @@ ELEMSET *eval_member_set      /* returns reference, not value */
       xassert(set->dim == tuple_dimen(mpl, tuple));
       info->set = set;
       info->tuple = tuple;
+#if 1 /* 12/XII-2008 */
+      if (set->gadget != NULL && set->data == 0)
+      {  /* initialize the set with data from a plain set */
+         saturate_set(mpl, set);
+      }
+#endif
       if (set->data == 1)
       {  /* check data, which are provided in the data section, but not
             checked yet */
@@ -5448,6 +5515,12 @@ static int display_func(MPL *mpl, void *info)
             {  /* the set has no assignment expression; refer to its
                   any existing member ignoring resultant value to check
                   the data provided the data section */
+#if 1 /* 12/XII-2008 */
+               if (set->gadget != NULL && set->data == 0)
+               {  /* initialize the set with data from a plain set */
+                  saturate_set(mpl, set);
+               }
+#endif
                if (set->array->head != NULL)
                   eval_member_set(mpl, set, set->array->head->tuple);
             }

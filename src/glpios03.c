@@ -3,7 +3,7 @@
 /***********************************************************************
 *  This code is part of GLPK (GNU Linear Programming Kit).
 *
-*  Copyright (C) 2000, 01, 02, 03, 04, 05, 06, 07, 08 Andrew Makhorin,
+*  Copyright (C) 2000,01,02,03,04,05,06,07,08,2009 Andrew Makhorin,
 *  Department for Applied Informatics, Moscow Aviation Institute,
 *  Moscow, Russia. All rights reserved. E-mail: <mao@mai2.rcnet.ru>.
 *
@@ -723,7 +723,7 @@ static void branch_mostf(glp_tree *tree)
 *  2 - both branches have no feasible solution and have been pruned;
 *      subproblem selection is needed. */
 
-int branch_on(glp_tree *tree)
+static int branch_on(glp_tree *tree)
 {     glp_prob *mip = tree->mip;
       int n = mip->n;
       int j = tree->br_var;
