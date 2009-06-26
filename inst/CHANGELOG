@@ -1,3 +1,9 @@
+2009-06-26  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+
+	* REMOVED: sparse matrix support from Rglpk package
+	* ADDED: slam dependency which replaces the old S3 sparse matrix support
+	* RELEASE: Rglpk 0.3-1 on CRAN
+
 2009-03-30  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
 
 	* UPDATED: Rglpk now includes GLPK version 4.37
