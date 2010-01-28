@@ -1,41 +1,54 @@
-2009-06-26  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+2010-01-28  Stefan Theussl  <stefan.theussl@wu.ac.at>
+
+	* UPDATED: Rglpk now includes GLPK version 4.42
+	* FIXED: compile warnings have been fixed in Upstream code
+	* ADDED: Windows support via separate configure script and Makevars 
+
+2009-09-07  Stefan Theussl  <stefan.theussl@wu.ac.at>
+
+	* UPDATED: Rglpk now includes GLPK version 4.39
+	* FIXED: lower, upper bound conversion in bound_table
+	* ADDED: separate configure script and Makevars due to
+	         major changes in upstream code
+
+2009-06-26  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* REMOVED: sparse matrix support from Rglpk package
 	* ADDED: slam dependency which replaces the old S3 sparse matrix support
 	* RELEASE: Rglpk 0.3-1 on CRAN
 
-2009-03-30  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+2009-03-30  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* UPDATED: Rglpk now includes GLPK version 4.37
 	* RELEASE: Rglpk 0.2-9 on CRAN
 
-2009-02-06  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+2009-02-06  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* UPDATED: Rglpk now includes GLPK version 4.36
 	* RELEASE: Rglpk 0.2-8 on CRAN
 
-2008-12-08  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+2008-12-08  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* UPDATED: Rglpk now includes GLPK version 4.34
 	* RELEASE: Rglpk 0.2-7 on CRAN
 
-2008-11-16  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+2008-11-16  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* UPDATED: Rglpk now includes GLPK version 4.33
 	* FIXED: replaced abort() with error() statments
 	* RELEASE: Rglpk 0.2-6 on CRAN
 
-2008-09-27  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+2008-09-27  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* UPDATED: Rglpk now includes GLPK version 4.31
 
 
-2008-08-20  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+2008-08-20  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* RELEASE: Rglpk 0.2-5 on CRAN 
 
 
-2008-08-15  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+2008-08-15  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* UPDATED:  GLPK 4.30
 	* FIXED: read/write MPS files new low level C routines
@@ -43,18 +56,18 @@
 	* ADDED: GLPK version information printed in R after loading shared library
 
 
-2008-07-30  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+2008-07-30  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* FIXED: integer/binary variables are now rounded to reduce
 	  failures due to numerical artefacts
 
 
-2008-07-21  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+2008-07-21  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* UPDATED: GLPK 4.29 integrated
 
 
-2008-06-06  Stefan Theussl  <stefan.theussl@wu-wien.ac.at>
+2008-06-06  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* RELEASE: Rglpk released to CRAN. It interfaces GLPK version
 	  4.28. Facilities to read MPS and CPLEX-LP format added.

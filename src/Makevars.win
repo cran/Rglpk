@@ -1,0 +1,3 @@
+GLPK_LIBS = -lglpk_4_42
+PKG_CPPFLAGS = -I$(GLPK_HOME)/include
+PKG_LIBS = -L$(GLPK_HOME)/w32 $(GLPK_LIBS)

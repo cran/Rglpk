@@ -103,8 +103,9 @@ function(lp_objective_coefficients, lp_n_of_objective_vars,
   out
 }
 
-## Convenience function for solving MILP objects (e.g., read by filereader)
-.Rglpk_solve <- function(x, control = list()){
+## Convenience function for solving MILP objects
+## upcoming ROI package (or for solving problems read with filereader)
+.ROI_glpk_solve <- function(x, control = list()){
   if(!inherits(x, "MILP"))
     stop("'x' must be of class 'MILP'")
   if(is.null(control$verbose))

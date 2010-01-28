@@ -12,8 +12,8 @@ function(x)
   if(!inherits(x,"bound_table"))
     stop("'x' is not of class 'bound_table'")
   x$type <- ifelse(is.finite(x$lower),
-                   ifelse(is.finite(x$upper), 4L, 3L),
-                   ifelse(is.finite(x$upper), 2L, 1L))
+                   ifelse(is.finite(x$upper), 4L, 2L),
+                   ifelse(is.finite(x$upper), 3L, 1L))
   x$type[x$upper == x$lower] <- 5L
   x
 }
@@ -48,7 +48,7 @@ glp_bounds <- function(x, n)
 
   ## Initialize default matrix
   bound_table <-
-      expand.grid(type = rep.int(2L, n), upper = 0.0, lower = Inf)
+      expand.grid(type = rep.int(2L, n), lower = 0.0, upper = Inf)
   class(bound_table) <- c("bound_table", class(bound_table))
   
   ## Lower bounds
