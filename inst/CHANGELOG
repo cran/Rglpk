@@ -1,8 +1,14 @@
+2010-02-02  Stefan Theussl  <stefan.theussl@wu.ac.at>
+
+	* FIXED: Now includes a static library for windows
+	* RELEASE: Rglpk 0.3-4 on CRAN
+
 2010-01-28  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* UPDATED: Rglpk now includes GLPK version 4.42
 	* FIXED: compile warnings have been fixed in Upstream code
 	* ADDED: Windows support via separate configure script and Makevars 
+	* RELEASE: Rglpk 0.3-3 on CRAN
 
 2009-09-07  Stefan Theussl  <stefan.theussl@wu.ac.at>
 

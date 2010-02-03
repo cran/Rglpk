@@ -1,6 +1,6 @@
 Package: Rglpk
-Version: 0.3-3
-Date: 2010-01-28
+Version: 0.3-4
+Date: 2010-02-03
 Title: R/GNU Linear Programming Kit Interface
 Author: Stefan Theussl and Kurt Hornik
 Maintainer: Stefan Theussl <stefan.theussl@wu.ac.at>
@@ -12,6 +12,6 @@ Depends: slam (>= 0.1-9)
 License: GPL-2
 URL: http://R-Forge.R-project.org/projects/rglp/,
         http://www.gnu.org/software/glpk/
-Packaged: 2010-01-28 14:07:18 UTC; theussl
+Packaged: 2010-02-10 10:00:01 UTC; theussl
 Repository: CRAN
-Date/Publication: 2010-01-28 16:22:10
+Date/Publication: 2010-02-11 08:45:18
