@@ -1,3 +1,8 @@
+2010-02-15  Stefan Theussl  <stefan.theussl@wu.ac.at>
+
+	* FIXED: Further Windows improvements (Makevars.win, Makefile.win)
+	* RELEASE: Rglpk 0.3-5 on CRAN
+
 2010-02-02  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* FIXED: Now includes a static library for windows
