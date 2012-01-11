@@ -1,4 +1,6 @@
 /* These are the interface functions to GLPK's MPS reader/writer
+ * Since 2012-01-11: Rglpk now supports MATHPROG files and retrieves
+ * variables names and constraints names. Thanks to Michael Kapler!
  */
 
 #include "Rglpk.h"
@@ -14,6 +16,8 @@ void Rglpk_read_file (char **file, int *type,
 
   int status;
   glp_prob *lp;
+  glp_tran *tran;
+
   
   // Turn on/off Terminal Output
   if (*lp_verbosity==1)
@@ -39,7 +43,21 @@ void Rglpk_read_file (char **file, int *type,
     // CPLEX LP Format
     status = glp_read_lp(lp, NULL, *file);
     break;
-  }
+  case 4:
+    // MATHPROG Format (based on lpx_read_model function)
+    tran = glp_mpl_alloc_wksp();
+
+    status = glp_mpl_read_model(tran, *file, 0);
+
+    if (!status) {
+        status = glp_mpl_generate(tran, NULL);
+        if (!status) {
+            glp_mpl_build_prob(tran, lp);
+        }
+    }
+    glp_mpl_free_wksp(tran);
+    break;    
+  } 
 
   // if file read successfully glp_read_* returns zero
   if ( status != 0 ) {
@@ -84,8 +102,14 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
 				  double *lp_bounds_lower,
 				  double *lp_bounds_upper,
 				  int *lp_ignore_first_row,
-				  int *lp_verbosity) {
+				  int *lp_verbosity,
+				  char **lp_constraint_names,
+				  char **lp_objective_vars_names
+				  ) {
   glp_prob *lp;
+  glp_tran *tran;
+  char *name; 
+  
   int i, j, lp_column_kind, tmp;
   int ind_offset, status;
 
@@ -113,7 +137,21 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
     // CPLEX LP Format
     status = glp_read_lp(lp, NULL, *file);
     break;
-  }
+  case 4:
+    // MATHPROG Format (based on lpx_read_model function)
+    tran = glp_mpl_alloc_wksp();
+
+    status = glp_mpl_read_model(tran, *file, 0);
+
+    if (!status) {
+        status = glp_mpl_generate(tran, NULL);
+        if (!status) {
+            glp_mpl_build_prob(tran, lp);
+        }
+    }
+    glp_mpl_free_wksp(tran);
+    break;    
+  } 
 
   // if file read successfully glp_read_* returns zero
   if ( status != 0 ) {
@@ -123,6 +161,14 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
   // retrieve column specific data (values, bounds and type)
   for (i = 0; i < *lp_n_objective_vars; i++) {
     lp_objective_coefficients[i] = glp_get_obj_coef(lp, i+1);
+    
+    // FIXME: is this really safe? we just initialized strings of
+    // length 100 in R.
+    name = glp_get_col_name(lp, i+1);    
+    if (name != NULL) {
+        strcpy(lp_objective_vars_names[i], name);
+    }	        
+    
     lp_bounds_type[i]            = glp_get_col_type(lp, i+1);
     lp_bounds_lower[i]           = glp_get_col_lb  (lp, i+1);
     lp_bounds_upper[i]           = glp_get_col_ub  (lp, i+1);
@@ -142,7 +188,14 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
   // retrieve row specific data (right hand side, direction of constraints)
   for (i = *lp_ignore_first_row; i < *lp_n_constraints; i++) {
     lp_direction_of_constraints[i] = glp_get_row_type(lp, i+1);
-
+    
+    // FIXME: is this really safe? we just initialized strings of
+    // length 100 in R.
+    name = glp_get_row_name(lp, i+1);    
+    if (name != NULL) {
+        strcpy(lp_constraint_names[i], name);
+    }	    
+    
     // the right hand side. Note we don't allow for double bounded or
     // free auxiliary variables 
     if( lp_direction_of_constraints[i] == GLP_LO )

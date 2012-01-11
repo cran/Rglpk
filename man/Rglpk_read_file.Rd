@@ -8,7 +8,7 @@
 }
 \usage{
 ## MPS file reader
-Rglpk_read_file(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP"),
+Rglpk_read_file(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP", "MathProg"),
 ignore_first_row = FALSE, verbose = FALSE) 
 
 ## print method
@@ -18,7 +18,8 @@ ignore_first_row = FALSE, verbose = FALSE)
   \item{file}{a character specifying the relative or absolute path to
     the model file.}
   \item{type}{a character specifying the file format. This can be either
-    \code{"MPS_fixed"}, \code{"MPS_free"} and \code{"CPLEX_LP"}.}
+    \code{"MPS_fixed"}, \code{"MPS_free"}, \code{"CPLEX_LP"}, and
+    GNU \code{"MathProg"}.}
   \item{ignore_first_row}{a logical indicating whether the first row of
     the model file should be ignored or not.
     Default: \code{FALSE}.}
