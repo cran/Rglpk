@@ -108,7 +108,7 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
 				  ) {
   glp_prob *lp;
   glp_tran *tran;
-  char *name; 
+  const char *str; 
   
   int i, j, lp_column_kind, tmp;
   int ind_offset, status;
@@ -162,11 +162,9 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
   for (i = 0; i < *lp_n_objective_vars; i++) {
     lp_objective_coefficients[i] = glp_get_obj_coef(lp, i+1);
     
-    // FIXME: is this really safe? we just initialized strings of
-    // length 100 in R.
-    name = glp_get_col_name(lp, i+1);    
-    if (name != NULL) {
-        strcpy(lp_objective_vars_names[i], name);
+    str = glp_get_col_name(lp, i+1);    
+    if (str != NULL) {
+      lp_objective_vars_names[i] = (char *) str;
     }	        
     
     lp_bounds_type[i]            = glp_get_col_type(lp, i+1);
@@ -189,11 +187,9 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
   for (i = *lp_ignore_first_row; i < *lp_n_constraints; i++) {
     lp_direction_of_constraints[i] = glp_get_row_type(lp, i+1);
     
-    // FIXME: is this really safe? we just initialized strings of
-    // length 100 in R.
-    name = glp_get_row_name(lp, i+1);    
-    if (name != NULL) {
-        strcpy(lp_constraint_names[i], name);
+    str = glp_get_row_name(lp, i+1);    
+    if (str != NULL) {
+      lp_constraint_names[i] = (char *) str;
     }	    
     
     // the right hand side. Note we don't allow for double bounded or

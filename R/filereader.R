@@ -133,8 +133,8 @@ glp_retrieve_MP_from_file <- function(x, ignore_first_row, verbose = FALSE){
             bounds_upper             = double(x$n_objective_vars),
             lp_ignore_first_row      = as.integer(ignore_first_row),
             verbosity                = as.integer(verbose),
-            constraint_names         = rep(paste(rep('',100),collapse=' '), x$n_constraints),
-            objective_vars_names     = rep(paste(rep('',100),collapse=' '), x$n_objective_vars),
+            constraint_names         = rep(character(1L), x$n_constraints),
+            objective_vars_names     = rep(character(1L), x$n_objective_vars),
             PACKAGE = "Rglpk")
   ## lp_is_integer               = as.integer(lp_is_integer),
 

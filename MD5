@@ -1,9 +1,9 @@
-fdcdd4966762733073e0ad9d57f833cb *DESCRIPTION
+267bdac6214c026cea5aa7fd53ad6998 *DESCRIPTION
 ffc7fdfda4b522c2c8f5193e1ec7d88b *NAMESPACE
 a1ae0d098dbd47842ea3dc82363f0119 *R/Misc.R
 2e77b02854284b3ff99dc334a680a6a1 *R/Rglpk_solve.R
 486233499334e76a2f9c84a078e962d2 *R/bounds.R
-29fafaf6e1506ab0739ee297959212f0 *R/filereader.R
+ac50e4d06f864cd91e3f8cd25d7d1429 *R/filereader.R
 b5926c311da3fe8b486ac730aeb3e933 *R/milp.R
 9a3dde9c92c8c109ba717446f2d7b2b2 *R/zzz.R
 5299c161b149974ccae263af06494afc *cleanup
@@ -203,5 +203,5 @@ c56799f2cd064bff61029232dce83e92 *src/GLPK/zlib/zlib.h
 dfa66b3059b851ef6e8e0cb382b1d1b1 *src/Makevars.win
 9c352efa930583859bd9c8de2b07a9c4 *src/Rglpk.h
 5622e753d3d13b4bf264756073cbc667 *src/Rglpk_initialize.c
-5894b5231f353cd033cc7a3d7d730265 *src/Rglpk_read_file.c
+39827ab4d2e85b6291e9f08a0bb249ff *src/Rglpk_read_file.c
 f164da4accb871d477ffa870633bdfbc *src/Rglpk_solve.c
