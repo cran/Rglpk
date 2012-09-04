@@ -23,6 +23,11 @@ function(obj, mat, dir, rhs, types = NULL, max = FALSE,
   if( any(is.na(direction_of_constraints)) )
     stop("Argument 'dir' must be either '<', '<=', '>', '>=' or '=='.")
 
+  ## we need to verify that obj is a numeric vector
+  ## FIXME: always use STMs?
+  if(slam::is.simple_triplet_matrix(obj))
+      obj <- as.matrix(obj)
+  obj <- as.numeric(obj)
   n_of_objective_vars <- length( obj )
 
   constraint_matrix <- as.simple_triplet_matrix(mat)

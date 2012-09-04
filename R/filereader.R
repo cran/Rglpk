@@ -46,8 +46,8 @@ Rglpk_read_file <- function(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP", 
   obj <- list(file = tools::file_path_as_absolute(file),
               type = type)
   ## read files in a two step approach
-  ## first, retrieve meta data like number of objective variables etc.
-  ## we need this to reserve memory in R accordingly
+  ## first, retrieve meta data: e.g., the number of objective variables, etc.
+  ## we need this to allocate memory on the R level for the result vectors
   meta_data <- glp_get_meta_data_from_file(obj, verbose)
   ## second, read all remaining data
   milp_data <- glp_retrieve_MP_from_file(meta_data, ignore_first_row, verbose)
@@ -55,10 +55,34 @@ Rglpk_read_file <- function(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP", 
   MP_data <- glp_merge_MP_data(meta_data, milp_data)
   ## Post processing
   MP_data$type <- names(type_db[type_db == MP_data$type])
-  ## unbounded (FREE, 1L) variable gets an upper bound of Inf
   ## and a direction '<='
-  dir_db <- c("<=" = 1L, ">=" = 2L, "<=" = 3L, "DB" = 4L, "==" = 5L)
+  dir_db <- c("FR" = 1L, ">=" = 2L, "<=" = 3L, "DB" = 4L, "==" = 5L)
   MP_data$direction_of_constraints <- names(dir_db[MP_data$direction_of_constraints])
+  ## we remove constraints marked as unbounded (GLP_FR)
+  ind_FR <- MP_data$direction_of_constraints == "FR"
+  if(any(ind_FR)){
+      MP_data$constraint_matrix <- MP_data$constraint_matrix[ !ind_FR, ]
+      MP_data$right_hand_side <- MP_data$right_hand_side[ !ind_FR ]
+      MP_data$left_hand_side <- MP_data$left_hand_side[ !ind_FR ]
+      MP_data$direction_of_constraints <- MP_data$direction_of_constraints[ !ind_FR ]
+      MP_data$constraint_names <- MP_data$constraint_names[ !ind_FR ]
+      MP_data$n_constraints <- MP_data$n_constraints - sum( ind_FR )
+  }
+  ## we add an additional constraint for double bounded constraints(GLP_DB)
+  ind_DB <- MP_data$direction_of_constraints == "DB"
+  if(any(ind_DB)){
+      n_double_bounded <- sum( ind_DB )
+      MP_data$constraint_matrix <- rbind( MP_data$constraint_matrix, MP_data$constraint_matrix[ ind_DB, ] )
+      ## upper bounds already in rhs vector
+      MP_data$direction_of_constraints[ ind_DB ] <- "<="
+      length(MP_data$direction_of_constraints) <- length(MP_data$direction_of_constraints) + sum(ind_DB)
+      MP_data$direction_of_constraints[is.na(MP_data$direction_of_constraints)] <- ">="
+      length(MP_data$right_hand_side) <- length(MP_data$right_hand_side) + sum(ind_DB)
+      MP_data$right_hand_side[is.na(MP_data$right_hand_side)] <- MP_data$left_hand_side[ind_DB ]
+      MP_data$constraint_names <- c(MP_data$constraint_names, MP_data$constraint_names[ ind_DB ])
+      MP_data$n_constraints <- MP_data$n_constraints + sum( ind_DB )
+  }
+
   ## default is to have only continuous variables
   ## if any is binary or integer set the value accordingly
   types <- rep("C", length.out = MP_data$n_objective_vars)
@@ -126,6 +150,7 @@ glp_retrieve_MP_from_file <- function(x, ignore_first_row, verbose = FALSE){
             constraint_matrix_values = double(x$n_values_in_constraint_matrix),
             direction_of_constraints = integer(x$n_constraints),
             right_hand_side          = double(x$n_constraints),
+            left_hand_side           = double(x$n_constraints),
             objective_var_is_integer = integer(x$n_objective_vars),
             objective_var_is_binary  = integer(x$n_objective_vars),
             bounds_type              = integer(x$n_objective_vars),
@@ -152,6 +177,7 @@ glp_retrieve_MP_from_file <- function(x, ignore_first_row, verbose = FALSE){
     res$constraint_matrix_j <- res$constraint_matrix_j[-to_remove]
     res$constraint_matrix_values <- res$constraint_matrix_values[-to_remove]
     res$right_hand_side <- res$right_hand_side[-1]
+    res$left_hand_side <- res$left_hand_side[-1]
     #res$direction_of_constraints <- res$direction_of_constraints[-length(res$right_hand_side)]
   }
   res
@@ -167,6 +193,7 @@ glp_merge_MP_data <- function(x, y){
                                                    y$n_objective_vars),
               direction_of_constraints      = y$direction_of_constraints,
               right_hand_side               = y$right_hand_side,
+              left_hand_side                = y$left_hand_side,
               objective_var_is_integer      = as.logical(y$objective_var_is_integer),
               objective_var_is_binary       = as.logical(y$objective_var_is_binary),
               ## minimization if GLP_MIN (1L) or max if GLP_MAX (2L)

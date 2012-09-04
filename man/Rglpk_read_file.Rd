@@ -7,7 +7,7 @@
   Programming Kit (GLPK).
 }
 \usage{
-## MPS file reader
+## File reader for various formats
 Rglpk_read_file(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP", "MathProg"),
 ignore_first_row = FALSE, verbose = FALSE) 
 
@@ -42,11 +42,20 @@ ignore_first_row = FALSE, verbose = FALSE)
 \author{Stefan Theussl}
 %%\seealso{}
 \examples{
-## not run:
-## x <- Rglpk_read_file(some_file.MPS)
-## x
-## Rglpk_solve_LP(x$objective, x$constraints[[1]], x$constraints[[2]],
-##                x$constraints[[3]], x$types, x$maximum, x$bounds)
+## read an MPS file
+x <- Rglpk_read_file( system.file(file.path("mps", "plan.mps"), package
+= "Rglpk"), type = "MPS_fixed")
+x
+## optimal solution: 296.2166
+Rglpk_solve_LP(x$objective, x$constraints[[1]], x$constraints[[2]],
+                x$constraints[[3]], x$types, x$maximum, x$bounds)
+## read a MATHPROG file
+x <- Rglpk_read_file( system.file(file.path("mod", "assign.mod"), package
+= "Rglpk"), type = "MathProg")
+x
+## optimal solution: 76
+Rglpk_solve_LP(x$objective, x$constraints[[1]], x$constraints[[2]],
+                x$constraints[[3]], x$types, x$maximum, x$bounds)
 }
 \keyword{IO}
 \keyword{utilities}

@@ -96,6 +96,7 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
 				  double *lp_constraint_matrix_values,
 				  int *lp_direction_of_constraints,
 				  double *lp_right_hand_side,
+				  double *lp_left_hand_side,
 				  int *lp_objective_var_is_integer,
 				  int *lp_objective_var_is_binary,
 				  int *lp_bounds_type,
@@ -155,17 +156,25 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
 
   // if file read successfully glp_read_* returns zero
   if ( status != 0 ) {
-    error("Reading file %c failed", *file);
+    error("Reading file %c failed.", *file);
   }
-  
+
+  if(*lp_verbosity==1)
+    Rprintf("Retrieve column specific data ...\n");
+
   // retrieve column specific data (values, bounds and type)
   for (i = 0; i < *lp_n_objective_vars; i++) {
     lp_objective_coefficients[i] = glp_get_obj_coef(lp, i+1);
     
+    // (char *) CHAR(mkChar(str)) copies the retrieved str into R's
+    // character cache. This makes the data usable in R even if the
+    // GLP problem gets deleted and thus, avoids segfaults on large
+    // problems.
     str = glp_get_col_name(lp, i+1);    
-    if (str != NULL) {
-      lp_objective_vars_names[i] = (char *) str;
-    }	        
+    if (str){
+      lp_objective_vars_names[i] = (char *) CHAR(mkChar(str));
+      /* strcpy(lp_objective_vars_names[i], str);  */
+    }
     
     lp_bounds_type[i]            = glp_get_col_type(lp, i+1);
     lp_bounds_lower[i]           = glp_get_col_lb  (lp, i+1);
@@ -183,14 +192,19 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
   }
   
   ind_offset = 0;
+
+  if(*lp_verbosity==1)
+    Rprintf("Retrieve row specific data ...\n");
+
   // retrieve row specific data (right hand side, direction of constraints)
   for (i = *lp_ignore_first_row; i < *lp_n_constraints; i++) {
     lp_direction_of_constraints[i] = glp_get_row_type(lp, i+1);
     
-    str = glp_get_row_name(lp, i+1);    
-    if (str != NULL) {
-      lp_constraint_names[i] = (char *) str;
-    }	    
+    str = glp_get_row_name(lp, i + 1);
+    if (str) { 
+      lp_constraint_names[i] = (char *) CHAR(mkChar(str));      
+      /* strcpy(lp_constraint_names[i], str); */
+    }
     
     // the right hand side. Note we don't allow for double bounded or
     // free auxiliary variables 
@@ -200,7 +214,11 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
       lp_right_hand_side[i] = glp_get_row_ub(lp, i+1);
     if( lp_direction_of_constraints[i] == GLP_FX )
       lp_right_hand_side[i] = glp_get_row_lb(lp, i+1);
-    
+    if( lp_direction_of_constraints[i] == GLP_DB  ){
+      lp_right_hand_side[i] = glp_get_row_ub(lp, i+1);
+      lp_left_hand_side[i] =  glp_get_row_lb(lp, i+1);
+    }
+
     tmp = glp_get_mat_row(lp, i+1, &lp_constraint_matrix_j[ind_offset-1],
 			           &lp_constraint_matrix_values[ind_offset-1]);
     if (tmp > 0)
@@ -208,8 +226,11 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
 	lp_constraint_matrix_i[ind_offset+j] = i+1;
 	ind_offset += tmp; 
   }
-  
+
   // delete problem object
   glp_delete_prob(lp);
-}
+  
+  if(*lp_verbosity==1)
+    Rprintf("Done.\n");
 
+}

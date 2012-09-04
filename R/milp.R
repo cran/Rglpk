@@ -9,7 +9,7 @@
 ## maximum: logical
 
 MILP <-
-function(objective, constraints, bounds = NULL, types = NULL, 
+function(objective, constraints, bounds = NULL, types = NULL,
          maximum = FALSE)
 {
     ## In the simples case, 'constraints' is a (not necessarily named)
@@ -17,7 +17,7 @@ function(objective, constraints, bounds = NULL, types = NULL,
     ## more advanced constraints, but let's worry about this later (and
     ## maybe also a little MILP_constraints() wrapper ...).
 
-    structure(list(objective = objective, constraints = constraints,
+    structure(list(objective = slam::as.simple_triplet_matrix(objective), constraints = constraints,
                    bounds = bounds, types = types, maximum = maximum),
               class = "MILP")
 }

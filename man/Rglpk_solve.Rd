@@ -101,5 +101,24 @@ Rglpk_solve_LP(obj, mat, dir, rhs, types, max)
 bounds <- list(lower = list(ind = c(1L, 3L), val = c(-Inf, 2)),
                upper = list(ind = c(1L, 2L), val = c(4, 100)))
 Rglpk_solve_LP(obj, mat, dir, rhs, types, max, bounds)
+
+## Examples from the GLPK manual
+
+## 1.3.1
+## maximize:   10 x_1 + 6 x_2 + 4 x_3
+## subject to:    x_1 +   x_2 +   x_3 <= 100
+##             10 x_1 + 4 x_2 + 5 x_3 <= 600
+##              2 x_1 + 2 x_2 + 6 x_3 <= 300
+##                x_1,    x_2,    x_3 are non-negative real numbers
+
+obj <- c(10, 6, 4)
+mat <- matrix(c(1, 10, 2, 1, 4, 2, 1, 5, 6), nrow = 3)
+dir <- c("<=", "<=", "<=")
+rhs <- c(100, 600, 300)
+max <- TRUE
+
+Rglpk_solve_LP(obj, mat, dir, rhs, max = max)
+
+
 }
 \keyword{optimize}
