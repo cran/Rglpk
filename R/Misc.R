@@ -17,18 +17,18 @@
 print.MP_data_from_file <- function(x, ...){
   if(!inherits(x, "MP_data_from_file"))
      stop("'x' must be of class 'MP_data_from_file'")
-  if(x$n_integer_vars > 0){
+  if(attr(x, "n_integer_vars") > 0L){
     writeLines(paste("A mixed integer linear program with",
-                     x$n_objective_vars, "objective variables,"))
-    writeLines(paste(x$n_integer_vars, "are integer and",
-                     x$n_binary_vars, "of which are binary variables."))
-    writeLines(paste("This problem has", x$n_constraints,
-                     "constraints with", length(x$constraints[[1]]$v),
+                     attr(x, "n_objective_vars"), "objective variables,"))
+    writeLines(paste(attr(x, "n_integer_vars"), "are integer and",
+                     attr(x, "n_binary_vars"), "of which are binary variables."))
+    writeLines(paste("This problem has", attr(x, "n_constraints"),
+                     "constraints with", attr(x, "n_nonzeros"),
                      "non-zero values in the constraint matrix."))
   } else{
-    writeLines(paste("A linear program with", x$n_objective_vars, "objective variables."))
-    writeLines(paste("This problem has", x$n_constraints,
-                     "constraints with", dim(x$constraints)[1] ,
+    writeLines(paste("A linear program with", attr(x, "n_objective_vars"), "objective variables."))
+    writeLines(paste("This problem has", attr(x, "n_constraints"),
+                     "constraints with", attr(x, "n_nonzeros"),
                      "non-zero values in the constraint matrix."))
-  } 
+  }
 }

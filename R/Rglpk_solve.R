@@ -2,18 +2,19 @@
 ## solve function --- C Interface
 
 Rglpk_solve_LP <-
-function(obj, mat, dir, rhs, types = NULL, max = FALSE,
-         bounds = NULL, verbose = FALSE)
+function(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
+          control = list(), ...)
 {
   ## validate direction of optimization
   if(!identical( max, TRUE ) && !identical( max, FALSE ))
     stop("'Argument 'max' must be either TRUE or FALSE.")
   direction_of_optimization <- as.integer(max)
 
-  ## validate verbosity flag
-  if(!identical(verbose, TRUE) && !identical(verbose, FALSE))
-    stop("'Argument 'verbose' must be either TRUE or FALSE.")
-  verb <- as.integer(verbose)
+  ## validate control list
+  dots <- list(...)
+  control[names(dots)] <- dots
+  control <- .check_control_parameters( control )
+  verb <- control$verbose
 
   ## match direction of constraints
   n_of_constraints <- length(dir)
@@ -73,8 +74,11 @@ function(obj, mat, dir, rhs, types = NULL, max = FALSE,
   solution[integers | binaries] <-
     round( solution[integers | binaries])
   ## match status of solution
-  ## 0 -> optimal solution (5 in GLPK) else 1
-  status <- as.integer(x$lp_status != 5L)
+  status <- as.integer(x$lp_status)
+  if(control$canonicalize_status){
+      ## 0 -> optimal solution (5 in GLPK) else 1
+      status <- as.integer(status != 5L)
+  }
   list(optimum = sum(solution * obj), solution = solution, status = status)
 }
 

@@ -1,3 +1,37 @@
+2012-09-11  Stefan Theussl  <stefan.theussl@R-project.org>
+	* UPDATED: argument list now in the following order: obj, mat,
+          dir, rhs, bounds = NULL, types = NULL, max = FALSE, control
+          = NULL. Currently, control can only be used for setting verbosity level.
+	* UPDATED: use only a subset of file reader example data
+	* FIXED: file reader improvements (C API), thx to ceeboo
+	* RELEASE: Rglpk 0.3-10 on CRAN
+
+2012-09-04  Stefan Theussl  <stefan.theussl@R-project.org>
+
+	* ADDED: example data for file reader function
+	* FIXED: fixing segfault when reading large instances from files
+	* UPDATED: maintainer mail address
+	* RELEASE: Rglpk 0.3-9 on CRAN
+
+2012-01-16  Stefan Theussl  <stefan.theussl@wu.ac.at>
+
+	* FIXED: gcc 4.5.x warning
+	* RELEASE: Rglpk 0.3-8 on CRAN
+
+2012-01-12  Stefan Theussl  <stefan.theussl@wu.ac.at>
+
+	* ADDED: added MATHPROG reader support
+	* ADDED: retrieving constraint names from file based instances
+	* RELEASE: Rglpk 0.3-7 on CRAN
+
+2011-12-30  Stefan Theussl  <stefan.theussl@wu.ac.at>
+
+	* UPDATED: now using packageStartupMessage()
+	* UPDATED: Windows build toolchain changed
+	* UPDATED: configure script now searching for system library
+	* UPDATED: Rglpk now includes GLPK sources of version 4.47
+	* RELEASE: Rglpk 0.3-7 on CRAN
+
 2010-02-15  Stefan Theussl  <stefan.theussl@wu.ac.at>
 
 	* FIXED: Further Windows improvements (Makevars.win, Makefile.win)

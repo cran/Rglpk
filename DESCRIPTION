@@ -1,6 +1,6 @@
 Package: Rglpk
-Version: 0.3-9
-Date: 2012-09-04
+Version: 0.3-10
+Date: 2012-09-12
 Title: R/GNU Linear Programming Kit Interface
 Description: R interface to the GNU Linear Programming Kit (GLPK
         version 4.47 is shipped with the source package).  GLPK is open
@@ -12,13 +12,12 @@ Authors@R: c(person("Kurt", "Hornik", role = "aut"), person("Stefan",
         "Stefan.Theussl@R-project.org" ))
 Depends: slam (>= 0.1-9)
 SystemRequirements: GLPK library package (e.g., libglpk-dev on
-        Debian/Ubuntu); or corresponding header files and binaries
-        (e.g., on Windows); sources are included for other OSes.
+        Debian/Ubuntu); sources are included for other OSes.
 License: GPL-2
 URL: http://R-Forge.R-project.org/projects/rglp/,
         http://www.gnu.org/software/glpk/
-Packaged: 2012-09-05 17:18:58 UTC; theussl
+Packaged: 2012-09-12 13:45:16 UTC; theussl
 Author: Kurt Hornik [aut], Stefan Theussl [aut, cre]
 Maintainer: Stefan Theussl <Stefan.Theussl@R-project.org>
 Repository: CRAN
-Date/Publication: 2012-09-05 17:50:19
+Date/Publication: 2012-09-12 14:54:59

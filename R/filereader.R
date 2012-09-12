@@ -2,7 +2,7 @@
 ## uses GLPK's facilities for reading these files
 ## Interface to GLPK's MPS file reader
 
-## Since 2012-01-11: Rglpk now supports MathProg files and retrieves
+## Since 2012-01-11: Rglpk supports MathProg files and retrieves
 ## variables names and constraints names. Thanks to Michael Kapler!
 
 ## Input: Path to a file specifying a mathematical program (MP),
@@ -11,25 +11,28 @@
 
 ## Output: an object of class 'MP_data_from_file' describing the MP
 
-## Mathematical Programming (MP) Data Object
-##$file                     ... absolute path to data file
-##$type                     ... file type (currently 'MPS-fixed', 'MPS-free', 'CPLEX LP'
-##$objective_coefficients   ... a vector of the objective coefficients
-##$constraint_matrix        ... specifies the constraint matrixin simple triplet form
-##$direction_of_constraints ... contains the direction of constraints
-##$right_hand_side          ... vector of right hand side values
-##$objective_var_is_integer ... a vector of logicals specifying which objective variable is of type 'integer'
-##$objective_var_is_binary  ... a vector of logicals specifying which objective variable is of type 'binary'
-##$direction_of_optimization... can be either 'min' or 'max'
-##$bounds                   ... upper and lower bounds of objective variables
-##$n_objective_vars         ... number of objective variables
-##$n_integer_vars           ... number of variables which are of type 'integer'
-##$n_binary_vars            ... number of variables which are of type 'binary'
-##$n_constraints            ... number of constraints
-##$n_values_in_constraint_matrix ... number of values in constraint matrix
-##$problem_name             ... name of the problem
-##$constraint_names         ... names of the constraints
-##$objective_vars_names     ... names of the objective vars
+## Mathematical Programming (MP) Data Object (consisting of 2 parts)
+## o MILP class
+##$objective        ... a 1 x n simple_triplet_matrix representing objective coeffs
+##$constraints[[1]] ... a m x n simple_triplet_matrix specifying the constraints
+##$constraints[[2]] ... contains the m direction of constraints
+##$constraints[[3]] ... vector of m right hand side values
+##$bounds           ... a list with elements $upper and $lower. Each of which contains indices and bounds of objective variables
+##$types            ... a character vector specifying which objective variable is of type 'binary' (B), continuous (C), or 'integer' (I)
+##$maximum          ... can be either 'min' or 'max'
+## o ATTRIBUTES
+##$n_objective_vars ... number of objective variables
+##$n_integer_vars   ... number of variables which are of type 'integer'
+##$n_binary_vars    ... number of variables which are of type 'binary'
+##$n_constraints    ... number of constraints
+##$n_nonzero        ... number of values in constraint matrix
+##$problem_name     ... name of the problem
+##$objective_name   ... name of the problem
+##$constraint_names ... names of the constraints
+##$objective_vars_names ... names of the objective vars
+##$file_name        ... absolute path to original data file
+##$file_type        ... file type (currently 'MPS-fixed', 'MPS-free', 'CPLEX LP', 'MathProg')
+
 
 
 Rglpk_read_file <- function(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP", "MathProg"), ignore_first_row = FALSE, verbose = FALSE){
@@ -92,6 +95,9 @@ Rglpk_read_file <- function(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP", 
   if(any(MP_data$objective_var_is_binary)){
     types[MP_data$objective_var_is_binary] <- "B"
   }
+  ## recalculate number of nonzeroes
+  MP_data$n_values_in_constraint_matrix <- length(MP_data$constraint_matrix$v)
+
   ## build object we want to return
   ## First add MILP to the object
   out <- MILP(objective = MP_data$objective_coefficients,
@@ -102,15 +108,17 @@ Rglpk_read_file <- function(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP", 
               types = types,
               maximum = MP_data$maximize
               )
-  out$n_objective_vars <- MP_data$n_objective_vars
-  out$n_integer_vars <- MP_data$n_integer_vars
-  out$n_binary_vars <- MP_data$n_binary_vars
-  out$n_constraints <- MP_data$n_constraints
-  ##out$n_values_in_constraint_matrix <- MP_data$n_values_in_constraint_matrix
-  out$file_type <- MP_data$type
-  out$file_name <- MP_data$file
-  out$constraint_names <- MP_data$constraint_names
-  out$objective_vars_names <- MP_data$objective_vars_names
+  attr(out, "n_objective_vars")     <- MP_data$n_objective_vars
+  attr(out, "n_integer_vars")       <- MP_data$n_integer_vars
+  attr(out, "n_binary_vars")        <- MP_data$n_binary_vars
+  attr(out, "n_constraints")        <- MP_data$n_constraints
+  attr(out, "n_nonzeros")           <- MP_data$n_values_in_constraint_matrix
+  attr(out, "problem_name")         <- MP_data$problem_name
+  attr(out, "objective_name")       <- MP_data$objective_name
+  attr(out, "objective_vars_names") <- MP_data$objective_vars_names
+  attr(out, "constraint_names")     <- MP_data$constraint_names
+  attr(out, "file_type")            <- MP_data$type
+  attr(out, "file_name")            <- MP_data$file
 
 
   class(out) <- c("MP_data_from_file", class(out))
@@ -129,8 +137,12 @@ glp_get_meta_data_from_file <- function(x, verbose){
             n_values_in_constraint_matrix = integer(1L),
             n_integer_vars                = integer(1L),
             n_binary_vars                 = integer(1L),
+            problem_name                  = character(1L),
+            objective_name                = character(1L),
             verbosity                     = as.integer(verbose),
             PACKAGE = "Rglpk")
+  ## free memory by deleting C-level problem object
+  .C("Rglpk_delete_prob", PACKAGE = "Rglpk")
   res
 }
 
@@ -141,9 +153,6 @@ glp_retrieve_MP_from_file <- function(x, ignore_first_row, verbose = FALSE){
             type                     = as.integer(x$type),
             n_constraints            = x$n_constraints,
             n_objective_vars         = x$n_objective_vars,
-            ##n_values_in_constraint_matrix = x$n_values_in_constraint_matrix,
-            ##n_integer_vars           = x$n_integer_vars,
-            ##n_binary_vars            = x$n_binary_vars,
             objective_coefficients   = double(x$n_objective_vars),
             constraint_matrix_i      = integer(x$n_values_in_constraint_matrix),
             constraint_matrix_j      = integer(x$n_values_in_constraint_matrix),
@@ -161,6 +170,8 @@ glp_retrieve_MP_from_file <- function(x, ignore_first_row, verbose = FALSE){
             constraint_names         = rep(character(1L), x$n_constraints),
             objective_vars_names     = rep(character(1L), x$n_objective_vars),
             PACKAGE = "Rglpk")
+  ## free memory by deleting C-level problem object
+  .C("Rglpk_delete_prob", PACKAGE = "Rglpk")
   ## lp_is_integer               = as.integer(lp_is_integer),
 
   ## replace infinity values
@@ -211,6 +222,8 @@ glp_merge_MP_data <- function(x, y){
               ## problem_name                  = x$problem_name,
               file                          = x$file,
               type                          = x$type,
+              problem_name                  = x$problem_name,
+              objective_name                = x$objective_name,
               constraint_names         = y$constraint_names,
               objective_vars_names     = y$objective_vars_names
               )
