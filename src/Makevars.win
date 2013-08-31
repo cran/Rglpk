@@ -1,11 +1,5 @@
 #-*- Makefile -*-
 #
 
-PKG_CPPFLAGS = -IGLPK
-PKG_LIBS = GLPK/libglpk.a
-
-all: libs $(SHLIB) 
-libs: GLPK/libglpk.a
-
-GLPK/libglpk.a:
-	$(MAKE) -C GLPK -f Makefile.win
+PKG_CPPFLAGS = -I${GLPK_HOME}/include
+PKG_LIBS = -L${GLPK_HOME}/lib -lglpk -lgmp
