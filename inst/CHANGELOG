@@ -1,4 +1,10 @@
 2013-06-03  Stefan Theussl  <stefan.theussl@R-project.org>
+	* UPDATED: Rglpk now ships with GLPK sources version 4.52
+	* UPDATED: new patches are needed for this GLPK release.
+	* FIXED:   Copyright holder statements as demanded by CRAN policy
+	* RELEASE: Rglpk 0.5-1 on CRAN
+
+2013-06-03  Stefan Theussl  <stefan.theussl@R-project.org>
 	* UPDATED: Rglpk now ships with GLPK sources version 4.50
 	* UPDATED: some extra patches are needed for this GLPK release.
 	* RELEASE: Rglpk 0.4-1 on CRAN

@@ -163,14 +163,32 @@ struct glp_tree
       /* control parameters and statistics */
       const glp_iocp *parm;
       /* copy of control parameters passed to the solver */
+#if 0 /* 10/VI-2013 */
       glp_long tm_beg;
+#else
+      double tm_beg;
+#endif
       /* starting time of the search, in seconds; the total time of the
          search is the difference between xtime() and tm_beg */
+#if 0 /* 10/VI-2013 */
       glp_long tm_lag;
+#else
+      double tm_lag;
+#endif
       /* the most recent time, in seconds, at which the progress of the
          the search was displayed */
       int sol_cnt;
       /* number of integer feasible solutions found */
+#if 1 /* 11/VII-2013 */
+      void *P; /* glp_prob *P; */
+      /* problem passed to glp_intopt */
+      void *npp; /* NPP *npp; */
+      /* preprocessor workspace or NULL */
+      const char *save_sol;
+      /* filename (template) to save every new solution */
+      int save_cnt;
+      /* count to generate filename */
+#endif
       /*--------------------------------------------------------------*/
       /* advanced solver interface */
       int reason;
@@ -455,6 +473,12 @@ void ios_clear_pool(glp_tree *tree, IOSPOOL *pool);
 void ios_delete_pool(glp_tree *tree, IOSPOOL *pool);
 /* delete cut pool */
 
+#if 1 /* 11/VII-2013 */
+#define ios_process_sol _glp_ios_process_sol
+void ios_process_sol(glp_tree *T);
+/* process integer feasible solution just found */
+#endif
+
 #define ios_preprocess_node _glp_ios_preprocess_node
 int ios_preprocess_node(glp_tree *tree, int max_pass);
 /* preprocess current subproblem */
@@ -572,6 +596,12 @@ void ios_pcost_free(glp_tree *tree);
 #define ios_feas_pump _glp_ios_feas_pump
 void ios_feas_pump(glp_tree *T);
 /* feasibility pump heuristic */
+
+#if 1 /* 25/V-2013 */
+#define ios_proxy_heur _glp_ios_proxy_heur
+void ios_proxy_heur(glp_tree *T);
+/* proximity search heuristic */
+#endif
 
 #define ios_process_cuts _glp_ios_process_cuts
 void ios_process_cuts(glp_tree *T);

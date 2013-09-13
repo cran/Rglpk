@@ -128,8 +128,12 @@ struct csa
          0 - not determined yet
          1 - search for primal feasible solution
          2 - search for optimal solution */
+#if 0 /* 10/VI-2013 */
       glp_long tm_beg;
       /* time value at the beginning of the search */
+#else
+      double tm_beg;
+#endif
       int it_beg;
       /* simplex iteration count at the beginning of the search */
       int it_cnt;
@@ -2765,7 +2769,11 @@ loop: /* main loop starts here */
          switch (csa->phase)
          {  case 1:
                if (parm->msg_lev >= GLP_MSG_ALL)
+#if 0 /* 13/VII-2013; suggested by Prof. Fischetti */
                   xprintf("PROBLEM HAS NO FEASIBLE SOLUTION\n");
+#else
+                  xprintf("LP HAS NO PRIMAL FEASIBLE SOLUTION\n");
+#endif
                p_stat = GLP_NOFEAS;
                set_orig_obj(csa);
                eval_cbar(csa);
@@ -2774,7 +2782,11 @@ loop: /* main loop starts here */
                break;
             case 2:
                if (parm->msg_lev >= GLP_MSG_ALL)
+#if 0 /* 13/VII-2013; suggested by Prof. Fischetti */
                   xprintf("OPTIMAL SOLUTION FOUND\n");
+#else
+                  xprintf("OPTIMAL LP SOLUTION FOUND\n");
+#endif
                p_stat = d_stat = GLP_FEAS;
                break;
             default:
@@ -2842,7 +2854,11 @@ loop: /* main loop starts here */
                break;
             case 2:
                if (parm->msg_lev >= GLP_MSG_ALL)
+#if 0 /* 13/VII-2013; suggested by Prof. Fischetti */
                   xprintf("PROBLEM HAS UNBOUNDED SOLUTION\n");
+#else
+                  xprintf("LP HAS UNBOUNDED PRIMAL SOLUTION\n");
+#endif
                store_sol(csa, lp, GLP_FEAS, GLP_NOFEAS,
                   csa->head[csa->m+csa->q]);
                ret = 0;

@@ -129,7 +129,7 @@ function(lp_objective_coefficients, lp_n_of_objective_vars,
     control$verbose <- FALSE
   Rglpk_solve_LP(x$objective, x$constraints[[1]],
                  x$constraints[[2]], x$constraints[[3]],
-                 x$types, x$maximum, x$bounds,
+                 types = x$types, max = x$maximum, bounds = x$bounds,
                  verbose = control$verbose)
 }
 

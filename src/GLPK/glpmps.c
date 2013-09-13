@@ -22,7 +22,11 @@
 *  along with GLPK. If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************/
 
+#if 1 /* 11/VI-2013 */
+#include "env2.h"
+#endif
 #include "glpapi.h"
+#include "glplib.h"
 
 /***********************************************************************
 *  NAME
@@ -838,6 +842,12 @@ blnk: {  /* new BOUNDS vector */
       else if (strcmp(type, "LI") == 0)
       {  glp_set_col_kind(csa->P, j, GLP_IV);
          lb = ceil(bnd);
+#if 1 /* 16/VII-2013 */
+         /* if column upper bound has not been explicitly specified,
+            take it as +inf */
+         if (!(flag[j] & 0x10))
+            ub = +DBL_MAX;
+#endif
       }
       else if (strcmp(type, "UI") == 0)
       {  glp_set_col_kind(csa->P, j, GLP_IV);

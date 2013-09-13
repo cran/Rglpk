@@ -23,8 +23,12 @@
 ***********************************************************************/
 
 #define _GLPSTD_STDIO
-#include "glpdmp.h"
+#if 1 /* 11/VI-2013 */
+#include "bignum.h"
+#endif
+#include "dmp.h"
 #include "glpgmp.h"
+#include "env.h"
 #define xfault xerror
 
 #ifdef HAVE_GMP               /* use GNU MP bignum library */
@@ -55,7 +59,11 @@ int gmp_pool_count(void)
 {     if (gmp_pool == NULL)
          return 0;
       else
+#if 0 /* 10/VI-2013 */
          return dmp_in_use(gmp_pool).lo;
+#else
+         return dmp_in_use(gmp_pool);
+#endif
 }
 
 unsigned short *gmp_get_work(int size)

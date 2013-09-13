@@ -24,6 +24,7 @@
 
 #include "glpapi.h"
 #include "glpgmp.h"
+#include "glplib.h"
 
 struct csa
 {     /* common storage area */
@@ -130,6 +131,10 @@ struct csa
       /* option to bound objective function */
       int obj_bnd;
       /* upper (minization) or lower (maximization) objective bound */
+#endif
+#if 1 /* 11/VII-2013 */
+      const char *use_sol;
+      /* name of input mip solution file in GLPK format */
 #endif
 };
 
@@ -308,6 +313,11 @@ static void print_help(const char *my_name)
       xprintf("                     (assumes --intopt)\n");
       xprintf("   --fpump           apply feasibility pump heuristic\n")
          ;
+#if 1 /* 29/VI-2013 */
+      xprintf("   --proxy [nnn]     apply proximity search heuristic (n"
+         "nn is time limit\n");
+      xprintf("                     in seconds; default is 60)\n");
+#endif
       xprintf("   --gomory          generate Gomory's mixed integer cut"
          "s\n");
       xprintf("   --mir             generate MIR (mixed integer roundin"
@@ -414,7 +424,7 @@ static int parse_cmdline(struct csa *csa, int argc, const char *argv[])
             if (strcmp(argv[k], "?") == 0)
                csa->seed = 0x80000000;
             else if (str2int(argv[k], &csa->seed))
-            {  xprintf("Invalid seed value `%s'\n", argv[k]);
+            {  xprintf("Invalid seed value '%s'\n", argv[k]);
                return 1;
             }
          }
@@ -500,7 +510,7 @@ static int parse_cmdline(struct csa *csa, int argc, const char *argv[])
                return 1;
             }
             if (str2int(argv[k], &tm_lim) || tm_lim < 0)
-            {  xprintf("Invalid time limit `%s'\n", argv[k]);
+            {  xprintf("Invalid time limit '%s'\n", argv[k]);
                return 1;
             }
             if (tm_lim <= INT_MAX / 1000)
@@ -516,7 +526,7 @@ static int parse_cmdline(struct csa *csa, int argc, const char *argv[])
                return 1;
             }
             if (str2int(argv[k], &mem_lim) || mem_lim < 1)
-            {  xprintf("Invalid memory limit `%s'\n", argv[k]);
+            {  xprintf("Invalid memory limit '%s'\n", argv[k]);
                return 1;
             }
             glp_mem_limit(mem_lim);
@@ -723,6 +733,20 @@ static int parse_cmdline(struct csa *csa, int argc, const char *argv[])
             csa->iocp.presolve = csa->iocp.binarize = GLP_ON;
          else if (p("--fpump"))
             csa->iocp.fp_heur = GLP_ON;
+#if 1 /* 29/VI-2013 */
+         else if (p("--proxy"))
+         {  csa->iocp.ps_heur = GLP_ON;
+            if (argv[k+1] && isdigit((unsigned char)argv[k+1][0]))
+            {  int nnn;
+               k++;
+               if (str2int(argv[k], &nnn) || nnn < 1)
+               {  xprintf("Invalid proxy time limit '%s'\n", argv[k]);
+                  return 1;
+               }
+               csa->iocp.ps_tm_lim = 1000 * nnn;
+            }
+         }
+#endif
          else if (p("--gomory"))
             csa->iocp.gmi_cuts = GLP_ON;
          else if (p("--mir"))
@@ -742,7 +766,7 @@ static int parse_cmdline(struct csa *csa, int argc, const char *argv[])
                return 1;
             }
             if (str2num(argv[k], &mip_gap) || mip_gap < 0.0)
-            {  xprintf("Invalid relative mip gap tolerance `%s'\n",
+            {  xprintf("Invalid relative mip gap tolerance '%s'\n",
                   argv[k]);
                return 1;
             }
@@ -761,15 +785,41 @@ static int parse_cmdline(struct csa *csa, int argc, const char *argv[])
             csa->minisat = 1;
             csa->use_bnd = 1;
             if (str2int(argv[k], &csa->obj_bnd))
-            {  xprintf("Invalid objective bound `%s' (should be integer"
+            {  xprintf("Invalid objective bound '%s' (should be integer"
                   " value)\n", argv[k]);
                return 1;
             }
          }
 #endif
+#if 1 /* 11/VII-2013 */
+         else if (p("--use"))
+         {  k++;
+            if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
+            {  xprintf("No input MIP solution file specified\n");
+               return 1;
+            }
+            if (csa->use_sol != NULL)
+            {  xprintf("Only one input MIP solution file allowed\n");
+               return 1;
+            }
+            csa->use_sol = argv[k];
+         }
+         else if (p("--save"))
+         {  k++;
+            if (k == argc || argv[k][0] == '\0' || argv[k][0] == '-')
+            {  xprintf("No output MIP solution file specified\n");
+               return 1;
+            }
+            if (csa->iocp.save_sol != NULL)
+            {  xprintf("Only one output MIP solution file allowed\n");
+               return 1;
+            }
+            csa->iocp.save_sol = argv[k];
+         }
+#endif
          else if (argv[k][0] == '-' ||
                  (argv[k][0] == '-' && argv[k][1] == '-'))
-         {  xprintf("Invalid option `%s'; try %s --help\n",
+         {  xprintf("Invalid option '%s'; try %s --help\n",
                argv[k], argv[0]);
             return 1;
          }
@@ -792,7 +842,11 @@ int glp_main(int argc, const char *argv[])
 {     /* stand-alone LP/MIP solver */
       struct csa _csa, *csa = &_csa;
       int ret;
+#if 0 /* 10/VI-2013 */
       glp_long start;
+#else
+      double start;
+#endif
       /* perform initialization */
       csa->prob = glp_create_prob();
       glp_get_bfcp(csa->prob, &csa->bfcp);
@@ -836,6 +890,9 @@ int glp_main(int argc, const char *argv[])
       csa->minisat = 0;
       csa->use_bnd = 0;
       csa->obj_bnd = 0;
+#endif
+#if 1 /* 11/VII-2013 */
+      csa->use_sol = NULL;
 #endif
       /* parse command-line parameters */
       ret = parse_cmdline(csa, argc, argv);
@@ -932,7 +989,11 @@ err1:    {  xprintf("MPS file processing error\n");
          csa->tran = glp_mpl_alloc_wksp();
          /* set seed value */
          if (csa->seed == 0x80000000)
+#if 0 /* 10/VI-2013 */
          {  csa->seed = glp_time().lo;
+#else
+         {  csa->seed = (int)fmod(glp_time(), 1000000000.0);
+#endif
             xprintf("Seed value %d will be used\n", csa->seed);
          }
          _glp_mpl_init_rand(csa->tran, csa->seed);
@@ -1109,6 +1170,19 @@ err2:    {  xprintf("MathProg model processing error\n");
          }
          goto skip;
       }
+#if 1 /* 11/VII-2013 */
+      /*--------------------------------------------------------------*/
+      /* if initial MIP solution is provided, read it */
+      if (csa->solution == SOL_INTEGER && csa->use_sol != NULL)
+      {  ret = glp_read_mip(csa->prob, csa->use_sol);
+         if (ret != 0)
+         {  xprintf("Unable to read initial MIP solution\n");
+            ret = EXIT_FAILURE;
+            goto done;
+         }
+         csa->iocp.use_sol = GLP_ON;
+      }
+#endif
       /*--------------------------------------------------------------*/
       /* scale the problem data, if required */
       if (csa->scale)

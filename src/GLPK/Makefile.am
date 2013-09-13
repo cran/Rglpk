@@ -5,11 +5,20 @@ include_HEADERS = glpk.h
 lib_LTLIBRARIES = libglpk.la
 
 libglpk_la_CPPFLAGS = \
--I$(srcdir) -I$(srcdir)/amd -I$(srcdir)/bflib -I$(srcdir)/colamd \
--I$(srcdir)/minisat -I$(srcdir)/zlib
+-I$(srcdir) \
+-I$(srcdir)/amd \
+-I$(srcdir)/bflib \
+-I$(srcdir)/cglib \
+-I$(srcdir)/colamd \
+-I$(srcdir)/env \
+-I$(srcdir)/minisat \
+-I$(srcdir)/misc \
+-I$(srcdir)/proxy \
+-I$(srcdir)/zlib
 
 libglpk_la_LDFLAGS = \
--version-info 35:0:0 -export-symbols-regex '^glp_*'
+-version-info 36:0:1 \
+-export-symbols-regex '^glp_*'
 
 libglpk_la_SOURCES = \
 glpapi01.c \
@@ -37,14 +46,7 @@ glpavl.c \
 glpbfd.c \
 glpbfx.c \
 glpcpx.c \
-glpdmp.c \
 glpdmx.c \
-glpenv01.c \
-glpenv02.c \
-glpenv03.c \
-glpenv04.c \
-glpenv05.c \
-glpenv06.c \
 glpenv07.c \
 glpenv08.c \
 glpgmp.c \
@@ -64,14 +66,11 @@ glpios10.c \
 glpios11.c \
 glpios12.c \
 glpipm.c \
-glplib01.c \
-glplib02.c \
 glplib03.c \
 glplpf.c \
 glplpx01.c \
 glplpx02.c \
 glplpx03.c \
-glpluf.c \
 glplux.c \
 glpmat.c \
 glpmpl01.c \
@@ -81,26 +80,16 @@ glpmpl04.c \
 glpmpl05.c \
 glpmpl06.c \
 glpmps.c \
-glpnet01.c \
-glpnet02.c \
 glpnet03.c \
 glpnet04.c \
 glpnet05.c \
-glpnet06.c \
-glpnet07.c \
-glpnet08.c \
-glpnet09.c \
 glpnpp01.c \
 glpnpp02.c \
 glpnpp03.c \
 glpnpp04.c \
 glpnpp05.c \
 glpnpp06.c \
-glpqmd.c \
 glprgr.c \
-glprlx.c \
-glprng01.c \
-glprng02.c \
 glpscf.c \
 glpscl.c \
 glpsdf.c \
@@ -126,10 +115,36 @@ amd/amd_valid.c \
 bflib/fhv.c \
 bflib/fhvint.c \
 bflib/luf.c \
+bflib/lufint.c \
 bflib/sgf.c \
 bflib/sva.c \
+cglib/cfg.c \
+cglib/cfg1.c \
 colamd/colamd.c \
+env/alloc.c \
+env/env.c \
+env/error.c \
+env/stdout.c \
+env/time.c \
+env/tls.c \
 minisat/minisat.c \
+misc/bignum.c \
+misc/dmp.c \
+misc/ffalg.c \
+misc/jd.c \
+misc/keller.c \
+misc/mc13d.c \
+misc/mc21a.c \
+misc/okalg.c \
+misc/qmd.c \
+misc/relax4.c \
+misc/rng.c \
+misc/rng1.c \
+misc/triang.c \
+misc/wclique.c \
+misc/wclique1.c \
+proxy/proxy.c \
+proxy/proxy1.c \
 zlib/adler32.c \
 zlib/compress.c \
 zlib/crc32.c \
@@ -138,7 +153,6 @@ zlib/gzclose.c \
 zlib/gzlib.c \
 zlib/gzread.c \
 zlib/gzwrite.c \
-zlib/infback.c \
 zlib/inffast.c \
 zlib/inflate.c \
 zlib/inftrees.c \
