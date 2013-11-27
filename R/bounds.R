@@ -53,6 +53,10 @@ glp_bounds <- function(x, n)
   
   ## Lower bounds
   lower <- x$lower
+  ## check for zero-length bounds
+  if( !any(unlist(lapply(lower, length))) )
+    lower <- NULL
+
   if(!is.null(lower)){
     ## input validation
     glp_bounds_check_sanity(lower, n)
@@ -64,6 +68,10 @@ glp_bounds <- function(x, n)
 
   ## Upper bounds
   upper <- x$upper
+  ## check for zero-length bounds
+  if( !any(unlist(lapply(upper, length))) )
+    upper <- NULL
+  
   if(!is.null(upper)){
     ## input validation
     glp_bounds_check_sanity(upper, n)

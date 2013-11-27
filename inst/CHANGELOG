@@ -1,3 +1,8 @@
+2013-11-27  Stefan Theussl  <stefan.theussl@R-project.org>
+	* UPDATED: Rglpk now ships with GLPK sources version 4.52.1
+	* FIXED: handling of bounds passed down from ROI
+	* RELEASE: Rglpk 0.5-2 on CRAN
+
 2013-06-03  Stefan Theussl  <stefan.theussl@R-project.org>
 	* UPDATED: Rglpk now ships with GLPK sources version 4.52
 	* UPDATED: new patches are needed for this GLPK release.
