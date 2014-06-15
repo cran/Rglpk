@@ -1,3 +1,8 @@
+2014-06-15  Stefan Theussl  <stefan.theussl@R-project.org>
+	* UPDATED: Rglpk does not ship GLPK sources anymore
+	* UPDATED: Licence now GPL-2 | GPL-3
+	* RELEASE: Rglpk 0.6-0 on CRAN
+
 2013-11-27  Stefan Theussl  <stefan.theussl@R-project.org>
 	* UPDATED: Rglpk now ships with GLPK sources version 4.52.1
 	* FIXED: handling of bounds passed down from ROI
