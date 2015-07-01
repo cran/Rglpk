@@ -1,5 +1,5 @@
-216c20ff65e60268346235f73bed9c30 *DESCRIPTION
-ffc7fdfda4b522c2c8f5193e1ec7d88b *NAMESPACE
+554c75059c517a316c9a97cfdb44d7e3 *DESCRIPTION
+5a45a9a2b361ccbdb0960632f3b7cfd8 *NAMESPACE
 89802f16b53ebb2fb07679fb89ac7b33 *R/Misc.R
 9a943f0a4c55276f9be37ac780e1943d *R/Rglpk_solve.R
 d4b39ae0e53f3ee9e1e23c5de5cec533 *R/bounds.R
@@ -10,7 +10,7 @@ f8672da398fee3461bded8d8de6cec02 *R/milp.R
 5299c161b149974ccae263af06494afc *cleanup
 1262f7a12fddb89ebbe29f58c04a1c00 *configure
 68b329da9893e34099c7d8ad5cb9c940 *configure.win
-4cf995b3d416aead375f839e723ad028 *inst/CHANGELOG
+cbcf3fa4248d9e6365783fa2ca48650f *inst/CHANGELOG
 bdee58c3965c7b68c5923ee60183e736 *inst/examples/assign.mod
 72aa9eab3996ee9aa7abeaeb4c05ff12 *inst/examples/plan.lp
 45e60857cbfdfb15805eb12cc2e17d94 *inst/examples/plan.mod
@@ -19,7 +19,8 @@ bdee58c3965c7b68c5923ee60183e736 *inst/examples/assign.mod
 378c9dbc172f711573eb516471b82335 *man/Rglpk_solve.Rd
 16928375c376f342565f9f81b85aff65 *src/Makevars.in
 82b5dfd7323f3bba9c092029c5ee25d7 *src/Makevars.win
-251280352529c5efb066d41fa89e985e *src/Rglpk.h
+00cf4d6bd6d46443d99cb7ebe5b53403 *src/Rglpk.h
+52bc8e948dd2a9d1d5a5105c3780aa3e *src/Rglpk_error.c
 5622e753d3d13b4bf264756073cbc667 *src/Rglpk_initialize.c
 f0c2674ec4184bca3eebbbeaadfb5cb2 *src/Rglpk_read_file.c
-f164da4accb871d477ffa870633bdfbc *src/Rglpk_solve.c
+191367f59d4892354705c35c6fb5c840 *src/Rglpk_solve.c

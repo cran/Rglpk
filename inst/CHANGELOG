@@ -1,3 +1,10 @@
+2015-07-01  Stefan Theussl  <stefan.theussl@R-project.org>
+	* FIXED: S3method properly registered
+	* FIXED: R does not terminate abnormally on an internal GLPK
+	library error since an error handler is now registered. Thanks to
+	a patch by Heinrich Schuchardt.
+	* RELEASE: Rglpk 0.6-1 on CRAN
+
 2014-06-15  Stefan Theussl  <stefan.theussl@R-project.org>
 	* UPDATED: Rglpk does not ship GLPK sources anymore
 	* UPDATED: Licence now GPL-2 | GPL-3
