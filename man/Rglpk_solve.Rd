@@ -11,11 +11,13 @@ Rglpk_solve_LP(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
 }
 \arguments{
   \item{obj}{a numeric vector representing the objective coefficients.}
-  \item{mat}{a numeric vector or a matrix of constraint coefficients.}
+  \item{mat}{a numeric vector or a (sparse) matrix of constraint coefficients. If
+    the optimization problem is unconstrained then a matrix of dimension
+    0 times the number of objective variables is required.}
   \item{dir}{a character vector with the directions of the constraints.
-    Each element must be one of \code{"<"}, \code{"<="}, \code{">"},
-    \code{">="}, or \code{"=="}.}
-  \item{rhs}{the right hand side of the constraints.}
+    For a nonzero number of constraints each element must be one of
+    \code{"<"}, \code{"<="}, \code{">"}, \code{">="}, or \code{"=="}.}
+  \item{rhs}{a numeric vector representing the right hand side of the constraints.}
   \item{bounds}{\code{NULL} (default) or a list with elements
     \code{upper} and \code{lower} containing the indices and
     corresponding bounds of the objective variables.  The default for
@@ -27,13 +29,9 @@ Rglpk_solve_LP(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
   \item{max}{a logical giving the direction of the optimization.
     \code{TRUE} means that the objective is to maximize the objective
     function, \code{FALSE} (default) means to minimize it.}
-  \item{control}{a list of parameters to the solver. Currently the
-    only options are: \code{verbose}, a logical for turning on/off additional
-    solver output; \code{canonicalize_status}, a logical indicating
-    whether to canonicalize GLPK status codes or not. Defaults:
-    \code{FALSE}; \code{TRUE}.}
+  \item{control}{a list of parameters to the solver.  See *Details*.}
   \item{\ldots}{a list of control parameters (overruling those specified in
-          \code{control}).}
+    \code{control}).}
 }
 \details{
   GLPK is open source. The current version can be found at
@@ -42,6 +40,26 @@ Rglpk_solve_LP(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
   of the GLPK solver. R interface packages which port all low level C routines
   of the GLPK API to R are also available. Consult the \sQuote{See Also}
   Section for references.
+
+  Matrix \code{mat} and \code{obj} may be sparse arrays or matrices
+  (\code{simple_triplet_matrix}) as provided by the \pkg{slam}
+  package.
+
+  The \code{control} argument can be used to set GLPK's many
+  parameters. See the respective method section of the \cite{GNU Linear
+    Programming Kit Reference Manual} for further details. The following
+  parameters are supported: 
+  
+  \describe{
+    \item{verbose:}{turn GLPK terminal output on (\code{TRUE}) or
+      off (\code{FALSE}, the default).}
+    \item{presolve:}{turn presolver on (\code{TRUE}) or
+      off (\code{FALSE}, the default).}
+    \item{tm_limit:}{time limit in milliseconds of call to optimizer. Can be any
+      nonnegative integer. Default: 0 (use GLPK default).}
+    \item{canonicalize_status:}{a logical indicating
+      whether to canonicalize GLPK status codes (on success \code{Rglpk_solve_LP()} returns code 0) or
+      not (1). Default: \code{TRUE}.}}
 }
 \value{
   A list containing the optimal solution, with the following components.
@@ -52,6 +70,10 @@ Rglpk_solve_LP(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
     (the default) then it will return 0 for the optimal solution being
     found, and non-zero otherwise. If the control parameter is set to
     \code{FALSE} it will return the GLPK status codes.}
+  \item{solution_dual}{variable reduced cost, if available (\code{NA} otherwise).}
+  \item{auxiliary}{a list with two vectors each containing the values of the
+    auxiliary variable associated with the respective constraint at
+    solution, primal and dual (if available, \code{NA} otherwise).}
 }
 \references{
   GNU Linear Programming Kit

@@ -15,6 +15,8 @@ function(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
   control[names(dots)] <- dots
   control <- .check_control_parameters( control )
   verb <- control$verbose
+  presolve <- control$presolve
+  time_limit <- control$tm_limit
 
   ## match direction of constraints
   n_of_constraints <- length(dir)
@@ -67,7 +69,7 @@ function(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
                           is_integer,
                           integers, binaries,
                           direction_of_optimization, bounds[, 1L],
-                          bounds[, 2L], bounds[, 3L], verb)
+                          bounds[, 2L], bounds[, 3L], verb, presolve, time_limit)
 
   solution <- x$lp_objective_vars_values
   ## are integer variables really integers? better round values
@@ -79,7 +81,16 @@ function(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
       ## 0 -> optimal solution (5 in GLPK) else 1
       status <- as.integer(status != 5L)
   }
-  list(optimum = sum(solution * obj), solution = solution, status = status)
+    list(optimum = sum(solution * obj), solution = solution, status = status,
+         solution_dual = if( is_integer )
+                             NA
+                         else
+                             x$lp_objective_dual_values,
+         auxiliary = list( primal = x$lp_row_prim_aux,
+                           dual   = if( is_integer)
+                                        NA
+                                    else
+                                        x$lp_row_dual_aux))
 }
 
 ## this function calls the C interface
@@ -91,7 +102,7 @@ function(lp_objective_coefficients, lp_n_of_objective_vars,
          lp_objective_var_is_integer, lp_objective_var_is_binary,
          lp_direction_of_optimization,
          lp_bounds_type, lp_bounds_lower, lp_bounds_upper,
-         verbose)
+         verbose, presolve, time_limit)
 {
   out <- .C("R_glp_solve",
             lp_direction_of_optimization= as.integer(lp_direction_of_optimization),
@@ -113,8 +124,15 @@ function(lp_objective_coefficients, lp_n_of_objective_vars,
             lp_bounds_upper             = as.double(lp_bounds_upper),
             ## lp_n_of_bounds_u            = as.integer(length(lp_upper_bounds_i)),
             lp_optimum                  = double(1),
+            lp_objective_stat           = integer(lp_n_of_objective_vars),
             lp_objective_vars_values    = double(lp_n_of_objective_vars),
+            lp_objective_dual_values    = double(lp_n_of_objective_vars),
+            lp_row_stat                 = integer(lp_n_of_constraints),
+            lp_row_prim_aux             = double(lp_n_of_constraints),
+            lp_row_dual_aux             = double(lp_n_of_constraints),
             lp_verbosity                = as.integer(verbose),
+            lp_presolve                 = as.integer(presolve),
+            lp_time_limit               = as.integer(time_limit),
             lp_status                   = integer(1),
             NAOK = TRUE, PACKAGE = "Rglpk")
   out

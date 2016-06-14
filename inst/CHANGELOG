@@ -1,3 +1,9 @@
+2016-06-13  Stefan Theussl  <stefan.theussl@R-project.org>
+	* ADDED: new control parameters "presolve" and "tm_limit"
+	* ADDED: reduced cost in return value (solution_dual)
+	* ADDED: value of auxiliary variable (primal|dual) in return value
+	* RELEASE: Rglpk 0.6-2 on CRAN
+
 2015-07-01  Stefan Theussl  <stefan.theussl@R-project.org>
 	* FIXED: S3method properly registered
 	* FIXED: R does not terminate abnormally on an internal GLPK
