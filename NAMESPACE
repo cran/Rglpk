@@ -1,4 +1,4 @@
-useDynLib("Rglpk")
+useDynLib("Rglpk", .registration = TRUE)
 import("slam")
 
 export("Rglpk_solve_LP")

@@ -99,6 +99,6 @@ function(x, n)
     stop("Length of bound indices must be equal to the length of the corresponding bound values.")
   if(any(duplicated(x[[1L]])))
     stop("Duplicated entries in bound indices found.")
-  if((max(x[[1L]]) > n))
+  if(any(x[[1L]]) > n)
     stop("Bound indices must not exceed number of objective coefficients.")
 }

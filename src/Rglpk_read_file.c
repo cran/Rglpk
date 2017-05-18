@@ -7,6 +7,7 @@
 
 #include "Rglpk.h"
 #include <stdio.h>
+#include <setjmp.h>
 
 // pointer to problem object.
 static glp_prob *lp = NULL;
@@ -24,7 +25,7 @@ void Rglpk_delete_prob() {
 }
 
 // read in all necessary elements for retrieving the LP/MILP
-void Rglpk_read_file (char **file, int *type, 
+void R_glp_read_file (char **file, int *type, 
 		      int *lp_direction_of_optimization,
 		      int *lp_n_constraints, int *lp_n_objective_vars,
 		      int *lp_n_values_in_constraint_matrix,
@@ -37,7 +38,15 @@ void Rglpk_read_file (char **file, int *type,
   extern glp_prob *lp;
   glp_tran *tran;
   const char *str; 
-  
+  jmp_buf env;
+
+  // Patch provided by Xypron: A far jump is used to return if an
+  // error occurs. Prior to that R crashed.
+  if (setjmp(env)) {
+    error("An error occured inside the GLPK library.");
+  } else {
+    glp_error_hook(Rglpk_error_hook, &env);
+
   // Turn on/off Terminal Output
   if (*lp_verbosity==1)
     glp_term_out(GLP_ON);
@@ -116,6 +125,8 @@ void Rglpk_read_file (char **file, int *type,
   
   // retrieve number of binary variables
   *lp_n_binary_vars = glp_get_num_bin(lp);
+
+  }
 }
 
 // retrieve all missing values of LP/MILP
@@ -145,6 +156,15 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
   
   int i, j, lp_column_kind, tmp;
   int ind_offset, status;
+
+    jmp_buf env;
+
+  // Patch provided by Xypron: A far jump is used to return if an
+  // error occurs. Prior to that R crashed.
+  if (setjmp(env)) {
+    error("An error occured inside the GLPK library.");
+  } else {
+    glp_error_hook(Rglpk_error_hook, &env);
 
   // Turn on/off Terminal Output
   if (*lp_verbosity==1)
@@ -273,6 +293,6 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
   
   if(*lp_verbosity==1)
     Rprintf("Done.\n");
-
+  }
 }
 

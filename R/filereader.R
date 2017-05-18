@@ -128,7 +128,7 @@ Rglpk_read_file <- function(file, type = c("MPS_fixed", "MPS_free", "CPLEX_LP", 
 ## First parse file to get some meta data of the LP/MILP
 ## (number of constraints/objective variables, direction of optimization, ...)
 glp_get_meta_data_from_file <- function(x, verbose){
-  res <- .C("Rglpk_read_file",
+  res <- .C(R_glp_read_file,
             file                          = as.character(x$file),
             type                          = as.integer(x$type),
             direction_of_optimization     = integer(1L),
@@ -142,13 +142,13 @@ glp_get_meta_data_from_file <- function(x, verbose){
             verbosity                     = as.integer(verbose),
             PACKAGE = "Rglpk")
   ## free memory by deleting C-level problem object
-  .C("Rglpk_delete_prob", PACKAGE = "Rglpk")
+  .C(Rglpk_delete_prob, PACKAGE = "Rglpk")
   res
 }
 
 ## Retrieve all missing elements of the LP/MILP
 glp_retrieve_MP_from_file <- function(x, ignore_first_row, verbose = FALSE){
-  res <- .C("Rglpk_retrieve_MP_from_file",
+  res <- .C(Rglpk_retrieve_MP_from_file,
             file                     = as.character(x$file),
             type                     = as.integer(x$type),
             n_constraints            = x$n_constraints,

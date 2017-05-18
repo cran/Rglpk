@@ -28,7 +28,9 @@ void R_glp_solve (int *lp_direction, int *lp_number_of_constraints,
 		  int *lp_verbosity,
 		  int *lp_presolve,
 		  int *lp_time_limit,
-		  int *lp_status) {
+		  int *lp_status,
+		  int *write_fmt,
+		  char **fname) {
 
   // GLPK problem object
   glp_prob *lp;
@@ -110,6 +112,22 @@ void R_glp_solve (int *lp_direction, int *lp_number_of_constraints,
 		      &lp_constraint_matrix_j[-1], &lp_constraint_matrix_values[-1]);
     }
 
+    // write lp to file
+    // mps_fixed := 1L, mps_free := 2L
+    if ( *write_fmt > 0 ) {
+        const char *out_name = fname[0];
+        if ( *write_fmt < 3 ) {
+            *lp_status = glp_write_mps(lp, *write_fmt, NULL, out_name);
+        } else if ( *write_fmt == 3 ) {
+            *lp_status = glp_write_lp(lp, NULL, out_name);
+        } else {
+            int future_flag = 0;
+            *lp_status = glp_write_prob(lp, future_flag, out_name);
+        }
+        glp_delete_prob(lp);
+        return;
+    }
+    
     // set optimizer control parameters
     glp_init_smcp(&control_sm);
     if (*lp_time_limit > 0) {

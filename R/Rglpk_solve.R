@@ -1,22 +1,26 @@
 ## the R-ported GNU Linear Programming kit
 ## solve function --- C Interface
 
-Rglpk_solve_LP <-
-function(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
-          control = list(), ...)
+Rglpk_solve_LP <- function(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
+                           control = list(), ...)
 {
+    ## validate control list
+    dots <- list(...)
+    control[names(dots)] <- dots
+    control <- .check_control_parameters( control )
+    canonicalize_status <- control$canonicalize_status
+    presolve <- control$presolve
+    time_limit <- control$tm_limit
+    verb <- control$verbose
+
+    Rglpk_call( obj = obj, mat = mat, dir = dir, rhs = rhs, bounds = bounds, types = types, max = max, canonicalize_status = canonicalize_status, presolve = presolve, time_limit = time_limit, verb = verb )
+}
+
+Rglpk_call <- function(obj, mat, dir, rhs, bounds, types, max, canonicalize_status, presolve, time_limit, verb, file = "", file_type = 0L ){
   ## validate direction of optimization
   if(!identical( max, TRUE ) && !identical( max, FALSE ))
-    stop("'Argument 'max' must be either TRUE or FALSE.")
+      stop("'Argument 'max' must be either TRUE or FALSE.")
   direction_of_optimization <- as.integer(max)
-
-  ## validate control list
-  dots <- list(...)
-  control[names(dots)] <- dots
-  control <- .check_control_parameters( control )
-  verb <- control$verbose
-  presolve <- control$presolve
-  time_limit <- control$tm_limit
 
   ## match direction of constraints
   n_of_constraints <- length(dir)
@@ -54,12 +58,31 @@ function(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
   ## bounds of objective coefficients
   bounds <- as.glp_bounds( as.list( bounds ), n_of_objective_vars )
 
+  ## GLPK doesn't fix the variables if the type is binary,
+  ## so we just change the type of fixed binary variables integer.
+  ## reported by Dirk Schumacher, patch submitted by Florian Schwendinger
+  change_to_integer <- which(binaries & bounds[, 1] == 5L)
+  if ( length(change_to_integer) ) {
+      if ( !all(unlist(bounds[change_to_integer, 2:3]) %in% c(0L, 1L)) ) {
+          stop("binary variables can only be fixed to 0L or 1L")
+      }
+      integers[change_to_integer] <- TRUE
+      binaries[change_to_integer] <- FALSE
+  }
+
   ## Sanity check: mat/dir/rhs
   if( !all(c(dim(mat)[ 1 ], length(rhs)) == n_of_constraints) )
       stop( "Arguments 'mat', 'dir', and/or 'rhs' not conformable." )
   ## Sanity check: mat, obj
   if( dim(mat)[ 2 ] != n_of_objective_vars )
       stop( "Arguments 'mat' and 'obj' not conformable." )
+
+  ## file writer functionality
+  if(file_type %in% 1:2){
+      if( direction_of_optimization )
+          obj <- -obj
+      direction_of_optimization <- 0L
+  }
 
   ## call the C interface - this actually runs the solver
   x <- glp_call_interface(obj, n_of_objective_vars, constraint_matrix$i,
@@ -69,7 +92,8 @@ function(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
                           is_integer,
                           integers, binaries,
                           direction_of_optimization, bounds[, 1L],
-                          bounds[, 2L], bounds[, 3L], verb, presolve, time_limit)
+                          bounds[, 2L], bounds[, 3L], verb, presolve, time_limit,
+                          file_type, file)
 
   solution <- x$lp_objective_vars_values
   ## are integer variables really integers? better round values
@@ -77,7 +101,7 @@ function(obj, mat, dir, rhs, bounds = NULL, types = NULL, max = FALSE,
     round( solution[integers | binaries])
   ## match status of solution
   status <- as.integer(x$lp_status)
-  if(control$canonicalize_status){
+  if(canonicalize_status){
       ## 0 -> optimal solution (5 in GLPK) else 1
       status <- as.integer(status != 5L)
   }
@@ -102,9 +126,9 @@ function(lp_objective_coefficients, lp_n_of_objective_vars,
          lp_objective_var_is_integer, lp_objective_var_is_binary,
          lp_direction_of_optimization,
          lp_bounds_type, lp_bounds_lower, lp_bounds_upper,
-         verbose, presolve, time_limit)
+         verbose, presolve, time_limit, write_fmt, fname)
 {
-  out <- .C("R_glp_solve",
+  out <- .C(R_glp_solve,
             lp_direction_of_optimization= as.integer(lp_direction_of_optimization),
             lp_n_of_constraints         = as.integer(lp_n_of_constraints),
             lp_direction_of_constraints = as.integer(lp_direction_of_constraints),
@@ -134,6 +158,8 @@ function(lp_objective_coefficients, lp_n_of_objective_vars,
             lp_presolve                 = as.integer(presolve),
             lp_time_limit               = as.integer(time_limit),
             lp_status                   = integer(1),
+            write_fmt                   = as.integer(write_fmt),
+            fname                       = as.character(fname),
             NAOK = TRUE, PACKAGE = "Rglpk")
   out
 }

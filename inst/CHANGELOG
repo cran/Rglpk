@@ -1,4 +1,10 @@
 2016-06-13  Stefan Theussl  <stefan.theussl@R-project.org>
+	* UPPDATED: useDynLib registriation of C routines
+	* FIXED: binary variables using a zero coefficient in objective function
+	* ADDED: Rglpk_write_file capabilities (not exported)
+	* RELEASE: Rglpk 0.6-3 on CRAN
+
+2016-06-13  Stefan Theussl  <stefan.theussl@R-project.org>
 	* ADDED: new control parameters "presolve" and "tm_limit"
 	* ADDED: reduced cost in return value (solution_dual)
 	* ADDED: value of auxiliary variable (primal|dual) in return value
