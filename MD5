@@ -1,7 +1,7 @@
-3490dabdc75f47ddd04a8d441af3be0f *DESCRIPTION
+94364d8a598862015d942f46e9239923 *DESCRIPTION
 c189bd36df502d339b7e65f37af00e68 *NAMESPACE
 89802f16b53ebb2fb07679fb89ac7b33 *R/Misc.R
-def7f7e44c84e689f6ff76b0b716088f *R/Rglpk_solve.R
+82dffa9e471498d1f75ab7f1ab642094 *R/Rglpk_solve.R
 8d3fb2da5d74e556691bae64d3cb2956 *R/Rglpk_write_file.R
 b00f4925068f332a7e0800c41af35e67 *R/bounds.R
 1697e847ac1d653ac49b23e7393d758c *R/control.R
@@ -11,7 +11,7 @@ f8672da398fee3461bded8d8de6cec02 *R/milp.R
 5299c161b149974ccae263af06494afc *cleanup
 1262f7a12fddb89ebbe29f58c04a1c00 *configure
 68b329da9893e34099c7d8ad5cb9c940 *configure.win
-bdc6fa8965d45c6c5a220c7875a5c075 *inst/CHANGELOG
+859d229a12a713e478109c16fcb563b0 *inst/CHANGELOG
 bdee58c3965c7b68c5923ee60183e736 *inst/examples/assign.mod
 72aa9eab3996ee9aa7abeaeb4c05ff12 *inst/examples/plan.lp
 45e60857cbfdfb15805eb12cc2e17d94 *inst/examples/plan.mod
@@ -19,10 +19,11 @@ bdee58c3965c7b68c5923ee60183e736 *inst/examples/assign.mod
 9e22c38d5268676761f77a2c82020cf8 *man/Rglpk_read_file.Rd
 93bffd67a6bfff9018c00eb9391f8655 *man/Rglpk_solve.Rd
 16928375c376f342565f9f81b85aff65 *src/Makevars.in
-82b5dfd7323f3bba9c092029c5ee25d7 *src/Makevars.win
+d50d4b23dbc4186a94e9f35690f432d8 *src/Makevars.win
 00cf4d6bd6d46443d99cb7ebe5b53403 *src/Rglpk.h
 52bc8e948dd2a9d1d5a5105c3780aa3e *src/Rglpk_error.c
 5622e753d3d13b4bf264756073cbc667 *src/Rglpk_initialize.c
 a15e81302d0243a630ab6b57fc8af160 *src/Rglpk_read_file.c
-8c36cc4c822ec150aab37adcf0f8adce *src/Rglpk_solve.c
-b16d6b2bd9db79e3bbe30a670a57d96b *src/init.c
+d0cfe01c4b3c56bb1aa49fcf610083cd *src/Rglpk_solve.c
+495714bd2c2150de16cc53d0ff2ef8da *src/init.c
+eef9d8be634a20d7a8b6a6abe1825d7c *tests/test.R

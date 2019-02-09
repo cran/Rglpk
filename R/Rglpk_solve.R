@@ -12,11 +12,16 @@ Rglpk_solve_LP <- function(obj, mat, dir, rhs, bounds = NULL, types = NULL, max 
     presolve <- control$presolve
     time_limit <- control$tm_limit
     verb <- control$verbose
+    sensitivity_report <- isTRUE(control$sensitivity_report)
 
-    Rglpk_call( obj = obj, mat = mat, dir = dir, rhs = rhs, bounds = bounds, types = types, max = max, canonicalize_status = canonicalize_status, presolve = presolve, time_limit = time_limit, verb = verb )
+    Rglpk_call( obj = obj, mat = mat, dir = dir, rhs = rhs, bounds = bounds,
+      types = types, max = max, canonicalize_status = canonicalize_status,
+      presolve = presolve, time_limit = time_limit, verb = verb,
+      sensitivity_report = sensitivity_report)
 }
 
-Rglpk_call <- function(obj, mat, dir, rhs, bounds, types, max, canonicalize_status, presolve, time_limit, verb, file = "", file_type = 0L ){
+Rglpk_call <- function(obj, mat, dir, rhs, bounds, types, max, canonicalize_status,
+  presolve, time_limit, verb, file = "", file_type = 0L, sensitivity_report = FALSE) {
   ## validate direction of optimization
   if(!identical( max, TRUE ) && !identical( max, FALSE ))
       stop("'Argument 'max' must be either TRUE or FALSE.")
@@ -55,6 +60,10 @@ Rglpk_call <- function(obj, mat, dir, rhs, bounds, types, max, canonicalize_stat
   ## do we have a mixed integer linear program?
   is_integer <- any( binaries | integers )
 
+  if ( sensitivity_report & is_integer ) {
+    stop("GLPK does not support sensitivity analysis report for mixed integer problems")
+  }
+
   ## bounds of objective coefficients
   bounds <- as.glp_bounds( as.list( bounds ), n_of_objective_vars )
 
@@ -84,6 +93,14 @@ Rglpk_call <- function(obj, mat, dir, rhs, bounds, types, max, canonicalize_stat
       direction_of_optimization <- 0L
   }
 
+  if (sensitivity_report) {
+    write_sensitivity_report <- 1L
+    fname_sensitivity_report <- tempfile()
+  } else {
+    write_sensitivity_report <- 0L
+    fname_sensitivity_report <- ""
+  }
+
   ## call the C interface - this actually runs the solver
   x <- glp_call_interface(obj, n_of_objective_vars, constraint_matrix$i,
                           constraint_matrix$j, constraint_matrix$v,
@@ -93,28 +110,30 @@ Rglpk_call <- function(obj, mat, dir, rhs, bounds, types, max, canonicalize_stat
                           integers, binaries,
                           direction_of_optimization, bounds[, 1L],
                           bounds[, 2L], bounds[, 3L], verb, presolve, time_limit,
-                          file_type, file)
+                          file_type, file, write_sensitivity_report, fname_sensitivity_report)
 
   solution <- x$lp_objective_vars_values
   ## are integer variables really integers? better round values
-  solution[integers | binaries] <-
-    round( solution[integers | binaries])
+  solution[integers | binaries] <- round( solution[integers | binaries])
   ## match status of solution
   status <- as.integer(x$lp_status)
-  if(canonicalize_status){
-      ## 0 -> optimal solution (5 in GLPK) else 1
-      status <- as.integer(status != 5L)
+  if(canonicalize_status) {
+    ## 0 -> optimal solution (5 in GLPK) else 1
+    status <- as.integer(status != 5L)
   }
-    list(optimum = sum(solution * obj), solution = solution, status = status,
-         solution_dual = if( is_integer )
-                             NA
-                         else
-                             x$lp_objective_dual_values,
-         auxiliary = list( primal = x$lp_row_prim_aux,
-                           dual   = if( is_integer)
-                                        NA
-                                    else
-                                        x$lp_row_dual_aux))
+
+  if (sensitivity_report) {
+      sensitivity_report <- readLines(fname_sensitivity_report)
+      file.remove(fname_sensitivity_report)
+  } else {
+    sensitivity_report <- NA_character_
+  }
+
+  list(optimum = sum(solution * obj), solution = solution, status = status,
+       solution_dual = if( is_integer ) NA else x$lp_objective_dual_values,
+       auxiliary = list(primal = x$lp_row_prim_aux,
+                        dual   = if( is_integer) NA else x$lp_row_dual_aux),
+       sensitivity_report = sensitivity_report)
 }
 
 ## this function calls the C interface
@@ -126,7 +145,8 @@ function(lp_objective_coefficients, lp_n_of_objective_vars,
          lp_objective_var_is_integer, lp_objective_var_is_binary,
          lp_direction_of_optimization,
          lp_bounds_type, lp_bounds_lower, lp_bounds_upper,
-         verbose, presolve, time_limit, write_fmt, fname)
+         verbose, presolve, time_limit, write_fmt, fname, write_sensitivity_report,
+         fname_sensitivity_report)
 {
   out <- .C(R_glp_solve,
             lp_direction_of_optimization= as.integer(lp_direction_of_optimization),
@@ -160,6 +180,8 @@ function(lp_objective_coefficients, lp_n_of_objective_vars,
             lp_status                   = integer(1),
             write_fmt                   = as.integer(write_fmt),
             fname                       = as.character(fname),
+            write_sensitivity_report    = write_sensitivity_report,
+            fname_sensitivity_report    = fname_sensitivity_report,
             NAOK = TRUE, PACKAGE = "Rglpk")
   out
 }

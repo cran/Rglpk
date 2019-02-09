@@ -1,3 +1,8 @@
+2019-02-07  Stefan Theussl  <stefan.theussl@R-project.org>
+	* UPDATED: removed compiler flags from preprocessor in MAKEVARS.win
+	* ADDED: sensitivity report feature
+	* RELEASE: Rglpk 0.6-4 on CRAN
+
 2016-06-13  Stefan Theussl  <stefan.theussl@R-project.org>
 	* UPPDATED: useDynLib registriation of C routines
 	* FIXED: binary variables using a zero coefficient in objective function
