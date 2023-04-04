@@ -14,7 +14,7 @@ static glp_prob *lp = NULL;
 
 // call destructor from the R level to guarantee that data has been
 // copied to R data structures.
-void Rglpk_delete_prob() {
+void Rglpk_delete_prob(void) {
   extern glp_prob *lp;
   // delete problem object (if any)
   if (lp){

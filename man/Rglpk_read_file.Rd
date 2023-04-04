@@ -3,7 +3,7 @@
 \alias{print.MP_data_from_file}
 \title{Interface to GLPK's file reader}
 \description{
-  High level R interface to the CPLEX\_LP, MATHPROG and MPS reader of the GNU Linear
+  High level R interface to the CPLEX_LP, MATHPROG and MPS reader of the GNU Linear
   Programming Kit (GLPK). Example data from the GLPK release is included
   in the \code{'./examples/'} sub-directory.
 }

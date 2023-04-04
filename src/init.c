@@ -39,7 +39,7 @@ void R_glp_read_file (char **file, int *type,
                       char **lp_prob_name,
                       char **lp_obj_name,
                       int *lp_verbosity);
-void Rglpk_delete_prob();
+void Rglpk_delete_prob(void);
 void Rglpk_retrieve_MP_from_file (char **file, int *type,
                                   int *lp_n_constraints,
                                   int *lp_n_objective_vars,

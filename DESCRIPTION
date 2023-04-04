@@ -1,23 +1,27 @@
 Package: Rglpk
-Version: 0.6-4
+Version: 0.6-5
 Title: R/GNU Linear Programming Kit Interface
 Description: R interface to the GNU Linear Programming Kit.
   'GLPK' is open source software for solving large-scale linear programming (LP),
   mixed integer linear programming ('MILP') and other related problems.
-Authors@R: c(person("Stefan", "Theussl", role = c("aut", "cre"), email = "Stefan.Theussl@R-project.org"), person("Kurt", "Hornik", role = "aut"), person("Christian", "Buchta", role = "ctb"), person("Florian", "Schwendinger", role = "ctb"), person("Heinrich", "Schuchardt", role = "ctb"))
+Authors@R: c(person("Stefan", "Theussl", role = c("aut", "cre"), email = "Stefan.Theussl@R-project.org", comment = c(ORCID = "0000-0002-6523-4620")),
+             person("Kurt", "Hornik", role = "aut", comment = c(ORCID = "0000-0003-4198-9911")),
+	     person("Christian", "Buchta", role = "ctb"),
+	     person("Florian", "Schwendinger", role = "ctb", comment = c(ORCID = "0000-0002-3983-9773")),
+	     person("Heinrich", "Schuchardt", role = "ctb"))
 Depends: slam (>= 0.1-9)
 SystemRequirements: GLPK library package (e.g., libglpk-dev on
         Debian/Ubuntu)
 License: GPL-2 | GPL-3
-URL: http://R-Forge.R-project.org/projects/rglp/,
-        http://www.gnu.org/software/glpk/
+URL: https://R-Forge.R-project.org/projects/rglp/,
+        https://www.gnu.org/software/glpk/
 NeedsCompilation: yes
-Packaged: 2019-02-08 18:08:20 UTC; theussl
-Author: Stefan Theussl [aut, cre],
-  Kurt Hornik [aut],
+Packaged: 2023-04-04 10:02:37 UTC; theussl
+Author: Stefan Theussl [aut, cre] (<https://orcid.org/0000-0002-6523-4620>),
+  Kurt Hornik [aut] (<https://orcid.org/0000-0003-4198-9911>),
   Christian Buchta [ctb],
-  Florian Schwendinger [ctb],
+  Florian Schwendinger [ctb] (<https://orcid.org/0000-0002-3983-9773>),
   Heinrich Schuchardt [ctb]
 Maintainer: Stefan Theussl <Stefan.Theussl@R-project.org>
 Repository: CRAN
-Date/Publication: 2019-02-09 15:33:16 UTC
+Date/Publication: 2023-04-04 10:40:02 UTC

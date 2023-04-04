@@ -20,7 +20,7 @@ function(x)
 
 ## TODO: should be a generic function providing methods for
 ## different representations (e.g., a matrix, list of vectors, ...)
-##                   
+##
 
 ## A generic function which allows to take different dense and sparse
 ## representations of bounds.
@@ -29,17 +29,17 @@ as.glp_bounds <- function(x, ...)
   UseMethod("as.glp_bounds")
 
 ## No default representation.
-as.glp_bounds.default <- function(x)
+as.glp_bounds.default <- function(x, ...)
  stop("There is no default method for bounds representations.")
 
 ## returns identity
-as.glp_bounds.bound_table <- function(x, n)
+as.glp_bounds.bound_table <- function(x, n, ...)
   x
 
 ## list -> GLPK bounds representation
-as.glp_bounds.list <- function(x, n)
+as.glp_bounds.list <- function(x, n, ...)
   glp_bounds(x, n)
-  
+
 glp_bounds <- function(x, n)
 {
   ## General input validation
@@ -50,7 +50,7 @@ glp_bounds <- function(x, n)
   bound_table <-
       expand.grid(type = rep.int(2L, n), lower = 0.0, upper = Inf)
   class(bound_table) <- c("bound_table", class(bound_table))
-  
+
   ## Lower bounds
   lower <- x$lower
   ## check for zero-length bounds
@@ -71,7 +71,7 @@ glp_bounds <- function(x, n)
   ## check for zero-length bounds
   if( !any(unlist(lapply(upper, length))) )
     upper <- NULL
-  
+
   if(!is.null(upper)){
     ## input validation
     glp_bounds_check_sanity(upper, n)
@@ -88,7 +88,7 @@ glp_bounds <- function(x, n)
   out <- glp_fix_bound_type(bound_table)
   out
 }
-  
+
 glp_bounds_check_sanity <-
 function(x, n)
 {

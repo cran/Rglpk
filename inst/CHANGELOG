@@ -1,3 +1,8 @@
+2023-03-24  Stefan Theussl  <stefan.theussl@R-project.org>
+	* FIXED: R CMD check NOTEs
+	* ADDED: ORCID of authors where applicable
+	* RELEASE: Rglpk 0.6-5 on CRAN
+
 2019-02-07  Stefan Theussl  <stefan.theussl@R-project.org>
 	* UPDATED: removed compiler flags from preprocessor in MAKEVARS.win
 	* ADDED: sensitivity report feature
