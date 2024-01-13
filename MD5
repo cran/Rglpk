@@ -1,4 +1,4 @@
-e62221e04cd50624085e70ce192e0831 *DESCRIPTION
+6c439178d710093527f69784e97ea844 *DESCRIPTION
 c189bd36df502d339b7e65f37af00e68 *NAMESPACE
 89802f16b53ebb2fb07679fb89ac7b33 *R/Misc.R
 82dffa9e471498d1f75ab7f1ab642094 *R/Rglpk_solve.R
@@ -23,7 +23,7 @@ d50d4b23dbc4186a94e9f35690f432d8 *src/Makevars.win
 00cf4d6bd6d46443d99cb7ebe5b53403 *src/Rglpk.h
 52bc8e948dd2a9d1d5a5105c3780aa3e *src/Rglpk_error.c
 5622e753d3d13b4bf264756073cbc667 *src/Rglpk_initialize.c
-7c2b6125342f01ee8752f7df9c78bba5 *src/Rglpk_read_file.c
+97eb26092f7950282104062535d94405 *src/Rglpk_read_file.c
 d0cfe01c4b3c56bb1aa49fcf610083cd *src/Rglpk_solve.c
 46836a6773622474c6b7dc270625cbd6 *src/init.c
 eef9d8be634a20d7a8b6a6abe1825d7c *tests/test.R

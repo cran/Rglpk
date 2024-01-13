@@ -212,7 +212,7 @@ void Rglpk_retrieve_MP_from_file (char **file, int *type,
   if ( status != 0 ) {
     glp_delete_prob(lp);
     lp = NULL;
-    error("Reading file %c failed.", *file);
+    error("Reading file %s failed.", *file);
   }
   
   if(*lp_verbosity==1)

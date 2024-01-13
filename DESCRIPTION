@@ -1,5 +1,5 @@
 Package: Rglpk
-Version: 0.6-5
+Version: 0.6-5.1
 Title: R/GNU Linear Programming Kit Interface
 Description: R interface to the GNU Linear Programming Kit.
   'GLPK' is open source software for solving large-scale linear programming (LP),
@@ -16,7 +16,7 @@ License: GPL-2 | GPL-3
 URL: https://R-Forge.R-project.org/projects/rglp/,
         https://www.gnu.org/software/glpk/
 NeedsCompilation: yes
-Packaged: 2023-04-04 10:02:37 UTC; theussl
+Packaged: 2024-01-13 15:39:28 UTC; hornik
 Author: Stefan Theussl [aut, cre] (<https://orcid.org/0000-0002-6523-4620>),
   Kurt Hornik [aut] (<https://orcid.org/0000-0003-4198-9911>),
   Christian Buchta [ctb],
@@ -24,4 +24,4 @@ Author: Stefan Theussl [aut, cre] (<https://orcid.org/0000-0002-6523-4620>),
   Heinrich Schuchardt [ctb]
 Maintainer: Stefan Theussl <Stefan.Theussl@R-project.org>
 Repository: CRAN
-Date/Publication: 2023-04-04 10:40:02 UTC
+Date/Publication: 2024-01-13 16:00:02 UTC
